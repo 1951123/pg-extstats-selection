@@ -1,0 +1,3 @@
+# Runtime dependencies (install into .venv)
+psycopg[binary]>=3.1
+sqlglot>=25.0

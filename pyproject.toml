@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "extstats"
+version = "0.1.0"
+description = "PostgreSQL extended statistics research toolkit for Census / JOB / stats_CEB benchmarks"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "psycopg[binary]>=3.1",
+    "sqlglot>=25.0",
+]
+
+[project.scripts]
+extstats-generate = "extstats.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+extstats = ["py.typed"]
