@@ -1,0 +1,11 @@
+# 忽略各基准的原始数据文件 (CSV/tgz), 但不忽略 schema 等 SQL 源文件
+benchmarks/*/data/*.csv
+benchmarks/*/data/*.tgz
+benchmarks/*/data/*.tar
+benchmarks/*/data/*.gz
+!benchmarks/*/data/*.sql
+
+# Census 1990 大数据文件 (保留 .txt 文档, 只忽略这些超大原始数据)
+benchmarks/Census/data/USCensus1990.data.txt
+benchmarks/Census/data/USCensus1990raw.data.txt
+benchmarks/Census/data/us+census+data+1990.zip
