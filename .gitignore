@@ -9,3 +9,11 @@ benchmarks/*/data/*.gz
 benchmarks/Census/data/USCensus1990.data.txt
 benchmarks/Census/data/USCensus1990raw.data.txt
 benchmarks/Census/data/us+census+data+1990.zip
+
+# Python 虚拟环境 / 缓存 / 实验输出
+.venv/
+__pycache__/
+*.pyc
+results/
+output/
+experiments/
