@@ -68,8 +68,8 @@ def _stat_name(candidate: CandidateSet, kind: str, prefix: str) -> str:
     Example: with prefix ``ext_`` and pair ``(a, b)`` on table ``t``,
     dependencies -> ``ext_d_t_a_b`` (attributes the table + columns).
     """
-    tbl = candidate.table_unqualified
-    cols = "_".join(candidate.columns)
+    tbl = candidate.table_unqualified.lower()
+    cols = "_".join(c.lower() for c in candidate.columns)
     kind_tag = _KIND_PREFIX.get(kind, "x")
     return f"{prefix}{kind_tag}_{tbl}_{cols}"
 
