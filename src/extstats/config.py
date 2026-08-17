@@ -34,7 +34,7 @@ class DBConfig:
     host: str = "localhost"
     port: int = 5432
     user: str = "postgres"
-    password: str = ""
+    password: str = "postgres"
     # Default database per benchmark; can be overridden in a full config.
     dbname: str = "postgres"
 

@@ -11,19 +11,27 @@ For each query:
     - consider all column combinations of size in ``arities`` (default 2..3),
     - each combination is a candidate extended statistic on that table.
 
-Deduplication
--------------
-Because the same ``(schema.table, column tuple)`` may appear in many queries,
-we optionally deduplicate so each physical statistic is created only once.
-When ``dedupe=True`` a combination is a capitalised set of its columns; the
-column order does not matter for correctness (PostgreSQL treats column order
-as insignificant for dependencies / ndistinct / mcv lists).
+Granularity
+-----------
+Two entry points are provided:
+
+  - :func:`generate_candidates_per_query` groups candidates **by query**
+    (dedup only *within* a query). This is the granularity of interest when
+    evaluating how much a *single query's* own extended statistics improve its
+    cardinality estimates.
+  - :func:`generate_candidates` collapses identical ``(table, columns)``
+    combinations **across the whole workload** so each physical statistic is
+    created only once (useful when creating statistics centrally).
+
+PostgreSQL treats column order within a combination as insignificant for
+dependencies / ndistinct / mcv, so combinations are always stored/sorted in a
+canonical (alphabetical) order.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from itertools import combinations
 from typing import Iterable, Iterator
 
@@ -62,13 +70,55 @@ def _gen_combinations(
             yield CandidateSet(table=table, columns=combo)
 
 
+def _query_candidates(
+    query: BenchQuery, arities: tuple[int, ...]
+) -> list[CandidateSet]:
+    """Generate the (query-local) candidate set list for a single query.
+
+    Deduplicates combinations *within* the query (a given table+columns combo
+    is emitted at most once), but does NOT coordinate with other queries.
+    """
+    per_table = predicate_columns(query)
+    seen: set[tuple[str, tuple[str, ...]]] = set()
+    result: list[CandidateSet] = []
+    for tbl, cols in per_table.items():
+        for combo in _gen_combinations(tbl, cols, arities):
+            key = (tbl, combo.columns)
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append(combo)
+    result.sort(key=lambda c: (c.table, c.columns))
+    return result
+
+
+def generate_candidates_per_query(
+    queries: list[BenchQuery],
+    *,
+    arities: tuple[int, ...] = (2, 3),
+) -> dict[str, list[CandidateSet]]:
+    """Return ``{query_id: [CandidateSet, ...]}`` grouped by query.
+
+    Candidates are deduplicated *within* each query but **not** across
+    queries, so every query gets its own independent candidate list. This is
+    the granularity to use for single-query extended-statistics experiments.
+
+    The ordering of ``queries`` is preserved for the dict (insertion order),
+    and each query's list is sorted deterministically.
+    """
+    mapping: dict[str, list[CandidateSet]] = {}
+    for q in queries:
+        mapping[q.qid] = _query_candidates(q, arities)
+    return mapping
+
+
 def generate_candidates(
     queries: list[BenchQuery],
     *,
     arities: tuple[int, ...] = (2, 3),
     dedupe: bool = True,
 ) -> list[CandidateSet]:
-    """Build the deduplicated list of candidate statistics across `queries`.
+    """Build the list of candidate statistics across the whole workload.
 
     Parameters
     ----------
@@ -77,8 +127,9 @@ def generate_candidates(
     arities : tuple of int
         Column-combination sizes to generate (default ``(2, 3)``).
     dedupe : bool
-        If True, collapse identical ``(table, columns)`` combinations so each
-        physical statistic is created only once (default True).
+        If True (default), collapse identical ``(table, columns)``
+        combinations across the workload so each physical statistic is
+        created only once. If False, keep every (per-query) occurrence.
 
     Returns
     -------
@@ -88,13 +139,11 @@ def generate_candidates(
     candidates: list[CandidateSet] = []
 
     for q in queries:
-        per_table = predicate_columns(q)
-        for tbl, cols in per_table.items():
-            for combo in _gen_combinations(tbl, cols, arities):
-                if dedupe and combo.columns in seen[tbl]:
-                    continue
-                seen[tbl].add(combo.columns)
-                candidates.append(combo)
+        for combo in _query_candidates(q, arities):
+            if dedupe and combo.columns in seen[combo.table]:
+                continue
+            seen[combo.table].add(combo.columns)
+            candidates.append(combo)
 
     # Deterministic ordering: by table, then by columns.
     candidates.sort(key=lambda c: (c.table, c.columns))
