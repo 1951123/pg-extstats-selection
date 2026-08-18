@@ -32,6 +32,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--budget", type=int, default=100000)
     ap.add_argument("--qerror-mode", default="first",
                     help="first|mean|worst|p90 (per-level summary)")
+    ap.add_argument("--global-disjoint", action="store_true",
+                    help="forbid co-installing column-overlapping stats "
+                         "(global disjointness, P1 ablation)")
     ap.add_argument("--out", default="results/sparse_solution.json")
     args = ap.parse_args(argv)
 
@@ -41,11 +44,12 @@ def main(argv: list[str] | None = None) -> int:
 
     n_opt = sum(len(o) for o in queries_options)
     print(f"phys_stats={len(phys_stats)}  queries={len(qerror_base)}  "
-          f"options={n_opt}  budget={args.budget}B")
+          f"options={n_opt}  budget={args.budget}B  "
+          f"global_disjoint={args.global_disjoint}")
 
     t0 = time.time()
     res = solve_ilp(phys_stats, queries_options, qerror_base, args.budget,
-                    per_query_cap=1)
+                    per_query_cap=1, global_disjoint=args.global_disjoint)
     dt = time.time() - t0
 
     # baseline vs selected mean q-error

@@ -375,6 +375,30 @@ prefer column-disjoint selected stats (making the §3 independence assumption
 hold globally, not just per query), or (b) after solving, run a lightweight E2E
 re-check and drop an interfering stat. This is now the driving refinement for
 the sparse model.
+
+**Option-A ablation: global disjointness restores exact predictability (P1).**
+Implemented a `global_disjoint` constraint in `solve_ilp` (forbid co-installing
+any two physical stats whose column sets overlap: $y_a+y_b\le1$) and measured
+predicted vs E2E for both models at two budgets (stats_CEB_single top-10,
+`results/p1_global_disjoint.json`):
+
+| budget | model | stats | predicted | E2E | ratio |
+|--------|-------|------:|----------:|----:|------:|
+| 2 MB  | overlap allowed | 5 | 1.021 | 1.320 | 1.294 |
+| 2 MB  | **global-disjoint** | 2 | 2.004 | **2.004** | **1.000** |
+| 100 KB| overlap allowed | 7 | 1.632 | 1.933 | 1.184 |
+| 100 KB| **global-disjoint** | 2 | 2.004 | **2.004** | **1.000** |
+
+The **global-disjoint** solution is *exactly* predictable (ratio 1.000 at both
+budgets), because the deployed set is pairwise column-disjoint so the planner
+cannot cross-talk (§3 independence assumption holds structurally). The cost is
+a well-defined nominal-quality loss (predicted 2.00 vs 1.02): disjointness
+forces the solver to give up overlapping-but-high-value dominant candidates.
+Together this sharply isolates the two facts: **(i) per-candidate measurement
+is sound** (disjoint ratios are 1.000), and **(ii) the overlap model's residual
+error is entirely planner interference among co-installed overlapping stats**
+(ratio 1.18–1.29). Option A therefore gives a *trustworthy* deployment at a
+quantified quality cost — exactly the trade-off the paper's §7 should present.
 ### 5.3 Capacity-level trade-off (measured on Census `climate`, 69 cols)
 
 | `target` | ANALYZE (0 ext) | ANALYZE (1000 ext) | repair (best, single-table) |

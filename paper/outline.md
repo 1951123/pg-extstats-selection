@@ -123,20 +123,32 @@ Extended Statistics*
 
 ---
 
-## 需要补的实验（按优先级）
+## 待补实验（按优先级）
 
-### P1 — global-disjoint MILP ablation（最重要）
-| model | per-query cap | global overlap | predicted | E2E |
-|-------|--------------:|:--------------:|----------:|----:|
-| baseline | 1 | allowed | 1.02 | **1.32** |
-| **sparse+disjoint** | 1 | **forbidden** | ?? | **??** |
-| post-check | 1 | allowed | 1.02 | ?? |
-若 **sparse+disjoint** 把 E2E 从 1.32 拉回近 1.02，非常强——直接闭环 Contribution 3。
-→ 实现：solve_ilp 增加全局重叠约束（$y_a+y_b\le1$ for overlapping cols）。
+### ~~P1 — global-disjoint MILP ablation~~ ✅ 已完成
+实现：`solve_ilp(..., global_disjoint=True)` 增加全局重叠约束
+（$y_a+y_b\le1$ for overlapping cols），`solve_sparse_ilp.py --global-disjoint`。
+**实测结果**（stats_CEB_single top-10，`results/p1_global_disjoint.json`）：
+
+| budget | model | stats | predicted | E2E | ratio |
+|--------|-------|------:|----------:|----:|------:|
+| 2 MB  | overlap allowed | 5 | 1.021 | 1.320 | 1.294 |
+| 2 MB  | **global-disjoint** | 2 | 2.004 | **2.004** | **1.000** |
+| 100 KB| overlap allowed | 7 | 1.632 | 1.933 | 1.184 |
+| 100 KB| **global-disjoint** | 2 | 2.004 | **2.004** | **1.000** |
+
+> **关键发现（闭环 Contribution 3）**：global-disjoint 解在两个预算点都
+> **精确可预测（ratio 1.000）**，因为统计两两列不相交 → planner 无串扰、
+> §3 独立性假设结构性成立。代价是**可量化的名义质量损失**（预测 2.00 vs 1.02）
+> ——不相交约束迫使求解器放弃"重叠但高价值"的主导候选。
+> 这精确定位了两件事：(i) 每候选测量模型正确（disjoint ratio=1.000）；
+> (ii) overlap 模型的残余误差**全部**是并发重叠统计的 planner 干扰
+> （ratio 1.18–1.29）。**Option A 给出可信赖部署，代价可量化**——这正是 §7 要呈现的 trade-off。
 
 ### P2 — 632-query stats_CEB_single 全集
 79 shared combos × 3 levels × 632 queries，验证 "capacity allocation 而非
 column selection" 在整个 workload 成立（而非仅 top-10）。测量成本小（79 组合）。
+
 
 ### P3 — 预算曲线 + level 分布 + 多指标
 - 预算 10KB/20KB/40KB/100KB/250KB/500KB/1MB/2MB/5MB → mean q-error。

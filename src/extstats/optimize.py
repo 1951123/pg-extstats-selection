@@ -201,6 +201,7 @@ def solve_ilp(
     qerror_base: list[float],
     budget_bytes: int,
     per_query_cap: Optional[int] = None,
+    global_disjoint: bool = False,
 ) -> ILPResult:
     """Solve the multi-select shared-resource ILP with scipy.optimize.milp.
 
@@ -213,6 +214,16 @@ def solve_ilp(
         pick several non-overlapping stats).
       - 1: "single best per query" — each query picks at most ONE candidate
         (stronger than overlap-free, so that constraint is skipped).
+
+    ``global_disjoint`` (default False): if True, additionally forbid selecting
+    (creating) ANY two physical statistics whose column sets overlap. This is a
+    global/structural constraint (applies to the ``y_s`` creation variables,
+    not just per-query), so the final deployed stat set is pairwise
+    column-disjoint. It is stronger than combo-level exclusivity (constraint 4):
+    the latter only forbids two levels of the SAME combination, whereas global
+    disjointness forbids overlapping *different* combinations too. This is the
+    Option-A model for avoiding planner cross-talk among co-installed
+    overlapping MCVs (see the end-to-end validation in the paper).
     """
     n_stats = len(phys_stats)
     n_opt = sum(len(opts) for opts in queries_options)
@@ -237,12 +248,15 @@ def solve_ilp(
     for s_idx, ps in enumerate(phys_stats):
         combo_groups.setdefault((ps.table, ps.columns), []).append(s_idx)
     n_combo = len(combo_groups)
+    # column sets, used only for the optional global-disjointness constraint
+    colset = [set(ps.columns) for ps in phys_stats]
 
     # 1) storage budget
     # 2) x_is <= y_s
     # 3) per-query cap: sum x_is <= per_query_cap  (when set)
     #    OR (multi-select) overlap-free within each query (x_a + x_b <= 1)
     # 4) column-combo level exclusivity: sum_level y_(cols,l) <= 1
+    # 5) (optional) global disjointness: y_a + y_b <= 1 for column-overlapping a,b
     if per_query_cap is not None:
         n_extra = m + n_combo
     else:
@@ -250,6 +264,15 @@ def solve_ilp(
         for opts in queries_options:
             n_overlap += len(list(_overlap_pairs(opts, phys_stats)))
         n_extra = n_overlap + n_combo
+    if global_disjoint:
+        # pairwise overlap among physical stats (y variables)
+        n_disjoint = sum(
+            1
+            for a in range(n_stats)
+            for b in range(a + 1, n_stats)
+            if colset[a] & colset[b]
+        )
+        n_extra += n_disjoint
     n_con = 1 + n_opt + n_extra
 
     A = lil_matrix((n_con, n_var))
@@ -298,6 +321,17 @@ def solve_ilp(
             A[nrow, s_idx] = 1.0
         ub[nrow] = 1.0
         nrow += 1
+
+    # 5) global disjointness (optional): no two created stats share a column.
+    #    y_a + y_b <= 1 whenever columns(a) intersect columns(b).
+    if global_disjoint:
+        for a in range(n_stats):
+            for b in range(a + 1, n_stats):
+                if colset[a] & colset[b]:
+                    A[nrow, a] = 1.0
+                    A[nrow, b] = 1.0
+                    ub[nrow] = 1.0
+                    nrow += 1
 
     constraints = LinearConstraint(A.tocsr(), lb=np.full(n_con, -np.inf), ub=ub)
     bounds = Bounds(lb=np.zeros(n_var), ub=np.ones(n_var))

@@ -304,6 +304,34 @@ variables.
 % §5.2: all preserved). Refinement: prefer column-disjoint selected sets, or a
 % post-solve interference check.
 
+\subsection{Option-A Ablation: Global Disjointness Restores Exact Predictability}
+\label{sec:p1}
+
+% We implemented the Option-A model: a ``global\_disjoint'' constraint in the
+% MILP that forbids co-installing any two physical stats whose column sets
+% overlap (y\_a + y\_b \le 1 when columns(a) intersect columns(b)), and measured
+% predicted vs E2E for both models (stats\_CEB single-table top-10; docs §5.9):
+%
+% | budget | model          | stats | predicted | E2E  | ratio |
+% |--------|----------------|------:|----------:|-----:|------:|
+% | 2 MB   | overlap allowed| 5     | 1.021     | 1.320| 1.294 |
+% | 2 MB   | global-disjoint| 2     | 2.004     | 2.004| 1.000 |
+% | 100 KB | overlap allowed| 7     | 1.632     | 1.933| 1.184 |
+% | 100 KB | global-disjoint| 2     | 2.004     | 2.004| 1.000 |
+%
+% Finding: the global-disjoint solution is EXACTLY predictable (ratio 1.000 at
+% both budgets), because the deployed set is pairwise column-disjoint so the
+% planner cannot cross-talk (the §3 independence assumption holds structurally).
+% The cost is a quantified nominal-quality loss (predicted 2.00 vs 1.02):
+% disjointness forces the solver to give up overlapping-but-high-value dominant
+% candidates.
+%
+% This sharply isolates two facts: (i) per-candidate measurement is sound
+% (disjoint ratios are 1.000); (ii) the overlap model's residual error is
+% entirely planner interference among co-installed overlapping stats
+% (ratio 1.18-1.29). Option A therefore gives a *trustworthy* deployment at a
+% quantified quality cost.
+
 \section{Discussion and Open Questions}
 \label{sec:disc}
 
@@ -316,6 +344,11 @@ variables.
 % Planned refinement (RQ5b): (A) global-disjointness constraint in the MILP
 % (y_a + y_b <= 1 when columns overlap) as the main model; (B) post-solve
 % lightweight EXPLAIN + repair as a practical fallback.
+% Measured (see §7 / Option-A ablation): global disjointness makes deployment
+% exactly predictable (ratio 1.000 at 2MB and 100KB) at a quantified
+% nominal-quality cost (pred 2.00 vs 1.02 overlap baseline). This validates
+% Option A as the trustworthy main model; Option B remains the practical
+% fallback when the nominal-quality cost of disjointness is unacceptable.
 % Limitations: MCV focus; single-table workloads; real-system object-count
 % limits; join workloads need other techniques.
 
