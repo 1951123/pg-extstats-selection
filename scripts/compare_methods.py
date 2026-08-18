@@ -83,7 +83,8 @@ def run_method_m1(phys_stats, queries_options, qerror_base, budget, kind):
     }
 
 
-def run_method_m4(phys_stats, queries_options, qerror_base, budget, kind, queries, cfg):
+def run_method_m4(phys_stats, queries_options, qerror_base, budget, kind, queries, cfg,
+                  verify_target=None):
     """M4: greedy + real re-test. Returns (selected stats, real measured mean q-error)."""
     # Order by phase-1 help-score (ordering heuristic only).
     help_score = defaultdict(float)
@@ -101,7 +102,7 @@ def run_method_m4(phys_stats, queries_options, qerror_base, budget, kind, querie
     # Start: baseline empty-set measurement.
     with connect(cfg) as conn:
         conn.autocommit = True
-        vr0 = verify_statistics(conn, queries, [])
+        vr0 = verify_statistics(conn, queries, [], target=verify_target)
         cur_real = vr0.mean_qerror
     t0 = time.time()
 
@@ -117,7 +118,7 @@ def run_method_m4(phys_stats, queries_options, qerror_base, budget, kind, querie
                                             level=ps.level, kind=kind)]
             with connect(cfg) as conn:
                 conn.autocommit = True
-                vr = verify_statistics(conn, queries, trial)
+                vr = verify_statistics(conn, queries, trial, target=verify_target)
             new_real = vr.mean_qerror
             if new_real < cur_real * (1.0 - EPS_REL):
                 selected = trial
@@ -163,14 +164,30 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--bench", choices=["census", "job", "stats_ceb"], default="stats_ceb")
     ap.add_argument("--kind", default="mcv")
     ap.add_argument("--methods", default="M1,M4")
+    ap.add_argument("--verify-target", type=int, default=None,
+                    help="global default_statistics_target for all EXPLAIN "
+                         "measurements in verify (e.g. 10000 for deterministic protocol)")
     ap.add_argument("--out", default="results/method_comparison.json")
     args = ap.parse_args(argv)
 
     phase1 = json.loads(Path(args.input).read_text())
     bench_root = Path(__file__).resolve().parents[1] / "benchmarks"
-    queries = _PARSERS[args.bench](bench_root / _BENCH_DIRS[args.bench] / "queries")
+    all_queries = _PARSERS[args.bench](bench_root / _BENCH_DIRS[args.bench] / "queries")
     phys_stats, queries_options, qerror_base = build_problem(phase1)
     m = len(qerror_base)
+
+    # Align the measured query set to the phase-1 subset (and its order), so the
+    # verifier measures exactly the queries the selection method optimized over.
+    # Otherwise (e.g. a 40-query phase-1 subset from a 146-query workload) the
+    # verify would include out-of-subset outliers and mismatch the predictions.
+    by_qid = {q.qid: q for q in all_queries}
+    want_qids = [r["qid"] for r in phase1["results"]]
+    missing = [qid for qid in want_qids if qid not in by_qid]
+    if missing:
+        sys.exit(f"phase1 qids missing from parsed workload: {missing[:10]}")
+    queries = [by_qid[qid] for qid in want_qids]
+    if len(queries) != m:
+        print(f"[warn] verify query set {len(queries)} != problem queries {m}")
 
     dbname = _DB[args.bench]
     cfg = DBConfig(host="localhost", port=5432, user="postgres", dbname=dbname)
@@ -203,7 +220,8 @@ def main(argv: list[str] | None = None) -> int:
             out["name"] = f"M1_linear_ILP({mode})"
         elif m_kind.upper() == "M4":
             out = run_method_m4(phys_stats, queries_options, qerror_base,
-                                args.budget, args.kind, queries, cfg)
+                                args.budget, args.kind, queries, cfg,
+                                verify_target=args.verify_target)
         else:
             raise NotImplementedError(f"Method {spec}")
         out_by_method[m_key] = out
@@ -213,7 +231,7 @@ def main(argv: list[str] | None = None) -> int:
         conn.autocommit = True
         # single clean baseline at session start
         reset_db(conn, tables)
-        vr_base = verify_statistics(conn, queries, [])
+        vr_base = verify_statistics(conn, queries, [], target=args.verify_target)
         base_mean_shared = vr_base.mean_qerror
     print(f"unified baseline real mean q-error = {base_mean_shared:.3f}")
 
@@ -231,7 +249,8 @@ def main(argv: list[str] | None = None) -> int:
             reset_db(conn, tables)  # clean state before this method
             t0 = time.time()
             vr = verify_statistics(conn, queries, out["selected_stats"],
-                                   predicted_per_query=pred_per_q)
+                                   predicted_per_query=pred_per_q,
+                                   target=args.verify_target)
             dt = time.time() - t0
 
         ratio = None

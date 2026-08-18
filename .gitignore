@@ -20,3 +20,7 @@ experiments/
 
 # 上游 End-to-End-CardEst-Benchmark 嵌套仓库（仅作数据/参考来源，不纳入本仓库）
 End-to-End-CardEst-Benchmark/
+
+# PostgreSQL 16.14 源码包与解压目录（本地源码参考，不纳入本仓库）
+postgresql-16.14.tar.bz2
+postgresql-16.14/

@@ -94,6 +94,7 @@ def verify_statistics(
     stats: list[StatToBuild],
     *,
     predicted_per_query: Optional[list[float]] = None,
+    target: Optional[int] = None,
 ) -> VerifyResult:
     """Build ``stats`` on the live DB and measure the TRUE q-error on ``queries``.
 
@@ -108,9 +109,18 @@ def verify_statistics(
     stats : statistics to create (each with its own capacity level).
     predicted_per_query : optional per-query approximated q-errors (aligned
         with ``queries`` order) so we can compare prediction vs reality.
+    target : optional global ``default_statistics_target`` for ALL EXPLAIN
+        measurements (baseline AND with-stats). Under the deterministic
+        protocol this should be 10000 so that single-column baselines and the
+        planner's MCV reading are both full-scan/noise-free, matching the
+        phase-1 predictions. If None, the baseline uses the session default
+        (typically 100) and each stat's EXPLAIN uses RESET.
     """
     # baseline (no stats)
-    _reset_target(conn)
+    if target is not None:
+        _set_target(conn, target)
+    else:
+        _reset_target(conn)
     base_q: list[float] = []
     for q in queries:
         r = estimate_count_query(conn, q.sql, actual=q.ground_truth)
@@ -135,6 +145,10 @@ def verify_statistics(
             _analyze(conn, table)
             seen_tables.add(table)
             _reset_target(conn)
+        # keep the global measurement target for the with-stats EXPLAIN phase so
+        # the planner reads the full deterministic MCV (matches phase-1).
+        if target is not None:
+            _set_target(conn, target)
         real_q: list[float] = []
         for q in queries:
             r = estimate_count_query(conn, q.sql, actual=q.ground_truth)
