@@ -4,8 +4,10 @@ Identical CLI surface to ``measure_phase1.py``, but each query is measured
 with ``extstats.measure_mask.measure_query_mask``: all candidate statistics
 for a table are built in a SINGLE ANALYZE and each candidate's independent
 q-error is obtained by masking the others (NULL-ing ``pg_statistic_ext_data``).
-This makes per-candidate deterministic measurement (target=10000) feasible on
-wide tables like Census ``climate``.
+This makes per-candidate deterministic measurement feasible on wide tables
+like Census ``climate``. The default build ``--target`` is 1000 (the
+cost/quality sweet spot); pass ``--target 10000`` for exact deterministic
+verification (slow ANALYZE on wide tables).
 
 Output JSON is shaped like ``measure_phase1.py``: per-query
 ``{qid, actual, qerror_base, estimate_base, target_levels, candidates}`` where
@@ -15,7 +17,7 @@ Usage
 -----
     source .venv/bin/activate
     python scripts/measure_phase1_mask.py \
-        --bench census --kind mcv --target 10000 --arities 2,3 \
+        --bench census --kind mcv --target 1000 --arities 2,3 \
         --limit 40 --out results/phase1_census_mask.json
 """
 
@@ -30,7 +32,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from extstats.candidates import generate_candidates_per_query  # noqa: E402
-from extstats.config import DEFAULT_DB, DBConfig  # noqa: E402
+from extstats.config import DEFAULT_DB, DBConfig, RECOMMENDED_STATS_TARGET  # noqa: E402
 from extstats.parsers import (  # noqa: E402
     parse_census_dir,
     parse_job_dir,
@@ -58,9 +60,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--kind", default="mcv",
                     choices=["dependencies", "ndistinct", "mcv"])
     ap.add_argument("--arities", default="2,3")
-    ap.add_argument("--target", type=int, default=None,
+    ap.add_argument("--target", type=int, default=RECOMMENDED_STATS_TARGET,
                     help="default_statistics_target for building stats "
-                         "(e.g. 10000 deterministic). One level only.")
+                         "(default 1000 = cost/quality sweet spot; 10000 = "
+                         "deterministic exact). One level only.")
     ap.add_argument("--limit", type=int, default=0, help="measure only first N queries")
     ap.add_argument("--qids", default="",
                     help="comma-separated qids to measure (overrides --limit)")

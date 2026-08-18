@@ -1,8 +1,8 @@
 """Measure ANALYZE time with N extended statistics on climate.
 
 Builds N distinct 2-column MCV stats (lazy), then times ANALYZE climate at
-t10000, then drops all + re-analyze to restore. Used to scale the
-"#stats -> ANALYZE time" curve (we only had 0/1/56 data points).
+a configurable target, then drops all + re-analyze to restore. Used to scale
+the "#stats -> ANALYZE time" curve at different statistics targets.
 """
 import sys, time, itertools
 sys.path.insert(0, "src")
@@ -12,6 +12,8 @@ from extstats.config import DBConfig
 
 N = 1000
 TARGET = 10000
+if "--target" in sys.argv:
+    TARGET = int(sys.argv[sys.argv.index("--target") + 1])
 cfg = DBConfig(host="localhost", port=5432, user="postgres", dbname="census")
 
 # 69 columns of climate (from information_schema)
@@ -47,7 +49,7 @@ with connect(cfg) as conn:
     with conn.cursor() as cur:
         cur.execute("ANALYZE climate")
     t1 = time.time()
-    print(f"ANALYZE climate with {N} ext stats @t10000: {t1-t0:.2f}s")
+    print(f"ANALYZE climate with {N} ext stats @t{TARGET}: {t1-t0:.2f}s")
 
     # cleanup
     t0 = time.time()

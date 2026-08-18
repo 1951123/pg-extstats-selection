@@ -57,6 +57,20 @@ DEFAULT_DB = {
 }
 
 
+# Recommended default statistics_target for building extended statistics.
+#
+# Rationale (measured on the 69-column Census table):
+#   target  ANALYZE(0 ext)  ANALYZE(1000 ext)  repair quality
+#     100       0.28s            2.03s         ~2.1-2.3 (loses 3-col correlation)
+#    1000       3.97s            ~31s          ~1.2-2.1 (good balance)
+#   10000      21.85s            264s          ~1.0    (exact/deterministic)
+#
+# 1000 is the maintenance-cost vs repair-quality sweet spot for real workloads:
+# it captures 3-column correlation (unlike 100) at ~1/5.5..1/8.5 the ANALYZE
+# cost of 10000. Use 10000 only for exact deterministic verification.
+RECOMMENDED_STATS_TARGET = 1000
+
+
 # ---------------------------------------------------------------------------
 # Candidate extended statistics generation defaults
 # ---------------------------------------------------------------------------
