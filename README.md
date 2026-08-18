@@ -21,10 +21,17 @@ extended-stats-optim/
 │   ├── predicates.py      # sqlglot 提取每基表的选择谓词列
 │   ├── candidates.py      # 由谓词列生成候选列组合 (2..3列, 全局去重)
 │   ├── stats.py           # 生成/执行 CREATE STATISTICS DDL
-│   └── parsers/           # 三种查询格式的解析器 (census/job/stats_ceb)
+│   ├── measure.py         # 协议 A (逐候选 CREATE+ANALYZE+EXPLAIN)
+│   ├── measure_mask.py    # 协议 M (一次 ANALYZE + catalog 掩码逐候选测量)
+│   ├── optimize.py        # 多选 ILP (含容量档决策)
+│   └── parsers/           # 各查询格式的解析器 (census/job/stats_ceb/single)
+├── docs/                  # 理论研究文档 (见 extended-statistics-selection.md)
 ├── scripts/               # CLI 入口
 └── results/               # 实验输出 (git 忽略)
 ```
+
+> 理论形式化、实证发现与容量档(statistics_target)决策的完整说明见
+> [`docs/extended-statistics-selection.md`](docs/extended-statistics-selection.md)。
 
 ## 安装
 
