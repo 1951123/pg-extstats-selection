@@ -263,6 +263,13 @@ variables.
 % add/drop. Honest caveat: whole-workload mean benefit is small (1.033->1.001,
 % +5.7-8.6%) because median baseline=1.0 (34/632 queries baseline>1.5); this
 % workload validates capacity allocation, while CENSUS validates large-tail repair.
+%
+% Multi-metric evaluation (P3, docs §5.6 / Fig.~budget-quality): reports
+% mean/median/P90/max at each budget. Mean IS outlier-dominated (median stays
+% 1.000 on 632-query workload); the ILP's real effect is TAIL repair (max
+% 4.7->1.1). On huge-tail CENSUS top-10: baseline (mean/med/P90/max) =
+% (1071.5/332.5/2542.9/4162.1) -> selected (1.10/1.09/1.18/1.41). We optimise
+% mean but evaluate the full distribution; headline is the tail collapse.
 
 \subsection{RQ4: Does the Approach Scale?}
 \label{sec:rq4}

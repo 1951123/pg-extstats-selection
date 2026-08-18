@@ -299,6 +299,29 @@ benefit is small (mean 1.033→1.001, +5.7→8.6%) because 632 queries have medi
 baseline = 1.0 and only 34 have baseline >1.5 — stats_CEB_single is a
 *capacity-allocation* validation vehicle, while the large-tail repair is CENSUS's
 role (§5.1). This bounds the claim precisely.
+
+**Multi-metric evaluation (P3, reviewer challenge: "mean is outlier-dominated").**
+`scripts/analyze_budget_metrics.py` re-runs the sparse ILP at each budget and
+reports the full q-error distribution (mean / median / P90 / max) alongside the
+capacity mix, and writes the paper's budget-figure
+(`paper/figures/budget_quality.pdf`). On the full 632-query workload:
+
+| budget | stats | mean | median | P90 | max | L100 | L1000 | L10000 |
+|--------|------:|-----:|-------:|----:|----:|-----:|------:|-------:|
+| 5 KB   | 3  | 1.033 | 1.000 | 1.003 | 2.2 | 1 | 1 | 1 |
+| 100 KB | 17 | 1.016 | 1.000 | 1.002 | 2.2 | 8 | 7 | 2 |
+| 250 KB | 14 | 1.004 | 1.000 | 1.002 | 1.4 | 4 | 6 | 4 |
+| 1 MB   | 42 | 1.001 | 1.000 | 1.000 | 1.1 | 12 | 15 | 15 |
+
+The multi-metric view confirms the reviewer's suspicion — **mean is dominated by
+a few outliers** (median stays 1.000): the ILP's real effect is *tail repair*
+(here max 4.7 → 1.1). On the huge-tail CENSUS top-10 (`results/p3_tail_census.json`)
+the effect is dramatic across the whole distribution: baseline (mean / median /
+P90 / **max**) = (1071.5 / 332.5 / 2542.9 / **4162.1**) → selected =
+(1.10 / 1.09 / 1.18 / **1.41**). So although the optimisation objective is the
+standard mean, evaluation reports the full distribution, and the headline
+improvement is the tail collapse (e.g. a 4162→1.4 max), not the mean alone.
+
 ### 5.7 Solve scale — what the ILP really sizes (feedback B)
 
 The raw candidate counts (e.g. "Census 30856") are **combinatorial option

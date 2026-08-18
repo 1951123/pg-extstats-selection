@@ -166,12 +166,25 @@ Extended Statistics*
 > 632 查询中位数基线=1.0、仅 34 个 >1.5。stats_CEB_single 是 *capacity-
 > allocation* 验证载体；大尾修复是 Census 的角色（§5.1）。这精确界定了主张。
 
-### P3 — 预算曲线 + level 分布 + 多指标
-- 预算 10KB/20KB/40KB/100KB/250KB/500KB/1MB/2MB/5MB → mean q-error。
-- 同时画 **level 分布**（L100/L1000/L10000 数量随预算变化）→ 直观展示
-  "budget 花在 capacity 而非 coverage"。
-- **多指标**平缓 reviewer challenge（mean 由离群值主导）：报告 mean / median /
-  P90 / max（Census 4162→1.08 的 tail-repair 是强项应展示）。
+### ~~P3 — 预算曲线 + level 分布 + 多指标~~ ✅ 已完成
+`scripts/analyze_budget_metrics.py`（8 budgets）+ 图 `paper/figures/budget_quality.pdf`
+（左: 预算-质量多指标曲线 mean/median/P90, 右: L100/L1000/L10000 堆叠分布）。
+`results/p3_metrics_full.json` + `results/p3_tail_census.json`。
+
+**stats_CEB_single 全 632 查询多指标**（基线 mean=1.095, median=1.000, max=4.7）：
+| 预算 | mean | median | P90 | max | L100/L1000/L10000 |
+|-----|-----:|-------:|----:|----:|-------------------|
+| 5KB | 1.033 | 1.000 | 1.003 | 2.2 | 1/1/1 |
+| 100KB | 1.016 | 1.000 | 1.002 | 2.2 | 8/7/2 |
+| 250KB | 1.004 | 1.000 | 1.002 | 1.4 | 4/6/4 |
+| 1MB | 1.001 | 1.000 | 1.000 | 1.1 | 12/15/15 |
+> 印证 reviewer 直觉——**mean 由离群值主导**（median 恒=1.000）；ILP 的真实作用是
+> **tail repair**（max 4.7→1.1）。
+
+**Census top-10 huge-tail**（`p3_tail_census.json`）：baseline mean/median/P90/**max**
+= 1071.5/332.5/2542.9/**4162.1** → selected 1.10/1.09/1.18/**1.41**。
+> objective 用 mean，但 evaluation 报告全分布；headline 是 tail 崩塌（4162→1.4）。
+
 
 ---
 
