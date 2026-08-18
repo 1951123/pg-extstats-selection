@@ -200,12 +200,19 @@ def solve_ilp(
     queries_options: list[list[Option]],
     qerror_base: list[float],
     budget_bytes: int,
+    per_query_cap: Optional[int] = None,
 ) -> ILPResult:
     """Solve the multi-select shared-resource ILP with scipy.optimize.milp.
 
     Variables:
       0 .. n_stats-1            : y_s (create physical stat)
       n_stats .. n_stats+n_opt  : x_is (query selects option)
+
+    ``per_query_cap`` optionally caps how many options a query may select:
+      - None (default): multi-select with overlap-free constraint (a query may
+        pick several non-overlapping stats).
+      - 1: "single best per query" — each query picks at most ONE candidate
+        (stronger than overlap-free, so that constraint is skipped).
     """
     n_stats = len(phys_stats)
     n_opt = sum(len(opts) for opts in queries_options)
@@ -223,13 +230,27 @@ def solve_ilp(
     integrality = np.ones(n_var)
 
     # ---- constraints ----
+    # group physical stats by (table, columns): a real object has ONE level, so
+    # the selected levels of the same column-combination must be mutually
+    # exclusive (sum over levels of y_(cols,l) <= 1).
+    combo_groups: dict[tuple, list[int]] = {}
+    for s_idx, ps in enumerate(phys_stats):
+        combo_groups.setdefault((ps.table, ps.columns), []).append(s_idx)
+    n_combo = len(combo_groups)
+
     # 1) storage budget
     # 2) x_is <= y_s
-    # 3) overlap-free within each query (x_a + x_b <= 1)
-    n_overlap = 0
-    for opts in queries_options:
-        n_overlap += len(list(_overlap_pairs(opts, phys_stats)))
-    n_con = 1 + n_opt + n_overlap
+    # 3) per-query cap: sum x_is <= per_query_cap  (when set)
+    #    OR (multi-select) overlap-free within each query (x_a + x_b <= 1)
+    # 4) column-combo level exclusivity: sum_level y_(cols,l) <= 1
+    if per_query_cap is not None:
+        n_extra = m + n_combo
+    else:
+        n_overlap = 0
+        for opts in queries_options:
+            n_overlap += len(list(_overlap_pairs(opts, phys_stats)))
+        n_extra = n_overlap + n_combo
+    n_con = 1 + n_opt + n_extra
 
     A = lil_matrix((n_con, n_var))
     ub = np.full(n_con, np.inf)
@@ -251,15 +272,32 @@ def solve_ilp(
             gi += 1
             nrow += 1
 
-    # 3) overlap-free within query: x_a + x_b <= 1
-    gi = 0
-    for opts in queries_options:
-        for a, b in _overlap_pairs(opts, phys_stats):
-            A[nrow, n_stats + gi + a] = 1.0
-            A[nrow, n_stats + gi + b] = 1.0
-            ub[nrow] = 1.0
+    # 3a) per-query cap: sum_{s in opts(i)} x_is <= per_query_cap
+    if per_query_cap is not None:
+        gi = 0
+        for opts in queries_options:
+            for _ in opts:
+                A[nrow, n_stats + gi] = 1.0
+                gi += 1
+            ub[nrow] = float(per_query_cap)
             nrow += 1
-        gi += len(opts)
+    # 3b) overlap-free within query: x_a + x_b <= 1 (multi-select mode)
+    else:
+        gi = 0
+        for opts in queries_options:
+            for a, b in _overlap_pairs(opts, phys_stats):
+                A[nrow, n_stats + gi + a] = 1.0
+                A[nrow, n_stats + gi + b] = 1.0
+                ub[nrow] = 1.0
+                nrow += 1
+            gi += len(opts)
+
+    # 4) column-combo level exclusivity: at most one level per (table, columns)
+    for members in combo_groups.values():
+        for s_idx in members:
+            A[nrow, s_idx] = 1.0
+        ub[nrow] = 1.0
+        nrow += 1
 
     constraints = LinearConstraint(A.tocsr(), lb=np.full(n_con, -np.inf), ub=ub)
     bounds = Bounds(lb=np.zeros(n_var), ub=np.ones(n_var))
