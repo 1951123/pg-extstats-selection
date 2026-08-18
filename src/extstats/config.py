@@ -19,8 +19,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 BENCHMARKS_DIR = REPO_ROOT / "benchmarks"
 RESULTS_DIR = REPO_ROOT / "results"
 
-# Names of the three benchmark subdirectories under benchmarks/.
-BENCH_NAMES = ("census", "job", "stats_ceb")
+# Names of the benchmark subdirectories under benchmarks/.
+BENCH_NAMES = ("census", "job", "stats_ceb", "stats_ceb_single")
 
 
 # ---------------------------------------------------------------------------
@@ -53,6 +53,7 @@ DEFAULT_DB = {
     "census": "census",
     "job": "imdb",
     "stats_ceb": "stats",
+    "stats_ceb_single": "stats",  # single-table sub-plans of the same schema
 }
 
 

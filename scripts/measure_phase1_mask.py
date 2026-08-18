@@ -35,6 +35,7 @@ from extstats.parsers import (  # noqa: E402
     parse_census_dir,
     parse_job_dir,
     parse_stats_ceb_dir,
+    parse_stats_ceb_single_dir,
 )
 from extstats.db import connect  # noqa: E402
 from extstats.measure_mask import measure_query_mask  # noqa: E402
@@ -43,8 +44,10 @@ _PARSERS = {
     "census": parse_census_dir,
     "job": parse_job_dir,
     "stats_ceb": parse_stats_ceb_dir,
+    "stats_ceb_single": parse_stats_ceb_single_dir,
 }
-_BENCH_DIRS = {"census": "Census", "job": "JOB", "stats_ceb": "stats_CEB"}
+_BENCH_DIRS = {"census": "Census", "job": "JOB", "stats_ceb": "stats_CEB",
+               "stats_ceb_single": "stats_CEB"}
 # single-table benchmark -> force the shared table per query
 _SINGLE_TABLE = {"census": "climate"}
 
@@ -59,6 +62,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="default_statistics_target for building stats "
                          "(e.g. 10000 deterministic). One level only.")
     ap.add_argument("--limit", type=int, default=0, help="measure only first N queries")
+    ap.add_argument("--qids", default="",
+                    help="comma-separated qids to measure (overrides --limit)")
     ap.add_argument("--out", default=None, help="output JSON path")
     ap.add_argument("--dbname", default=None)
     ap.add_argument("--pguser", default="postgres")
@@ -77,7 +82,10 @@ def main(argv: list[str] | None = None) -> int:
         forced_table = _SINGLE_TABLE.get(bench)
 
         queries = _PARSERS[bench](bench_root / _BENCH_DIRS[bench] / "queries")
-        if args.limit:
+        if args.qids:
+            want = {x.strip() for x in args.qids.split(",") if x.strip()}
+            queries = [q for q in queries if q.qid in want]
+        elif args.limit:
             queries = queries[: args.limit]
 
         per_query_cands = generate_candidates_per_query(queries, arities=arities)

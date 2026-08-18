@@ -39,6 +39,7 @@ from extstats.parsers import (  # noqa: E402
     parse_census_dir,
     parse_job_dir,
     parse_stats_ceb_dir,
+    parse_stats_ceb_single_dir,
 )
 from extstats.db import connect  # noqa: E402
 from extstats.measure import measure_query  # noqa: E402
@@ -47,8 +48,10 @@ _PARSERS = {
     "census": parse_census_dir,
     "job": parse_job_dir,
     "stats_ceb": parse_stats_ceb_dir,
+    "stats_ceb_single": parse_stats_ceb_single_dir,
 }
-_BENCH_DIRS = {"census": "Census", "job": "JOB", "stats_ceb": "stats_CEB"}
+_BENCH_DIRS = {"census": "Census", "job": "JOB", "stats_ceb": "stats_CEB",
+               "stats_ceb_single": "stats_CEB"}
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -49,14 +49,20 @@ from extstats.parsers import (  # noqa: E402
     parse_census_dir,
     parse_job_dir,
     parse_stats_ceb_dir,
+    parse_stats_ceb_single_dir,
 )
 from extstats.verify import StatToBuild, verify_statistics  # noqa: E402
 
-_PARSERS = {"census": parse_census_dir, "job": parse_job_dir, "stats_ceb": parse_stats_ceb_dir}
-_BENCH_DIRS = {"census": "Census", "job": "JOB", "stats_ceb": "stats_CEB"}
-_DB = {"census": "census", "job": "imdb", "stats_ceb": "stats"}
+_PARSERS = {"census": parse_census_dir, "job": parse_job_dir, "stats_ceb": parse_stats_ceb_dir,
+            "stats_ceb_single": parse_stats_ceb_single_dir}
+_BENCH_DIRS = {"census": "Census", "job": "JOB", "stats_ceb": "stats_CEB",
+               "stats_ceb_single": "stats_CEB"}
+_DB = {"census": "census", "job": "imdb", "stats_ceb": "stats",
+       "stats_ceb_single": "stats"}
 _TABLES = {"stats_ceb": ["badges", "comments", "posts", "posthistory", "postlinks",
                          "tags", "users", "votes"],
+           "stats_ceb_single": ["badges", "comments", "posts", "posthistory", "postlinks",
+                                "tags", "users", "votes"],
            "census": ["climate"],
            "job": ["title"]}
 
