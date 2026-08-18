@@ -1,0 +1,43 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "论文: 完整编译为 PDF (pdflatex+bibtex)",
+      "type": "shell",
+      "command": "cd ${workspaceFolder}/paper && pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1 && bibtex main >/dev/null 2>&1 && pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1 && pdflatex -interaction=nonstopmode main.tex && echo '=== 编译完成: paper/main.pdf ==='",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "论文: 快速编译 (仅 pdflatex 一次)",
+      "type": "shell",
+      "command": "cd ${workspaceFolder}/paper && pdflatex -interaction=nonstopmode main.tex && echo '=== 快速编译完成: paper/main.pdf ==='",
+      "problemMatcher": [],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "论文: 清理中间文件",
+      "type": "shell",
+      "command": "cd ${workspaceFolder}/paper && rm -f main.aux main.bbl main.blg main.log main.out main.pdf && echo '=== 已清理 paper 编译产物 ==='",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    }
+  ]
+}
