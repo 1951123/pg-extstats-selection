@@ -145,10 +145,26 @@ Extended Statistics*
 > (ii) overlap 模型的残余误差**全部**是并发重叠统计的 planner 干扰
 > （ratio 1.18–1.29）。**Option A 给出可信赖部署，代价可量化**——这正是 §7 要呈现的 trade-off。
 
-### P2 — 632-query stats_CEB_single 全集
-79 shared combos × 3 levels × 632 queries，验证 "capacity allocation 而非
-column selection" 在整个 workload 成立（而非仅 top-10）。测量成本小（79 组合）。
+### ~~P2 — 632-query stats_CEB_single 全集~~ ✅ 已完成
+完整 phase-1 掩码测量（79 组合 × 3 档 × 8 表，共 126s）+
+8 个预算求解（`results/p2_capacity_allocation.json`）：
 
+| budget | stats | mean | L100 | L1000 | L10000 |
+|--------|------:|-----:|-----:|------:|-------:|
+| 5KB  | 3 | 1.033 | 1 | 1 | 1 |
+| 10KB | 5 | 1.026 | 3 | 1 | 1 |
+| 40KB | 11 | 1.019 | 8 | 2 | 1 |
+| 100KB| 17 | 1.016 | 8 | 7 | 2 |
+| 250KB| 14 | 1.004 | 4 | 6 | 4 |
+| 1MB  | 42 | 1.001 | 12 | 15 | 15 |
+
+> **验证 capacity allocation**：高容量统计数随预算增长（L10000 1→2→4→7→15；
+> L1000 1→…→15）——solver 升级已选组合的 target，而非只加覆盖。
+> 教科书案例 `posts(AnswerCount,ViewCount)`：L100→L1000→L10000 随预算升档。
+> 8 个预算间 25 次容量档变化与增删组合并存 → capacity 是活跃的第二决策维度。
+> **诚实 caveat**：全 workload mean 改善小（1.033→1.001, +5.7-8.6%），因
+> 632 查询中位数基线=1.0、仅 34 个 >1.5。stats_CEB_single 是 *capacity-
+> allocation* 验证载体；大尾修复是 Census 的角色（§5.1）。这精确界定了主张。
 
 ### P3 — 预算曲线 + level 分布 + 多指标
 - 预算 10KB/20KB/40KB/100KB/250KB/500KB/1MB/2MB/5MB → mean q-error。

@@ -255,6 +255,14 @@ variables.
 % instead of dropping coverage, giving a smooth budget-quality curve (docs §5.6).
 % TODO: add a budgeted-greedy baseline (greedy that also degrades capacity within
 % budget) to make the tight-budget advantage quantitative.
+%
+% Full-workload evidence (P2, 632-query stats_CEB_single, docs §5.6): at 8 budgets
+% the selected set spends budget on CAPACITY not just coverage -- L10000 counts
+% grow 1->...->15 and posts(AnswerCount,ViewCount) upgrades L100->L1000->L10000 as
+% budget grows. 25 capacity-level changes among 8 budgets alongside coverage
+% add/drop. Honest caveat: whole-workload mean benefit is small (1.033->1.001,
+% +5.7-8.6%) because median baseline=1.0 (34/632 queries baseline>1.5); this
+% workload validates capacity allocation, while CENSUS validates large-tail repair.
 
 \subsection{RQ4: Does the Approach Scale?}
 \label{sec:rq4}

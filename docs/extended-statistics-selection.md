@@ -267,6 +267,38 @@ stats_CEB single-table top-10 (per-query dominant candidates):
 - Under a tight budget the ILP **degrades capacity levels** (L10000 → L100/1000)
   rather than dropping coverage, giving a smooth budget–quality curve; greedy
   would insist on each query's personal best regardless of budget.
+
+**Full-workload capacity allocation (P2, 632-query stats_CEB_single).** To
+verify the "capacity allocation, not just coverage" claim beyond the top-10, we
+ran phase-1 mask measurement on the **entire** 632-query stats_CEB_single
+workload (79 shared combos × 3 levels × 8 tables; whole measurement took ~126 s
+because the tables are small) and solved the sparse ILP at 8 budgets
+(`results/p2_capacity_allocation.json`):
+
+| budget | stats | mean q-error | L100 | L1000 | L10000 |
+|--------|------:|-------------:|-----:|------:|-------:|
+| 5 KB   | 3  | 1.033 | 1 | 1 | 1 |
+| 10 KB  | 5  | 1.026 | 3 | 1 | 1 |
+| 20 KB  | 6  | 1.024 | 4 | 2 | 0 |
+| 40 KB  | 11 | 1.019 | 8 | 2 | 1 |
+| 100 KB | 17 | 1.016 | 8 | 7 | 2 |
+| 250 KB | 14 | 1.004 | 4 | 6 | 4 |
+| 500 KB | 28 | 1.001 | 12 | 9 | 7 |
+| 1 MB   | 42 | 1.001 | 12 | 15 | 15 |
+
+Two observations. **First**, the budget is materially spent on **capacity, not
+just coverage**: the number of *high-capacity* selections grows with budget
+(L10000: 1→1→0→1→2→4→7→15; L1000: 1→…→15), i.e. the solver upgrades already
+chosen combinations to a higher `statistics_target`. The clearest case is
+`posts(AnswerCount,ViewCount)`, whose level rises from L100 → L1000 → L10000 as
+the budget grows — the same *what*, more *how much*. Across the eight budgets,
+25 capacity-level changes on already-selected combinations occur alongside
+coverage changes (add/drop combos), confirming capacity is an active second
+decision dimension. **Second**, an honest caveat: the *whole-workload*
+benefit is small (mean 1.033→1.001, +5.7→8.6%) because 632 queries have median
+baseline = 1.0 and only 34 have baseline >1.5 — stats_CEB_single is a
+*capacity-allocation* validation vehicle, while the large-tail repair is CENSUS's
+role (§5.1). This bounds the claim precisely.
 ### 5.7 Solve scale — what the ILP really sizes (feedback B)
 
 The raw candidate counts (e.g. "Census 30856") are **combinatorial option
