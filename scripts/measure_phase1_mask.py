@@ -60,10 +60,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--kind", default="mcv",
                     choices=["dependencies", "ndistinct", "mcv"])
     ap.add_argument("--arities", default="2,3")
-    ap.add_argument("--target", type=int, default=RECOMMENDED_STATS_TARGET,
-                    help="default_statistics_target for building stats "
-                         "(default 1000 = cost/quality sweet spot; 10000 = "
-                         "deterministic exact). One level only.")
+    ap.add_argument("--target", type=int, default=None,
+                    help="single default_statistics_target (default uses "
+                         "RECOMMENDED_STATS_TARGET). Mutually exclusive with "
+                         "--target-levels.")
+    ap.add_argument("--target-levels", default=None,
+                    help="comma-separated capacity levels to measure ALL equal,"
+                         " e.g. 100,1000,10000 (multi-object one-ANALYZE scheme).")
     ap.add_argument("--limit", type=int, default=0, help="measure only first N queries")
     ap.add_argument("--qids", default="",
                     help="comma-separated qids to measure (overrides --limit)")
@@ -75,7 +78,12 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     arities = tuple(int(x) for x in args.arities.split(",") if x.strip())
-    target_levels = [args.target] if args.target is not None else [0]
+    if args.target_levels:
+        level_list = tuple(int(x) for x in args.target_levels.split(",") if x.strip())
+        target_arg = None
+    else:
+        level_list = (args.target,) if args.target is not None else (RECOMMENDED_STATS_TARGET,)
+        target_arg = level_list[0]
     bench_root = Path(__file__).resolve().parents[1] / "benchmarks"
     benches = list(_PARSERS) if args.bench == "all" else [args.bench]
 
@@ -95,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         total_cands = sum(len(v) for v in per_query_cands.values())
 
         print(f"=== phase1[mask] {bench} (db={dbname}, kind={args.kind}, "
-              f"target={args.target}) ===")
+              f"levels={level_list}) ===")
         print(f"queries={len(queries)}  total_candidates={total_cands}")
 
         results: list[dict] = []
@@ -108,14 +116,15 @@ def main(argv: list[str] | None = None) -> int:
                 # unique backup table per query (avoids stale temp table reuse)
                 backup_table = f"_ext_mask_backup_{qi}"
                 mes = measure_query_mask(
-                    conn, q, cands, kind=args.kind, target=args.target,
+                    conn, q, cands, kind=args.kind, target=target_arg,
+                    target_levels=level_list if len(level_list) > 1 else None,
                     table=forced_table, backup_table=backup_table)
                 results.append({
                     "qid": mes.qid,
                     "actual": mes.actual,
                     "qerror_base": mes.qerror_base,
                     "estimate_base": mes.estimate_base,
-                    "target_levels": target_levels,
+                    "target_levels": list(level_list),
                     "candidates": mes.candidates,
                 })
                 measured += 1
@@ -130,7 +139,7 @@ def main(argv: list[str] | None = None) -> int:
             "bench": bench,
             "kind": args.kind,
             "arities": list(arities),
-            "target_levels": target_levels,
+            "target_levels": list(level_list),
             "n_queries": len(results),
             "n_candidates": total_cands,
             "elapsed_s": (datetime.now() - t_start).total_seconds(),
