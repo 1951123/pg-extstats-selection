@@ -179,22 +179,34 @@ def main(argv: list[str] | None = None) -> int:
     # Unified session: reset once, measure shared baseline.
     base_mean_shared = None
     results = []
-    methods = [x.strip() for x in args.methods.split(",") if x.strip()]
+    method_specs = [x.strip() for x in args.methods.split(",") if x.strip()]
     print(f"=== unified-session method comparison ({args.bench}, {args.kind}, "
           f"budget={args.budget}) ===")
 
     # Pre-compute each method's selected set (M4 needs DB; M1 is offline).
+    # Method spec may carry an argument after ':' e.g. M1:worst, M1:mean.
     out_by_method = {}
-    for method in methods:
-        if method.upper() == "M1":
-            out_by_method[method] = run_method_m1(
-                phys_stats, queries_options, qerror_base, args.budget, args.kind)
-        elif method.upper() == "M4":
+    for spec in method_specs:
+        if ":" in spec:
+            m_kind, m_arg = spec.split(":", 1)
+            m_kind = m_kind.strip()
+            m_arg = m_arg.strip()
+        else:
+            m_kind, m_arg = spec, None
+        m_key = m_kind if m_arg is None else f"{m_kind}:{m_arg}"
+
+        if m_kind.upper() == "M1":
+            # Rebuild the problem with the requested q-error mode.
+            mode = m_arg if m_arg in ("first", "mean", "worst", "p90") else "first"
+            ps, qo, qb = build_problem(phase1, qerror_mode=mode)
+            out = run_method_m1(ps, qo, qb, args.budget, args.kind)
+            out["name"] = f"M1_linear_ILP({mode})"
+        elif m_kind.upper() == "M4":
             out = run_method_m4(phys_stats, queries_options, qerror_base,
                                 args.budget, args.kind, queries, cfg)
-            out_by_method[method] = out
         else:
-            raise NotImplementedError(f"Method {method}")
+            raise NotImplementedError(f"Method {spec}")
+        out_by_method[m_key] = out
 
     # Verifier connection shared across methods.
     with connect(cfg) as conn:
@@ -205,8 +217,9 @@ def main(argv: list[str] | None = None) -> int:
         base_mean_shared = vr_base.mean_qerror
     print(f"unified baseline real mean q-error = {base_mean_shared:.3f}")
 
-    for method in methods:
-        out = out_by_method[method]
+    for spec in method_specs:
+        m_key = spec if ":" not in spec else spec
+        out = out_by_method[m_key]
         name = out["name"]
         pred_mean = out["predicted_mean"]
         pred_per_q = out["predicted_qerror_per_query"]

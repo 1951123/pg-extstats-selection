@@ -43,6 +43,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--input", default="results/phase1_stats_ceb_mcv.json")
     ap.add_argument("--budget", default="500000",
                     help="storage budget in bytes (int or comma-separated list)")
+    ap.add_argument("--qerror-mode", default="first",
+                    choices=["first", "mean", "worst", "p90"],
+                    help="per-level q-error summary from qerror_repeats")
     ap.add_argument("--out", default="results/ilp_solution.json")
     args = ap.parse_args(argv)
 
@@ -51,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     budgets = [int(b) for b in args.budget.split(",") if b.strip()]
 
     # Build the problem once (shared across budget sweeps).
-    phys_stats, queries_options, qerror_base = build_problem(phase1)
+    phys_stats, queries_options, qerror_base = build_problem(phase1, qerror_mode=args.qerror_mode)
     m = len(qerror_base)
     base_mean = float(np.mean(qerror_base))
     n_opt = sum(len(opts) for opts in queries_options)

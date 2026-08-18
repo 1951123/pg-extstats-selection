@@ -105,16 +105,26 @@ def build_problem(
     phase1: dict,
     *,
     skip_worse_than_baseline: bool = True,
+    qerror_mode: str = "first",
 ) -> tuple[list[PhysicalStat], list[list[Option]], list[float]]:
     """Build (phys_stats, queries_options, qerror_base) from a phase-1 dict.
 
     Options with q-error >= baseline are dropped (they can never help under the
     multiplicative model: log(e_is/e_i0) >= 0 only increases the objective).
 
+    ``qerror_mode`` selects which per-level q-error to use when a level carries
+    ``qerror_repeats`` (from a multi-measure phase-1):
+      - "first" : the first repeat (backward-compatible, single measurement)
+      - "mean"  : arithmetic mean over repeats
+      - "worst" : the maximum q-error over repeats (conservative / pessimistic)
+      - "p90"   : the 90th percentile over repeats (mildly conservative)
+    Modes other than "first" require the level to have ``qerror_repeats``.
+
     Parameters
     ----------
     phase1 : loaded phase-1 JSON with key "results".
     skip_worse_than_baseline : drop dominated options (default True).
+    qerror_mode : summarisation of per-repeat q-errors (default "first").
     """
     results = phase1["results"]
     qerror_base: list[float] = []
@@ -122,6 +132,20 @@ def build_problem(
 
     stat_index: dict[str, int] = {}
     phys_stats: list[PhysicalStat] = []
+
+    def _summarize(lv: dict) -> float:
+        reps = lv.get("qerror_repeats")
+        if reps and qerror_mode != "first":
+            clean = [v for v in reps if v == v]
+            if not clean:
+                return float("nan")
+            if qerror_mode == "mean":
+                return float(np.mean(clean))
+            if qerror_mode == "worst":
+                return float(np.max(clean))
+            if qerror_mode == "p90":
+                return float(np.percentile(clean, 90))
+        return float(lv["qerror"])
 
     for r in results:
         base = float(r["qerror_base"])
@@ -132,7 +156,7 @@ def build_problem(
             table = cand["table"]
             for level_str, lv in cand.get("levels", {}).items():
                 level = int(level_str)
-                qerr = float(lv["qerror"])
+                qerr = _summarize(lv)
                 if skip_worse_than_baseline and qerr >= base:
                     continue
                 stat_key = f"{table}|{','.join(cols)}|L{level}"

@@ -59,6 +59,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--arities", default="2,3")
     ap.add_argument("--target-levels", default="100,1000,10000",
                     help="comma-separated statistics_target capacity levels")
+    ap.add_argument("--repeats", type=int, default=1,
+                    help="re-ANALYZE + re-measure each level K times "
+                         "(records qerror_repeats for conservative selection)")
     ap.add_argument("--limit", type=int, default=0, help="measure only first N queries")
     ap.add_argument("--out", default=None, help="output JSON path")
     ap.add_argument("--dbname", default=None)
@@ -94,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
             for q in queries:
                 cands = per_query_cands.get(q.qid, [])
                 mes = measure_query(conn, q, cands, kind=args.kind,
-                                    target_levels=target_levels)
+                                    target_levels=target_levels, repeats=args.repeats)
                 results.append(
                     {
                         "qid": mes.qid,

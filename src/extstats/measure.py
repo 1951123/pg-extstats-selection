@@ -34,6 +34,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
+import numpy as np
 from psycopg import Connection
 
 from .candidates import CandidateSet
@@ -135,6 +136,7 @@ def measure_query(
     kind: str = "mcv",
     stat_prefix: str = "ext_",
     target_levels: tuple[int, ...] = DEFAULT_TARGET_LEVELS,
+    repeats: int = 1,
 ) -> QueryMeasurement:
     """Measure baseline + each (candidate, capacity level) q-error for a query.
 
@@ -144,6 +146,11 @@ def measure_query(
     and on-disk size. The statistic is dropped and the table re-analysed after
     each level to keep measurements isolated.
 
+    ``repeats>1`` re-runs the ANALYZE+EXPLAIN cycle ``repeats`` times per
+    (candidate, level), capturing the run-to-run variability of the estimate.
+    Each per-level dict then carries ``qerror_repeats`` (list of per-repeat
+    q-errors, in order) and ``size_bytes``; ``qerror`` is the mean over repeats.
+
     Parameters
     ----------
     conn : psycopg connection (autocommit recommended).
@@ -152,6 +159,7 @@ def measure_query(
     kind : which statistic kind to create per candidate (default ``mcv``).
     stat_prefix : name prefix for created statistic objects.
     target_levels : capacity levels to probe (default (100, 1000, 10000)).
+    repeats : number of times to re-ANALYZE + re-measure each level.
     """
     # Baseline estimate (no extended statistics), with default target.
     _reset_target(conn)
@@ -178,13 +186,20 @@ def measure_query(
         try:
             for level in target_levels:
                 _set_target(conn, level)
-                _analyze(conn, table)
-                res = estimate_count_query(conn, query.sql, actual=query.ground_truth)
-                size = stat_size_bytes(conn, name, kind)
+                qerrs = []
+                sizes = []
+                estimates = []
+                for _ in range(repeats):
+                    _analyze(conn, table)
+                    res = estimate_count_query(conn, query.sql, actual=query.ground_truth)
+                    sizes.append(stat_size_bytes(conn, name, kind))
+                    estimates.append(res.estimate)
+                    qerrs.append(res.qerror if res.qerror is not None else float("nan"))
                 per_level[int(level)] = {
-                    "estimate": res.estimate,
-                    "qerror": res.qerror if res.qerror is not None else float("nan"),
-                    "size_bytes": size,
+                    "estimate": estimates[0],
+                    "qerror": float(np.mean(qerrs)) if qerrs else float("nan"),
+                    "qerror_repeats": qerrs,
+                    "size_bytes": int(np.mean(sizes)) if sizes else 0,
                 }
             _reset_target(conn)
         finally:
