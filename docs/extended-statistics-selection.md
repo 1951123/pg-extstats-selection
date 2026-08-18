@@ -223,6 +223,32 @@ This justifies `per_query_cap=1`: **sparse (one dominant candidate per query) is
 optimal/near-optimal; joint is harmful (planner interference from non-dominant
 stats); the "middle" (several non-overlapping) adds almost nothing.**
 
+**Generality check on the wide Census table (feedback A).** The result above
+came from `stats_CEB_single` (narrow schema, few candidates/query). To rule out
+that it is an artefact of a small candidate space, we ran the same top-1/2/3
+non-overlap experiment on the two hardest Census queries — the wide 69-column
+table, hundreds of candidates each, huge baselines:
+
+| query | base | cands | k=1 | k=2 | k=3 | (L1000 / L10000) |
+|-------|------|-------|-----|-----|-----|------------------|
+| query.184 | 4162 | 165 | 1.08 | 1.08 | 1.08 | both |
+| query.382 | 378  | 56  | 1.12 | 1.12 | 1.12 | both |
+
+Adding a 2nd/3rd non-overlapping candidate changes nothing (identical at both
+`L1000` and `L10000`). So the *single dominant candidate* property is **not a
+quirk of small candidate spaces** — it holds on the widest, highest-error, most
+candidate-dense workload. This also resolves the earlier ambiguity: on these
+queries the single candidate already reaches the ~1.0 floor (q≈1.08–1.12), so
+the "single candidate is optimal" conclusion is not just "we cannot fix it
+further" (a valid-candidate signature), it is that the one dominant candidate
+*is* the fix.
+
+**What about capacity-driven changes *within* one dominant candidate?** When a
+single candidate cannot reach the floor, the levers are (a) its capacity level
+(t100 → t10000, §5.3) and (b) whether a *different single* candidate is better —
+both are handled by the ILP (which considers every level of every candidate as
+a distinct option). The multi-candidate dimension is the one that adds nothing.
+
 ### 5.6 Sparse ILP under a storage budget: global, non-greedy
 
 `scripts/solve_sparse_ilp.py` + `scripts/compare_greedy_vs_ilp.py` on
@@ -241,7 +267,56 @@ stats_CEB single-table top-10 (per-query dominant candidates):
 - Under a tight budget the ILP **degrades capacity levels** (L10000 → L100/1000)
   rather than dropping coverage, giving a smooth budget–quality curve; greedy
   would insist on each query's personal best regardless of budget.
+### 5.7 Solve scale — what the ILP really sizes (feedback B)
 
+The raw candidate counts (e.g. "Census 30856") are **combinatorial option
+counts**, not MILP variable counts. The actual MILP has a binary variable per
+`(stat, level)` option kept after pruning plus per-(query, option) assignment:
+
+$$
+\text{var}_{ILP} \;=\; n_{\text{stats}} + n_{\text{opt}}, \qquad
+n_{\text{opt}} = \sum_i \#\{\text{options for } q_i\}.
+$$
+
+Two factors keep this tractable in practice:
+
+1. **`skip_worse_than_baseline` pruning** (`build_problem`): an option whose
+   per-query q-error is *not better* than the no-stat baseline is dropped
+   entirely. Baseline estimates are usually already good (median q-error ≈ 1),
+   so for most queries nearly every candidate is pruned — leaving a few
+   "repairers" (§1.1: most queries have tiny effective candidate sets).
+2. **Global dedup** across queries: one physical `y_s` serves all queries that
+   can use it, so `n_stats` is the deduped universe of `(table, cols, level)`,
+   not the per-query sum.
+
+Measured sizes on the top-10 phase-1 file used in §5.6:
+`phys_stats=128, queries=10, options=341` → and HiGHS solves them in ~0.02–0.08 s
+(budget 20 KB–2 MB). The genuinely large case is a **full Census run**: ~19,245
+column combos × 3 levels ≈ **~57,700 physical stats** before pruning, which is
+the real scale question (not the 43M the candidate sum might suggest — those are
+*options*, and most are pruned). Open question 4 (§6) tracks whether the
+"one dominant candidate + prune" structure keeps *that* instance solvable.
+
+### 5.8 Two more workload-driven clarifications (feedback C & D)
+
+**C — for `stats_CEB_single`, the ILP's main job is capacity allocation, not
+combo selection.** Its per-query candidate count has median 1 (min–max 1–35) and
+only 79 distinct combos globally (Table in §1.1). So for the *typical* query there
+is no real "which columns" choice; the sparse ILP mostly decides (a) *whether* to
+fix the query at all and (b) *which capacity level* of a shared combo to pay for.
+The value added by the ILP is therefore concentrated in **budget→capacity**
+selection for a handful of shared, high-value combos (the smooth curve in §5.6),
+not in combinatorial column selection. Census (median 56, global 19245) is the
+benchmark where the *column-selection* dimension is genuinely large.
+
+**D — JOB is a sharp negative control.** Only 37/113 ≈ 33% of JOB queries even
+have a multi-column selection candidate, and after deduplication there are just
+**7 distinct combos** (min–med–max per query 1/1/4). Because JOB's errors are
+driven by joins (which extended statistics cannot touch, §1) and it has almost
+no selection-only candidates, it is the cleanest demonstration that **the model
+has no work to do on join-heavy workloads** — the 7 combos cannot repair
+join-error, and no amount of per-object capacity tuning changes that. This is
+the expected null result for the negative control, not a failure of the method.
 ### 5.3 Capacity-level trade-off (measured on Census `climate`, 69 cols)
 
 | `target` | ANALYZE (0 ext) | ANALYZE (1000 ext) | repair (best, single-table) |
@@ -281,4 +356,8 @@ per-candidate, per-level q-errors + sizes needed by the ILP at ~60x lower cost.
    the actual database?) is the remaining closed-loop step.
 4. **Scalability / larger workloads** — how do ILP solve time and phase-1 cost
    scale to the full 468-query Census or 632-query stats_CEB-single, and does
-   the "one dominant candidate" finding hold at that scale?
+   the "one dominant candidate" finding hold at that scale? Empirical so far:
+   top-10 instances solve in <0.1 s even at 2 MB budget, and the Census
+   multi-candidate check (§5.5) shows the dominant-candidate property survives
+   on the widest table; the open item is a *full-workload* solve (≈57.7 K
+   physical stats pre-prune, §5.7) to confirm phase-1 and solve remain feasible.
