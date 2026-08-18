@@ -81,10 +81,11 @@ $c_{s}$ (bytes) and a per-query effective q-error $e_{is}$.
 
 ---
 
-## 3. Multiplicative approximation for joint selection
+## 3. Multiplicative approximation (multi-select) and the sparse special case
 
-Empirically measuring every subset of statistics is infeasible. We approximate
-the joint effect multiplicatively in log space:
+For the general **multi-select** model (a query may use several statistics),
+empirically measuring every subset is infeasible, so we approximate the joint
+effect multiplicatively in log space:
 
 $$
 \log e_i(T_i) \;\approx\; \log e^0_i + \sum_{s\in T_i} \log\!\Big(\frac{e_{is}}{e^0_i}\Big),
@@ -99,9 +100,20 @@ we forbid column-overlapping selections within a query.
 > stats_CEB, the planner's improvement comes from **precisely chosen single (or
 > few) statistics**, not from many overlapping ones. Building *many* candidate
 > statistics jointly can make the planner pick a sub-optimal combination and
-> *hurt* the estimate (the "joint interference" effect). This means the
-> independence/multiplicative model is most reliable when selections are sparse
-> and non-overlapping — consistent with the overlap-free constraint.
+> *hurt* the estimate (the "joint interference" effect).
+
+**Sparse special case (this project's final model).** Empirical results (below)
+showed that per query a **single dominant candidate** already captures the
+relevant correlation, and adding a second non-overlapping candidate gives almost
+no extra benefit. We therefore specialise to **at most one statistic per query**
+(`per_query_cap = 1`). In that case the objective is **exactly linear** — no
+multiplicative approximation / log transform is needed:
+
+$$
+e_i(T_i) = e^0_i - \sum_{s} \underbrace{(e^0_i - e_{is})}_{\Delta_{is} \ge 0}\cdot x_{is}
+\ \longmapsto\ \min \sum_i \Big(e^0_i - \textstyle\sum_s \Delta_{is} x_{is}\Big),
+\qquad \sum_s x_{is}\le 1.
+$$
 
 ---
 
@@ -124,12 +136,14 @@ Constraints:
 1. Storage budget: $\displaystyle \sum_s c_s\, y_s \le C$.
 2. A statistic must exist to be used: $x_{is} \le y_s$ (share `y_s` across queries → pay storage once).
 3. Overlap-free within a query: $x_{i a}+x_{i b} \le 1$ for column-overlapping `a,b`.
+4. **Column-combo capacity exclusivity**: at most one level per `(table, columns)` — $\sum_{\text{levels } l} y_{(\text{cols}, l)} \le 1$. A physical object has a single `statistics_target`, so different capacity levels of the *same* combination are mutually exclusive (they can't all be created).
+5. **Sparse per-query cap** (optional, `per_query_cap=1`): $\sum_s x_{is} \le 1$ — each query picks at most one candidate (stronger than overlap-free, so constraint 3 is skipped). With `per_query_cap=1` the objective is linear (§3).
 
 > This already treats **each capacity level as a distinct physical statistic**
 > (`Option.level`, `PhysicalStat.level`, cost from `size_bytes`). So "select a
 > statistic AND choose its capacity" is expressed by picking *which level* of a
 > `(table, columns)` combination appears in the solution — exactly the
-> per-object `statistics_target` knobs of §2.
+> per-object `statistics_target` knobs of §2 (subject to constraint 4).
 
 ---
 
@@ -153,6 +167,45 @@ Constraints:
 - Best candidates across different queries used **disjoint 3-col combos**; high
   sharing degree on stats_CEB single-table (many queries benefit from the same
   `(AnswerCount, FavoriteCount, ViewCount)` etc.).
+
+### 5.5 One dominant candidate is (nearly) optimal; multi-candidate adds nothing
+
+Measured with `exp_multi_candidate.py` (stats_CEB single-table top-10, all on
+`posts`): for each query we greedily picked non-overlapping candidates ranked by
+single q-error and measured the JOINT q-error keeping the top-1/2/3 picks:
+
+- **k=2 and k=3 joint q-error ≈ k=1** (within 0.02–0.03); no query materially
+  improved by adding a 2nd/3rd non-overlapping candidate.
+- **Why:** single-table selection error is driven by **one dominant correlated
+  column cluster** (here `AnswerCount/FavoriteCount/ViewCount/PostTypeId`). One
+  best 3-col MCV captures it; other non-overlapping combos have no independent
+  second cluster to contribute.
+- The `t=1000` ceiling (~2.0) is a **capacity-precision** limit (MCV entries),
+  not a coverage limit — raising `target` to 10000 fixes it; adding candidates
+  does not.
+
+This justifies `per_query_cap=1`: **sparse (one dominant candidate per query) is
+optimal/near-optimal; joint is harmful (planner interference from non-dominant
+stats); the "middle" (several non-overlapping) adds almost nothing.**
+
+### 5.6 Sparse ILP under a storage budget: global, non-greedy
+
+`scripts/solve_sparse_ilp.py` + `scripts/compare_greedy_vs_ilp.py` on
+stats_CEB single-table top-10 (per-query dominant candidates):
+
+| budget | stats | used | mean q-error | improve |
+|--------|-------|------|--------------|---------|
+| 20 KB  | 5 | 19.6 KB | 1.864 | +56.7% |
+| 40 KB  | 5 | 28.6 KB | 1.821 | +57.6% |
+| 100 KB | 7 | 96.5 KB | 1.632 | +62.0% |
+| 2 MB   | 5 | 360 KB | 1.021  | +76.3% |
+
+- The ILP is **global (not per-query greedy)**: every statistic is an option to
+  every relevant query, statistics are shared across queries (built once), and
+  the budget is allocated to the highest-value (stat, capacity) choices.
+- Under a tight budget the ILP **degrades capacity levels** (L10000 → L100/1000)
+  rather than dropping coverage, giving a smooth budget–quality curve; greedy
+  would insist on each query's personal best regardless of budget.
 
 ### 5.3 Capacity-level trade-off (measured on Census `climate`, 69 cols)
 
@@ -181,12 +234,16 @@ per-candidate, per-level q-errors + sizes needed by the ILP at ~60x lower cost.
 
 ## 6. Open questions
 
-1. **Optimal level selection** — the ILP already chooses *which level* of a
-   combo; does it need a monotonicity constraint (higher level ⇒ lower q-error,
-   higher cost) or is free choice fine?
+1. **Optimal level selection** — with `per_query_cap=1` the ILP chooses the
+   (stat, level) jointly; a monotonicity constraint (higher level ⇒ lower
+   q-error, higher cost) is not required for correctness but could speed solve
+   time. Is free choice fine in practice? (Current evidence: yes.)
 2. **Storage model accuracy** — `size_bytes` from `pg_column_size(stxdmcv)` is
-   per-level; can we model the cost of a combo as a function of level and
+   per-level; can we model the cost of a combo as a smooth function of level and
    share/promote levels across queries cheaply?
-3. **Joint-interference vs. sparsity** — under which workloads does building
-   multiple stats interfere (multi-table) vs. help (single-table)? The empirical
-   evidence suggests single-table prefers sparse exact selection.
+3. **End-to-end validation** — the real-PG verification of a selected sparse
+   stat set (does the ILP's predicted mean q-error match the measured one on
+   the actual database?) is the remaining closed-loop step.
+4. **Scalability / larger workloads** — how do ILP solve time and phase-1 cost
+   scale to the full 468-query Census or 632-query stats_CEB-single, and does
+   the "one dominant candidate" finding hold at that scale?
