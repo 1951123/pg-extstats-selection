@@ -1,3 +1,5 @@
 # Runtime dependencies (install into .venv)
 psycopg[binary]>=3.1
 sqlglot>=25.0
+# Phase-2 ILP solver (HiGHS via scipy.optimize.milp)
+scipy>=1.11
