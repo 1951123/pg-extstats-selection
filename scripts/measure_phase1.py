@@ -62,6 +62,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--repeats", type=int, default=1,
                     help="re-ANALYZE + re-measure each level K times "
                          "(records qerror_repeats for conservative selection)")
+    ap.add_argument("--single-target", type=int, default=None,
+                    help="single-column statistics_target for the baseline "
+                         "(e.g. 10000 for a deterministic baseline)")
     ap.add_argument("--limit", type=int, default=0, help="measure only first N queries")
     ap.add_argument("--out", default=None, help="output JSON path")
     ap.add_argument("--dbname", default=None)
@@ -97,7 +100,8 @@ def main(argv: list[str] | None = None) -> int:
             for q in queries:
                 cands = per_query_cands.get(q.qid, [])
                 mes = measure_query(conn, q, cands, kind=args.kind,
-                                    target_levels=target_levels, repeats=args.repeats)
+                                    target_levels=target_levels, repeats=args.repeats,
+                                    single_target=args.single_target)
                 results.append(
                     {
                         "qid": mes.qid,

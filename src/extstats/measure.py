@@ -137,6 +137,7 @@ def measure_query(
     stat_prefix: str = "ext_",
     target_levels: tuple[int, ...] = DEFAULT_TARGET_LEVELS,
     repeats: int = 1,
+    single_target: Optional[int] = None,
 ) -> QueryMeasurement:
     """Measure baseline + each (candidate, capacity level) q-error for a query.
 
@@ -151,6 +152,12 @@ def measure_query(
     Each per-level dict then carries ``qerror_repeats`` (list of per-repeat
     q-errors, in order) and ``size_bytes``; ``qerror`` is the mean over repeats.
 
+    ``single_target`` optionally sets the single-column statistics target used
+    for the BASELINE measurement (which otherwise uses the connection default,
+    100). Setting it high (e.g. 10000) makes the single-column histograms
+    deterministic (full-table), so the baseline q-error is stable across runs and
+    the remaining error reflects column correlation, not sampling noise.
+
     Parameters
     ----------
     conn : psycopg connection (autocommit recommended).
@@ -160,9 +167,14 @@ def measure_query(
     stat_prefix : name prefix for created statistic objects.
     target_levels : capacity levels to probe (default (100, 1000, 10000)).
     repeats : number of times to re-ANALYZE + re-measure each level.
+    single_target : optional single-column stats target for the baseline.
     """
-    # Baseline estimate (no extended statistics), with default target.
-    _reset_target(conn)
+    # Baseline estimate (no extended statistics). If single_target is given, use
+    # it so the single-column stats are deterministic (stable baseline).
+    if single_target is not None:
+        _set_target(conn, single_target)
+    else:
+        _reset_target(conn)
     base = estimate_count_query(conn, query.sql, actual=query.ground_truth)
     mes = QueryMeasurement(
         qid=query.qid,
