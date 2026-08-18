@@ -57,6 +57,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--kind", default="mcv",
                     choices=["dependencies", "ndistinct", "mcv"])
     ap.add_argument("--arities", default="2,3")
+    ap.add_argument("--target-levels", default="100,1000,10000",
+                    help="comma-separated statistics_target capacity levels")
     ap.add_argument("--limit", type=int, default=0, help="measure only first N queries")
     ap.add_argument("--out", default=None, help="output JSON path")
     ap.add_argument("--dbname", default=None)
@@ -66,6 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     arities = tuple(int(x) for x in args.arities.split(",") if x.strip())
+    target_levels = tuple(int(x) for x in args.target_levels.split(",") if x.strip())
     bench_root = Path(__file__).resolve().parents[1] / "benchmarks"
     benches = list(_PARSERS) if args.bench == "all" else [args.bench]
 
@@ -90,13 +93,15 @@ def main(argv: list[str] | None = None) -> int:
             conn.autocommit = True
             for q in queries:
                 cands = per_query_cands.get(q.qid, [])
-                mes = measure_query(conn, q, cands, kind=args.kind)
+                mes = measure_query(conn, q, cands, kind=args.kind,
+                                    target_levels=target_levels)
                 results.append(
                     {
                         "qid": mes.qid,
                         "actual": mes.actual,
                         "qerror_base": mes.qerror_base,
                         "estimate_base": mes.estimate_base,
+                        "target_levels": list(target_levels),
                         "candidates": mes.candidates,
                     }
                 )

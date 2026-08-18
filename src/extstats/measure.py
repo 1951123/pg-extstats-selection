@@ -14,17 +14,24 @@ measure the query's q-error under *exactly that one* extended statistic:
        f. ANALYZE the base table again to restore the pre-``s`` state
           (protocol A requirement: no residual statistic interferes later).
 
-All candidate statistics are created with a deterministic name so we can
-always DROP the right object, and every real measurement leaves the database
-unchanged (the last ANALYZE restores the baseline).
+Capacity levels: the MCV/ndistinct capacity is controlled by
+``default_statistics_target``. For every candidate we repeat the cycle for each
+requested capacity level in ``target_levels`` (e.g. ``{100, 1000, 10000}``),
+setting the GUC before ANALYZE. This reveals that for high-cardinality column
+combinations the statistic may be EMPTY at low capacity and only materialise at
+higher capacity, so per-(candidate, level) results are needed.
 
-Output: for each query a small dict of results consumed by the ILP stage.
+All candidate statistics are created with a deterministic (lowercase) name so
+we can always DROP the right object, and every real measurement leaves the
+database unchanged (the last ANALYZE restores the baseline).
+
+Output: for each query a dict of results consumed by the ILP stage, keyed by
+capacity level.
 """
 
 from __future__ import annotations
 
-import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Optional
 
 from psycopg import Connection
@@ -36,6 +43,14 @@ from .stats import _qualify_table
 
 # One object holding a single statistical kind, matching stats.py naming.
 _KIND_PREFIX = {"dependencies": "d", "ndistinct": "n", "mcv": "m"}
+_KIND_DATA_COL = {
+    "dependencies": "stxddependencies",
+    "ndistinct": "stxdndistinct",
+    "mcv": "stxdmcv",
+}
+
+# Default capacity levels to probe (default_statistics_target values).
+DEFAULT_TARGET_LEVELS: tuple[int, ...] = (100, 1000, 10000)
 
 
 @dataclass
@@ -49,15 +64,15 @@ class QueryMeasurement:
     # estimated baseline cardinality (root plan rows).
     estimate_base: int
     actual: Optional[int]
-    # Per-candidate results keyed by a candidate identifier.
-    candidates: dict[str, dict] = field(default_factory=dict)
+    # Per-candidate results: {candidate_key: {level: {...}}}.
+    candidates: dict[str, dict[int, dict]] = field(default_factory=dict)
 
 
 def stat_name(cand: CandidateSet, kind: str, prefix: str = "ext_") -> str:
-    """Deterministic statistic object name, matching stats.py's scheme.
+    """Deterministic (lowercase) statistic object name.
 
     PostgreSQL folds unquoted identifiers (including statistic object names)
-    to lowercase, so we build the name in lowercase from the start to avoid a
+    to lowercase, so we build the name lowercase from the start to avoid a
     CREATE/DROP/SELECT `stxname` mismatch.
     """
     tbl = cand.table_unqualified.lower()
@@ -73,11 +88,7 @@ def stat_size_bytes(conn: Connection, name: str, kind: str = "mcv") -> int:
     ndistinct, mcv) since a statistic created with a single kind only populates
     that column; the others are NULL.
     """
-    col = {
-        "dependencies": "stxddependencies",
-        "ndistinct": "stxdndistinct",
-        "mcv": "stxdmcv",
-    }[kind]
+    col = _KIND_DATA_COL[kind]
     with conn.cursor() as cur:
         cur.execute(
             f"""
@@ -104,6 +115,18 @@ def _analyze(conn: Connection, table: str) -> None:
         cur.execute(f"ANALYZE {table}")
 
 
+def _set_target(conn: Connection, level: int) -> None:
+    """Set default_statistics_target to ``level`` for the session."""
+    with conn.cursor() as cur:
+        cur.execute(f"SET default_statistics_target = {int(level)}")
+
+
+def _reset_target(conn: Connection) -> None:
+    """Reset default_statistics_target to its default (100)."""
+    with conn.cursor() as cur:
+        cur.execute("RESET default_statistics_target")
+
+
 def measure_query(
     conn: Connection,
     query: BenchQuery,
@@ -111,9 +134,15 @@ def measure_query(
     *,
     kind: str = "mcv",
     stat_prefix: str = "ext_",
+    target_levels: tuple[int, ...] = DEFAULT_TARGET_LEVELS,
 ) -> QueryMeasurement:
-    """Measure baseline + each candidate's q-error for a single query
-    (protocol A: create/analyze/explain/drop/analyze per candidate).
+    """Measure baseline + each (candidate, capacity level) q-error for a query.
+
+    Protocol A, extended to capacity levels: for each candidate combination we
+    create the statistic once, then for each ``target_level`` we ANALYZE the
+    table under ``SET default_statistics_target = level`` and record the q-error
+    and on-disk size. The statistic is dropped and the table re-analysed after
+    each level to keep measurements isolated.
 
     Parameters
     ----------
@@ -122,8 +151,10 @@ def measure_query(
     candidates : candidate combinations belonging to this query.
     kind : which statistic kind to create per candidate (default ``mcv``).
     stat_prefix : name prefix for created statistic objects.
+    target_levels : capacity levels to probe (default (100, 1000, 10000)).
     """
-    # Baseline estimate (no extended statistics).
+    # Baseline estimate (no extended statistics), with default target.
+    _reset_target(conn)
     base = estimate_count_query(conn, query.sql, actual=query.ground_truth)
     mes = QueryMeasurement(
         qid=query.qid,
@@ -133,37 +164,42 @@ def measure_query(
         actual=query.ground_truth,
     )
 
-    # Map table alias -> qualified table for ANALYZE.
     for cand in candidates:
         name = stat_name(cand, kind, stat_prefix)
         table = _qualify_table(cand.table)
 
-        # 1. create the statistic
+        # Create the statistic object once; ANALYZE per level under its target.
         with conn.cursor() as cur:
             cur.execute(
                 f"CREATE STATISTICS {name} ({kind}) ON "
                 f"{', '.join(cand.columns)} FROM {table}"
             )
-        # 2. analyze the base table so the statistic is populated
-        _analyze(conn, table)
-        # 3. measure the estimate + q-error under this single statistic
+        per_level: dict[int, dict] = {}
         try:
-            res = estimate_count_query(conn, query.sql, actual=query.ground_truth)
-            # capture on-disk size BEFORE dropping (row still exists)
-            size = stat_size_bytes(conn, name, kind)
+            for level in target_levels:
+                _set_target(conn, level)
+                _analyze(conn, table)
+                res = estimate_count_query(conn, query.sql, actual=query.ground_truth)
+                size = stat_size_bytes(conn, name, kind)
+                per_level[int(level)] = {
+                    "estimate": res.estimate,
+                    "qerror": res.qerror if res.qerror is not None else float("nan"),
+                    "size_bytes": size,
+                }
+            _reset_target(conn)
         finally:
-            # 4/5. drop the statistic and restore baseline via ANALYZE
             with conn.cursor() as cur:
                 cur.execute(f"DROP STATISTICS {name}")
             _analyze(conn, table)
+            _reset_target(conn)
 
-        mes.candidates[f"{cand.table_unqualified}({','.join(cand.columns)})"] = {
+        key = f"{cand.table_unqualified}({','.join(cand.columns)})"
+        mes.candidates[key] = {
             "table": cand.table,
             "columns": list(cand.columns),
-            "estimate": res.estimate,
-            "qerror": res.qerror if res.qerror is not None else float("nan"),
-            "size_bytes": size,
             "kind": kind,
+            "levels": per_level,
         }
 
     return mes
+
