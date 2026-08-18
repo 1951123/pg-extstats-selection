@@ -291,11 +291,25 @@ Two factors keep this tractable in practice:
 
 Measured sizes on the top-10 phase-1 file used in §5.6:
 `phys_stats=128, queries=10, options=341` → and HiGHS solves them in ~0.02–0.08 s
-(budget 20 KB–2 MB). The genuinely large case is a **full Census run**: ~19,245
-column combos × 3 levels ≈ **~57,700 physical stats** before pruning, which is
-the real scale question (not the 43M the candidate sum might suggest — those are
-*options*, and most are pruned). Open question 4 (§6) tracks whether the
-"one dominant candidate + prune" structure keeps *that* instance solvable.
+(budget 20 KB–2 MB). The genuinely large case is the **full Census solve**, now
+*actually constructed and solved* with `scripts/bench_census_solve_scale.py`
+(real baseline distribution for all 468 queries from
+`results/census_baseline_all.json`; candidate/level options synthesized with a
+realistic size model — problem **size** and solver time are purely structural).
+
+**Measured full-Census solve (468 queries, arities 2+3, levels 100/1000/10000):**
+
+| mode | phys stats | options | binary vars | build | solve | total |
+|------|-----------:|--------:|------------:|------:|------:|------:|
+| worst-case (no prune) | **57,735** | 92,568 | 150,303 | 0.24 s | 4.74 s | ~5.0 s |
+| realistic (prune ON)  | 34,280 | 46,392 | 80,672 | 0.14 s | 4.29 s | ~4.4 s |
+
+Both hit **HiGHS Status 7 (Optimal)** and selected 357 stats within a 1 MB
+budget (mean q-error ≈ 1.02). The no-prune row *is* the ~57.7 K physical-stats
+instance flagged as the open scale question — it solves in **under 5 seconds**.
+So **solve is not the bottleneck at full Census scale**; phase-1 measurement
+(building/ANALYZING ~19 K statistics objects on one table) is the expensive step,
+not the MILP.
 
 ### 5.8 Two more workload-driven clarifications (feedback C & D)
 
@@ -356,8 +370,12 @@ per-candidate, per-level q-errors + sizes needed by the ILP at ~60x lower cost.
    the actual database?) is the remaining closed-loop step.
 4. **Scalability / larger workloads** — how do ILP solve time and phase-1 cost
    scale to the full 468-query Census or 632-query stats_CEB-single, and does
-   the "one dominant candidate" finding hold at that scale? Empirical so far:
-   top-10 instances solve in <0.1 s even at 2 MB budget, and the Census
-   multi-candidate check (§5.5) shows the dominant-candidate property survives
-   on the widest table; the open item is a *full-workload* solve (≈57.7 K
-   physical stats pre-prune, §5.7) to confirm phase-1 and solve remain feasible.
+   the "one dominant candidate" finding hold at that scale? **RESOLVED for the
+   solve:** the full-Census MILP (57,735 physical stats, 150,303 binary vars,
+   worst-case no-prune) solves optimally in ~5 s (§5.7), so MILP solve is not
+   the bottleneck. The dominant-candidate property also survives on the widest
+   table (§5.5). What remains open is **phase-1 measurement** cost: creating
+   ~19 K statistics objects on one table (Census is single-table) and one
+   ANALYZE is the expensive step, and the 632-query stats_CEB_single measurement
+   (79 shared combos × 3 levels, much smaller) is the natural next full-workload
+   validation.
