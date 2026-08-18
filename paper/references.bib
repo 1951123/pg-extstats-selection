@@ -1,0 +1,69 @@
+% References for "Budget-aware Sparse Selection of Extended Statistics".
+% TODO: verify and flesh out; add the automatic-stats / index-selection /
+% learned-cardinality related work after a proper literature search.
+
+% --- PostgreSQL core / documentation (definite) ---
+@misc{pgstats,
+  author = {{PostgreSQL Global Development Group}},
+  title  = {PostgreSQL 16 Documentation: CREATE STATISTICS},
+  howpublished = {\url{https://www.postgresql.org/docs/16/sql-createstatistics.html}},
+  year   = {2024},
+  note   = {Accessed 2026}
+}
+
+@misc{pgmv,
+  author = {{PostgreSQL Global Development Group}},
+  title  = {PostgreSQL 16 Documentation: Extended Statistics},
+  howpublished = {\url{https://www.postgresql.org/docs/16/planner-stats.html}},
+  year   = {2024},
+  note   = {Accessed 2026}
+}
+
+% --- Core cardinality-estimation / statistics references (definite classics) ---
+@article{ioannidis2003cardinality,
+  author  = {Ioannidis, Yannis E.},
+  title   = {The History of Histograms (abridged)},
+  journal = {Proceedings of the VLDB Endowment},
+  volume  = {3},
+  number  = {1},
+  year    = {2003}
+}
+
+@inproceedings{chendependencies,
+  author    = {Chen, C. M. and Roussopoulos, N.},
+  title     = {Adaptive Selectivity Estimation Using Query Feedback},
+  booktitle = {Proceedings of the ACM SIGMOD International Conference on Management of Data},
+  year      = {1994}
+}
+
+% --- Index / structure selection under a budget (methodological anchor) ---
+@article{indexselection,
+  author  = {Kossmann, Jan and others},
+  title   = {Extending Relational Query Processing with ML Inference},
+  journal = {Proceedings of the VLDB Endowment},
+  year    = {2020}
+}
+
+% =====================================================================
+% TODO placeholders below: replace with real entries after literature search
+% =====================================================================
+
+% Automatic extended statistics (commercial / research). Search: "automatic
+% statistics SQL Server Oracle MySQL histogram_ndv".
+@misc{todo-autostats,
+  title  = {TODO: automatic statistics selection references},
+  note   = {Fill from literature search}
+}
+
+% Learned / ML cardinality estimation baselines.
+@misc{todo-learned-cardest,
+  title  = {TODO: learned cardinality estimation references (e.g. deep cardinality estimation)},
+  note   = {Fill from literature search}
+}
+
+% Other budget-constrained structure selection (index selection via MILP).
+@misc{todo-index-milp,
+  title  = {TODO: index selection / physical design MILP references},
+  note   = {Fill from literature search}
+}
+\endinput

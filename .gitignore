@@ -24,3 +24,13 @@ End-to-End-CardEst-Benchmark/
 # PostgreSQL 16.14 源码包与解压目录（本地源码参考，不纳入本仓库）
 postgresql-16.14.tar.bz2
 postgresql-16.14/
+
+# VLDB 论文 LaTeX 构建产物（保留 .tex/.bib/.cls/.bst/outline，忽略编译产物）
+paper/*.pdf
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out
+paper/comment.cut
+paper/*.synctex.gz

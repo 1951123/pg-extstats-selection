@@ -1,0 +1,272 @@
+% VLDB template version of 2020-08-03 enhances the ACM template, version 1.7.0:
+% https://www.acm.org/publications/proceedings-template
+\documentclass[sigconf, nonacm]{acmart}
+
+%% The following content must be adapted for the final version
+% paper-specific
+\newcommand\vldbdoi{XX.XX/XXX.XX}
+\newcommand\vldbpages{XXX-XXX}
+% issue-specific
+\newcommand\vldbvolume{14}
+\newcommand\vldbissue{1}
+\newcommand\vldbyear{2020}
+% should be fine as it is
+\newcommand\vldbauthors{\authors}
+\newcommand\vldbtitle{\shorttitle}
+% leave empty if no availability url should be set
+\newcommand\vldbavailabilityurl{}
+% whether page numbers should be shown or not, use 'plain' for review versions,
+% 'empty' for camera ready
+\newcommand\vldbpagestyle{plain}
+
+% packages useful for this paper
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{amsmath}
+
+\begin{document}
+
+\title{Budget-aware Sparse Selection of Extended Statistics}
+
+% TODO: authors. Placeholders below; fill real authors before submission.
+\author{Author One}
+\affiliation{%
+  \institution{Your Institution}
+  \city{City}
+  \country{Country}
+}
+\email{first.last@example.com}
+
+\author{Author Two}
+\affiliation{%
+  \institution{Your Institution}
+  \city{City}
+  \country{Country}
+}
+\email{first.last@example.com}
+
+\begin{abstract}
+TODO: one-paragraph abstract. Draft from outline.md §0: we formalise the
+selection of PostgreSQL extended statistics (\texttt{CREATE STATISTICS}) under a
+storage budget as a sparse, budget-constrained selection problem with an
+explicit \emph{capacity} dimension (each statistic's \texttt{statistics\_target}).
+On single-table workloads a single dominant column combination suffices per
+query, which makes the objective exactly linear and solvable with a mixed-integer
+program in seconds at full-workload scale. A catalog-mask measurement protocol
+makes per-candidate, per-capacity estimation feasible on wide tables. On
+join-heavy workloads extended statistics cannot act, which we use as a sharp
+negative control. End-to-end validation shows per-candidate prediction is sound,
+and isolates the residual risk to planner cross-talk among overlapping statistics.
+\end{abstract}
+
+\maketitle
+
+%%% do not modify the following VLDB block %%
+%%% VLDB block start %%%
+\pagestyle{\vldbpagestyle}
+\begingroup\small\noindent\raggedright\textbf{PVLDB Reference Format:}\\
+\vldbauthors. \vldbtitle. PVLDB, \vldbvolume(\vldbissue): \vldbpages, \vldbyear.\\
+\href{https://doi.org/\vldbdoi}{doi:\vldbdoi}
+\endgroup
+\begingroup
+\renewcommand\thefootnote{}\footnote{\noindent
+This work is licensed under the Creative Commons BY-NC-ND 4.0 International License. Visit \url{https://creativecommons.org/licenses/by-nc-nd/4.0/} to view a copy of this license. For any use beyond those covered by this license, obtain permission by emailing \href{mailto:info@vldb.org}{info@vldb.org}. Copyright is held by the owner/author(s). Publication rights licensed to the VLDB Endowment. \\
+\raggedright Proceedings of the VLDB Endowment, Vol. \vldbvolume, No. \vldbissue\ %
+ISSN 2150-8097. \\
+\href{https://doi.org/\vldbdoi}{doi:\vldbdoi} \\
+}\addtocounter{footnote}{-1}\endgroup
+%%% VLDB block end %%%
+
+\section{Introduction}
+\label{sec:intro}
+
+% TODO (write last; see outline.md §1). Three-paragraph structure:
+% 1) hook: modern DBMS rely on multi-column correlation estimates; CREATE
+%    STATISTICS is the primitive; "which stats, how big" is hand-tuned by DBAs.
+%    Surprising finding: on single-table workloads, one well-chosen 3-column MCV
+%    repairs q-error from thousands down to ~1.
+% 2) two decision dimensions: (a) which (table, columns) combos, (b) which
+%    capacity level (statistics_target). Combo explosion (Census: up to 455
+%    candidates/query, 19,245 globally); capacity couples precision/storage with
+%    a single high-target stat dragging ANALYZE to a full scan.
+% 3) our answers: single-table workloads reduce to an exactly-linear sparse
+%    selection problem solved by MILP in seconds at full-workload scale;
+%    join workloads are a negative control; catalog-mask protocol makes
+%    measurement feasible on wide tables; E2E validation.
+% Contributions (bulleted, from outline.md §0).
+
+\section{Background and Related Work}
+\label{sec:back}
+
+\subsection{Cardinality Estimation and Multi-column Correlation}
+
+% Independent column assumption; per-column histograms/MCVs fail on correlated
+% columns; extended statistics (mcv/ndistinct/dependencies); we focus on MCV.
+
+\subsection{How PostgreSQL Actually Uses Extended Statistics}
+\label{sec:mechanisms}
+
+% Verified facts (see docs §1, §2):
+%  - CREATE STATISTICS ... (mcv); pg_statistic_ext / pg_statistic_ext_data.
+%  - Per-object capacity via ALTER STATISTICS ... SET STATISTICS N
+%    (stxstattarget); ANALYZE samples at the MAX target over all statistics
+%    (analyze.c targrows) -> one high-target stat forces full scan.
+%  - Scope restriction (source-verified): extended stats act only on
+%    single-relation restriction clauses; eqjoinsel never consults
+%    pg_statistic_ext -> cannot improve JOIN estimation.
+% Table: capacity-level cost/repair matrix (t100/t1000/t10000), from docs §5.3.
+
+\subsection{Related Work}
+
+% Automatic statistics selection in commercial DBMS; index-/structure-selection
+% using MILP/greedy (methodological comparison point: our sparsity + global
+% sharing + capacity dimension); learned cardinality estimation (we measure the
+% real planner, not a surrogate). TODO: fill biblio in paper/references.bib.
+
+\section{Problem Formulation}
+\label{sec:formulation}
+
+\subsection{Notation and Objective}
+\label{sec:notn}
+
+% q-error qerr(est,act)=max/min >=1 ; baseline e_i^0; statistic
+% s=(table,cols,level); cost c_s bytes; per-query effective q-error e_is.
+% Objective: min 1/n sum_i qerr_i(T_i) s.t. sum_s c_s y_s <= C.
+% Shared-resource semantics: x_is <= y_s (built once, paid once).
+
+\subsection{Multi-select vs.\ the Sparse Special Case}
+\label{sec:sparse}
+
+% General multi-select needs a multiplicative approximation in log space; the
+% approximation breaks for column-overlapping stats (joint interference).
+% Sparse special case (this paper's model): at most one statistic per query
+% (per_query_cap=1) makes the objective EXACTLY linear:
+% \min \sum_i ( e_i^0 - \sum_s (e_i^0 - e_is) x_is ),  s.t. sum_s x_is <= 1.
+
+\section{Optimization: Sparse MILP with Capacity Levels}
+\label{sec:milp}
+
+\subsection{Variables and Objective}
+
+% binary y_s (create), x_is (query i uses s); objective sum_{i,s}
+% log(e_is/e_i^0) x_is; linear in the sparse case.
+
+\subsection{Constraints}
+
+% 1) storage budget sum c_s y_s <= C
+% 2) x_is <= y_s (shared y_s across queries)
+% 3) (multi-select) overlap-free within query; replaced by per-query cap in sparse
+% 4) capacity-level exclusivity: at most one level per (table,cols)
+% 5) sparse per-query cap sum_s x_is <= 1 (optional)
+
+\subsection{Pruning and Solve Scalability}
+\label{sec:scale}
+
+% skip_worse_than_baseline pruning + global dedup. Full-Census measured sizes
+% (docs §5.7 / results):
+%   no-prune (worst): 57,735 phys stats, 92,568 options, 150,303 vars -> 4.74 s
+%   prune ON        : 34,280 phys stats, 46,392 options,  80,672 vars -> 4.29 s
+% Both HiGHS Optimal. Solve is not the bottleneck; phase-1 measurement is.
+
+\section{Measurement Infrastructure}
+\label{sec:measure}
+
+% Protocol-A (per-candidate CREATE+ANALYZE+EXPLAIN) is infeasible on wide tables
+% (Census ANALYZE ~20s each; 1000 ext stats ~264s). Catalog-mask Protocol-M:
+% build all candidates in one ANALYZE; mask others via NULL-ing
+% pg_statistic_ext_data payload; per-candidate per-level q-error + size at ~60x
+% lower cost. Multi-level via ALTER STATISTICS + one ANALYZE at max target.
+% (docs §5.4; src/extstats/measure_mask.py)
+
+\section{Empirical Findings}
+\label{sec:findings}
+
+\subsection{Experimental Setup}
+\label{sec:setup}
+
+% PG 16.14; four workloads (docs §1.1): Census(468, single 69-col),
+% JOB(113, joins), stats_CEB(146, joins), stats_CEB_single(632, single-table).
+% Targets: t10000 deterministic for measurement, t1000 default. q-error metric.
+
+\subsection{Single-table Selection Predicates Are Fixable}
+\label{sec:fixable}
+
+% Census: every high-baseline query has a single 3-col MCV taking q-error from
+% hundreds to ~1 (q184: 4162 -> 1.08; verified by independent real ANALYZE:
+% 54107 -> 14 rows). stats_CEB_single: ~4.6 -> 1.0-1.06.
+% Table from phase1_census_mask_top10.json (docs §5.1).
+
+\subsection{One Dominant Candidate per Query; Multi-candidate Adds Nothing}
+\label{sec:dominant}
+
+% Greedy top-1/2/3 non-overlap, joint measured q-error unchanged (docs §5.5).
+% Confirmed on wide Census: query.184 (165 cands) / query.382 (56 cands)
+% k=1,2,3 identical at L1000 and L10000. => sparsity is not an artefact of a
+% small candidate space.
+
+\subsection{Sparse MILP under a Storage Budget}
+\label{sec:budget}
+
+% stats_CEB_single top-10 budget curve (docs §5.6):
+% 20KB->1.864(+56.7%), 40KB->1.821, 100KB->1.632, 2MB->1.021.
+% Global non-greedy: tight budgets degrade capacity levels, not coverage.
+% Figure: budget (log) vs mean q-error (matplotlib).
+
+\subsection{Join Workloads as Negative Control}
+\label{sec:negctrl}
+
+% JOB: 37/113 ~33% have candidates; dedup -> 7 unique combos; errors are
+% join-driven and extended stats cannot act. Expected null result (docs §5.8D).
+
+\subsection{Capacity-Level Trade-off}
+\label{sec:capacity}
+
+% t100/1000/10000 ANALYZE cost (0 and 1000 ext stats) + repair quality (docs §5.3);
+% t1000 is the maintenance/repair sweet spot.
+
+\section{End-to-End Validation}
+\label{sec:e2e}
+
+\subsection{Experiment}
+
+% Build the ILP 2MB solution (5 stats) on the real DB; measured mean 1.32 vs
+% predicted 1.021 (docs §5.9). Per-query table: 5 match, 3 degrade.
+
+\subsection{Attribution: Concurrent Overlapping Stats Interfere}
+
+% Single-stat control: the stat alone reproduces the mask prediction
+% (st.144->1.042, st.588->1.029, st.284->1.025); with all 5 overlapping MCVs
+% co-present the planner switches some queries to a sub-optimal overlapping stat
+% (2.13/2.07/1.90). Per-candidate prediction is sound; residual risk is
+% planner cross-talk on overlapping concurrent stats.
+
+\subsection{Implications for the Model}
+
+% E2E predictability holds when concurrent stats are column-disjoint (Census
+% §5.2: all preserved). Refinement: prefer column-disjoint selected sets, or a
+% post-solve interference check.
+
+\section{Discussion and Open Questions}
+\label{sec:disc}
+
+% Why one dominant candidate: a single correlated column cluster drives
+% single-table selection error. True scalability bottleneck is phase-1
+% measurement, not the MILP. Limitations: MCV focus; single-table workloads;
+% real-system object-count limits; join workloads need other techniques.
+
+\section{Conclusion}
+\label{sec:concl}
+
+% Restate: formulation (sparse + capacity), measurement infra (Protocol-M),
+% sparse empirical finding, solvability, honest E2E assessment.
+
+\begin{acks}
+TODO: acknowledgements.
+\end{acks}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+
+\end{document}
+\endinput
