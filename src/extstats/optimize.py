@@ -1,32 +1,40 @@
 """Phase-2 MILP: choose a budgeted set of extended-statistics (combo, capacity)
 options that minimises the workload's average q-error.
 
-Model
------
-Input (from a phase-1 results JSON):
-  - queries i = 1..m, each with a baseline q-error ``qerror_base`` and a set of
-    candidate options O_i. Each option k corresponds to a physical statistic
-    ``s(k) = (table, columns, capacity)`` and carries a q-error ``e_ik``.
-  - physical statistics s in S, each with storage cost ``c_s`` (size_bytes).
-  - global storage budget C.
+Model (multi-select, multiplicative approximation)
+--------------------------------------------------
+A query may select ANY subset of its candidate statistics (powerset semantics):
+multiple independent column-combinations can all be built for the same query.
+Because measuring every subset empirically is infeasible, we approximate the
+joint effect multiplicatively in log space:
 
-Decision variables (all binary):
-  - y_s   : create physical statistic s
-  - x_ik  : query i selects option k
+    log e_i(T_i)  ≈  log e_i^0 + sum_{s in T_i} log(e_is / e_i^0)
+
+This is exact when each statistic's effect on the query is independent (which
+holds when the chosen combinations do not share columns). To keep the
+approximation valid we forbid selecting column-overlapping statistics *within
+a single query*, so the terms are independent.
+
+Variables (all binary):
+  - y_s   : create physical statistic s (table, columns, capacity)
+  - x_is  : query i selects statistic s
+
+Objective (minimise mean q-error; equivalently sum of log-q-error since the
+log is monotone and the common offset is constant):
+
+    sum_i log e_i^0            <- constant
+  + sum_{i,s} w_is * x_is      <- w_is = log(e_is/e_i^0) <= 0
 
 Constraints:
-  1) storage budget       : sum_s c_s * y_s <= C
-  2) at most one option   : sum_{k in O_i} x_ik <= 1   (query i, else baseline)
-  3) select only created  : x_ik <= y_{s(k)}           (share a physical stat)
+  1) storage budget  : sum_s c_s * y_s <= C
+  2) select created  : x_is <= y_s                     (all queries share y_s)
+  3) overlap-free    : within each query, column-overlapping stats can't both
+                       be chosen: x_{i s_a} + x_{i s_b} <= 1 for overlapping
+                       pairs (keeps the multiplicative approximation valid).
 
-Objective (minimise mean q-error):
-    minimise (1/m) * sum_i t_i
-where t_i = qerror_base_i + sum_{k in O_i} (e_ik - qerror_base_i) * x_ik,
-which is exact because sum_k x_ik <= 1 makes at most one term nonzero.
-
-Because y_s is shared across queries (constraint 3) but paid once in the budget
-(constraint 1), multiple queries reusing the same statistic pay its storage
-only once — the "shared resource" semantics.
+Because y_s is shared across queries (2) but paid once in the budget (1),
+multiple queries reusing the same statistic pay its storage only once — the
+"shared resource" semantics.
 """
 
 from __future__ import annotations
@@ -38,9 +46,6 @@ import numpy as np
 from scipy.optimize import Bounds, LinearConstraint, milp
 from scipy.sparse import lil_matrix
 
-# Upper bound used for the implicit binary boxes (<=1) of y variables.
-_BIG = 1.0
-
 
 @dataclass(frozen=True)
 class Option:
@@ -48,14 +53,17 @@ class Option:
 
     # Index into physical statistic list (which carries storage cost).
     stat_index: int
-    # q-error if this query selects this option.
+    # q-error if this query selects this option (EFFECTIVE, not log).
     qerror: float
-    # query id (informational)
+    # capacity level
+    level: int
+    # informational fields
     query: str = ""
-    # candidate key (table(columns)) informational
     cand: str = ""
-    # capacity level (informational)
-    level: int = 0
+
+    def log_improvement(self, qbase: float) -> float:
+        """w = log(e_is / e_i^0), <= 0 when the stat helps."""
+        return float(np.log(max(self.qerror, 1e-12) / max(qbase, 1e-12)))
 
 
 @dataclass(frozen=True)
@@ -67,7 +75,6 @@ class PhysicalStat:
     level: int
     # storage cost in bytes
     cost: int
-    # a readable key
     key: str = ""
 
     def __post_init__(self) -> None:
@@ -82,45 +89,37 @@ class PhysicalStat:
 class ILPResult:
     """Solution of the phase-2 ILP."""
 
-    # optimal mean q-error
     mean_qerror: float
-    # per-query achieved q-error
+    # per-query achieved q-error (multiplicative approximation)
     qerror_per_query: list[float]
-    # baseline per-query q-error (pre)
     baseline_per_query: list[float]
-    # selected physical statistics (created)
     selected_stats: list[PhysicalStat]
-    # total storage used
     total_bytes: int
-    # per-query chosen option (stat key or None for baseline)
-    chosen: list[Optional[str]]
-    # solver status / message
+    # per-query chosen stat keys (list may be empty -> baseline)
+    chosen: list[list[str]]
     status: int
     message: str
 
 
 def build_problem(
     phase1: dict,
-    budget_bytes: int,
     *,
     skip_worse_than_baseline: bool = True,
-) -> tuple[list[Option], list[PhysicalStat], list[list[Option]], list[float]]:
-    """Build (options, phys_stats, queries_options, qerror_base) from a phase-1
-    results dict.
+) -> tuple[list[PhysicalStat], list[list[Option]], list[float]]:
+    """Build (phys_stats, queries_options, qerror_base) from a phase-1 dict.
+
+    Options with q-error >= baseline are dropped (they can never help under the
+    multiplicative model: log(e_is/e_i0) >= 0 only increases the objective).
 
     Parameters
     ----------
-    phase1 : loaded phase-1 JSON (keys: results, and each result has
-        qerror_base + candidates{... levels{...}})
-    budget_bytes : storage budget (kept for reference; returned stats only)
-    skip_worse_than_baseline : if True, drop options with qerror >= baseline
-        (they can never be chosen in the optimum, shrinking the problem).
+    phase1 : loaded phase-1 JSON with key "results".
+    skip_worse_than_baseline : drop dominated options (default True).
     """
     results = phase1["results"]
     qerror_base: list[float] = []
     queries_options: list[list[Option]] = []
-    all_options: list[Option] = []
-    # phys stat unique key -> index
+
     stat_index: dict[str, int] = {}
     phys_stats: list[PhysicalStat] = []
 
@@ -134,8 +133,6 @@ def build_problem(
             for level_str, lv in cand.get("levels", {}).items():
                 level = int(level_str)
                 qerr = float(lv["qerror"])
-                # Option that is worse (or equal) than baseline is dominated;
-                # skip unless caller wants it.
                 if skip_worse_than_baseline and qerr >= base:
                     continue
                 stat_key = f"{table}|{','.join(cols)}|L{level}"
@@ -149,130 +146,127 @@ def build_problem(
                             cost=int(lv["size_bytes"]),
                         )
                     )
-                o = Option(
-                    stat_index=stat_index[stat_key],
-                    qerror=qerr,
-                    query=str(r["qid"]),
-                    cand=cand_key,
-                    level=level,
+                opts.append(
+                    Option(
+                        stat_index=stat_index[stat_key],
+                        qerror=qerr,
+                        level=level,
+                        query=str(r["qid"]),
+                        cand=cand_key,
+                    )
                 )
-                opts.append(o)
-                all_options.append(o)
         queries_options.append(opts)
 
-    return all_options, phys_stats, queries_options, qerror_base
+    return phys_stats, queries_options, qerror_base
+
+
+def _overlap_pairs(query_options: list[Option], phys_stats: list[PhysicalStat]):
+    """Yield pairs of option indices (within one query) whose stats share a
+    column, so at most one can be chosen (keeps multiplicative approx valid)."""
+    for a in range(len(query_options)):
+        cols_a = set(phys_stats[query_options[a].stat_index].columns)
+        for b in range(a + 1, len(query_options)):
+            cols_b = set(phys_stats[query_options[b].stat_index].columns)
+            if cols_a & cols_b:
+                yield a, b
 
 
 def solve_ilp(
-    all_options: list[Option],
     phys_stats: list[PhysicalStat],
     queries_options: list[list[Option]],
     qerror_base: list[float],
     budget_bytes: int,
 ) -> ILPResult:
-    """Solve the shared-resource selection ILP with scipy.optimize.milp.
+    """Solve the multi-select shared-resource ILP with scipy.optimize.milp.
 
     Variables:
-      0 .. n_stats-1           : y_s (create physical stat)
-      n_stats .. n_stats+n_opt : x_ik (query selects option)
+      0 .. n_stats-1            : y_s (create physical stat)
+      n_stats .. n_stats+n_opt  : x_is (query selects option)
     """
-    n_stats = len(phys_stats) if phys_stats else 0
-    n_opt = len(all_options)
+    n_stats = len(phys_stats)
+    n_opt = sum(len(opts) for opts in queries_options)
     n_var = n_stats + n_opt
-
-    # Map (query, option) -> x variable index.
-    # all_options is in the same order as encountered while building per-query lists
-    # but queries_options references Option objects; we need a position map.
-    # Rebuild a global position index for options in all_options.
-    opt_index = {id(o): i for i, o in enumerate(all_options)}
-
-    # ---- objective coefficients ----
-    # Minimise mean q-error: c = (1/m) * delta_ik on x vars (0 on y vars),
-    # plus constant sum(qerror_base)/m which milp handles via offset? milp has
-    # no integer offset; we add it back in the result.
     m = len(qerror_base)
+
+    # ---- objective: sum log e_i = const + sum w_is x_is ----
     c = np.zeros(n_var)
+    gi = 0
     for q_idx, opts in enumerate(queries_options):
-        base = qerror_base[q_idx]
+        qbase = qerror_base[q_idx]
         for o in opts:
-            vi = opt_index[id(o)]
-            c[n_stats + vi] = (o.qerror - base) / m
-    integrality = np.ones(n_var)  # all binary
+            c[n_stats + gi] = o.log_improvement(qbase)
+            gi += 1
+    integrality = np.ones(n_var)
 
     # ---- constraints ----
-    n_con = 1 + m + n_opt  # budget + query-cardinality + select-only-created
+    # 1) storage budget
+    # 2) x_is <= y_s
+    # 3) overlap-free within each query (x_a + x_b <= 1)
+    n_overlap = 0
+    for opts in queries_options:
+        n_overlap += len(list(_overlap_pairs(opts, phys_stats)))
+    n_con = 1 + n_opt + n_overlap
+
     A = lil_matrix((n_con, n_var))
-    lb = np.full(n_con, -np.inf)
     ub = np.full(n_con, np.inf)
-    row = 0
+    nrow = 0
 
-    # 1) storage budget: sum c_s y_s <= C
+    # 1) storage budget: sum_s c_s y_s <= C
     for s_idx, ps in enumerate(phys_stats):
-        A[row, s_idx] = ps.cost
-    ub[row] = budget_bytes
-    lb[row] = -np.inf
-    row += 1
+        A[nrow, s_idx] = ps.cost
+    ub[nrow] = budget_bytes
+    nrow += 1
 
-    # 2) per-query at most one option: sum x_ik <= 1
-    for q_idx, opts in enumerate(queries_options):
+    # 2) x_is - y_{s} <= 0
+    gi = 0
+    for opts in queries_options:
         for o in opts:
-            A[row, n_stats + opt_index[id(o)]] = 1.0
-        ub[row] = 1.0
-        lb[row] = -np.inf
-        row += 1
+            A[nrow, n_stats + gi] = 1.0
+            A[nrow, o.stat_index] = -1.0
+            ub[nrow] = 0.0
+            gi += 1
+            nrow += 1
 
-    # 3) x_ik <= y_{s(k)}  =>  x_ik - y_{s(k)} <= 0
-    for o in all_options:
-        vi = n_stats + opt_index[id(o)]
-        A[row, vi] = 1.0
-        A[row, o.stat_index] = -1.0
-        ub[row] = 0.0
-        lb[row] = -np.inf
-        row += 1
+    # 3) overlap-free within query: x_a + x_b <= 1
+    gi = 0
+    for opts in queries_options:
+        for a, b in _overlap_pairs(opts, phys_stats):
+            A[nrow, n_stats + gi + a] = 1.0
+            A[nrow, n_stats + gi + b] = 1.0
+            ub[nrow] = 1.0
+            nrow += 1
+        gi += len(opts)
 
-    constraints = LinearConstraint(
-        A.tocsr(), lb=np.array(lb), ub=np.array(ub)
-    )
+    constraints = LinearConstraint(A.tocsr(), lb=np.full(n_con, -np.inf), ub=ub)
     bounds = Bounds(lb=np.zeros(n_var), ub=np.ones(n_var))
 
-    res = milp(
-        c=c,
-        integrality=integrality,
-        bounds=bounds,
-        constraints=constraints,
-    )
-
-    # ---- decode ----
+    res = milp(c=c, integrality=integrality, bounds=bounds, constraints=constraints)
     if res.x is None:
         raise RuntimeError(f"ILP failed: {res.message}")
 
     x = res.x
-    selected = [
-        phys_stats[s_idx]
-        for s_idx in range(n_stats)
-        if x[s_idx] > 0.5
-    ]
+    selected = [phys_stats[s_idx] for s_idx in range(n_stats) if x[s_idx] > 0.5]
     total_bytes = int(sum(ps.cost for ps in selected))
 
+    # decode per-query chosen stats + approximate (multiplicative) qerror
     qerr_per_query: list[float] = []
-    chosen: list[Optional[str]] = []
-    mean = 0.0
+    chosen: list[list[str]] = []
+    gi = 0
     for q_idx, opts in enumerate(queries_options):
-        base = qerror_base[q_idx]
-        t = base
-        chosen_key: Optional[str] = None
-        for o in opts:
-            if x[n_stats + opt_index[id(o)]] > 0.5:
-                t = o.qerror
-                chosen_key = phys_stats[o.stat_index].key
-                break
-        qerr_per_query.append(t)
-        mean += t
-        chosen.append(chosen_key)
-    mean /= m
+        qbase = qerror_base[q_idx]
+        log_t = np.log(max(qbase, 1e-12))
+        sel_keys: list[str] = []
+        for j, o in enumerate(opts):
+            if x[n_stats + gi + j] > 0.5:
+                log_t += o.log_improvement(qbase)
+                sel_keys.append(phys_stats[o.stat_index].key)
+        qerr_per_query.append(float(np.exp(log_t)))
+        chosen.append(sel_keys)
+        gi += len(opts)
 
+    mean_qerror = float(np.mean(qerr_per_query))
     return ILPResult(
-        mean_qerror=mean,
+        mean_qerror=mean_qerror,
         qerror_per_query=qerr_per_query,
         baseline_per_query=list(qerror_base),
         selected_stats=selected,

@@ -51,14 +51,12 @@ def main(argv: list[str] | None = None) -> int:
     budgets = [int(b) for b in args.budget.split(",") if b.strip()]
 
     # Build the problem once (shared across budget sweeps).
-    all_options, phys_stats, queries_options, qerror_base = build_problem(
-        phase1, budget_bytes=0
-    )
+    phys_stats, queries_options, qerror_base = build_problem(phase1)
     m = len(qerror_base)
     base_mean = float(np.mean(qerror_base))
-    n_opt = len(all_options)
+    n_opt = sum(len(opts) for opts in queries_options)
 
-    print(f"=== phase-2 ILP ===")
+    print(f"=== phase-2 ILP (multi-select, multiplicative approx) ===")
     print(f"queries={m}  options={n_opt}  physical_stats={len(phys_stats)}")
     print(f"baseline mean q-error = {base_mean:.3f}")
 
@@ -66,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     for budget in budgets:
         t0 = time.time()
         res = solve_ilp(
-            all_options, phys_stats, queries_options, qerror_base,
+            phys_stats, queries_options, qerror_base,
             budget_bytes=budget,
         )
         dt = time.time() - t0
