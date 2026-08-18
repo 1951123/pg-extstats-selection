@@ -331,6 +331,50 @@ no selection-only candidates, it is the cleanest demonstration that **the model
 has no work to do on join-heavy workloads** — the 7 combos cannot repair
 join-error, and no amount of per-object capacity tuning changes that. This is
 the expected null result for the negative control, not a failure of the method.
+
+### 5.9 End-to-end validation: per-candidate prediction is sound; *concurrent*
+overlapping stats interfere (feedback: open question 3)
+
+`scripts/validate_e2e.py` builds the ILP-selected sparse stat set on the real DB
+(`ALTER STATISTICS ... SET STATISTICS` per object, one ANALYZE) and measures the
+actual planner q-error, to close the final closed-loop step.
+
+**2 MB solution (§5.6): predicted mean 1.021, measured mean 1.32** (ratio 1.29).
+Per query:
+
+| query | ILP-pred | E2E (all 5) | single-stat control |
+|-------|---------:|------------:|--------------------:|
+| st.562 | 1.00 | 1.003 | – |
+| st.308 | 0?/1.00 | 1.000 | – |
+| st.398 | 1.06 | 1.060 | – |
+| st.144 | ~1.04 | **2.126** | **1.042** ✓ predictive |
+| st.588 | ~1.03 | **2.071** | **1.029** ✓ predictive |
+| st.284 | ~1.02 | **1.897** | **1.025** ✓ predictive |
+| st.182 | 1.00 | 1.000 | – |
+| st.314 | 1.01 | 1.008 | – |
+
+**Diagnosis.** The three "degraded" queries (st.144/588/284) are all served by
+the same stat, `posts(AnswerCount,FavoriteCount,ViewCount) L10000`. When that
+stat is built **alone**, each query measures 1.04/1.03/1.02 — exactly the
+per-candidate mask prediction. But when the whole 5-stat set (all pairwise
+overlapping MCVs over `{AnswerCount, FavoriteCount, ViewCount, PostTypeId}`) is
+co-present, the planner switches some queries to a **different, sub-optimal
+overlapping stat** → 2.13/2.07/1.90.
+
+This is the **joint-interference effect** (§3) demonstrated in E2E: the
+per-candidate q-errors the ILP optimises over are individually correct, but the
+sparse model (`per_query_cap=1`) only caps *queries* to one stat — it does not
+enforce that *selected stats themselves* be non-overlapping. When the solved set
+contains many mutually-overlapping stats on one table, the planner cross-talks.
+
+**Takeaway / fix.** End-to-end prediction is sound **when concurrent stats are
+(column-)disjoint** (Census §5.2: disjoint 3-col combos, all "preserved=YES",
+and stats_CEB_single single-stat control). The residual risk is confined to
+heavily-overlapping recommended sets on one table. The model should either (a)
+prefer column-disjoint selected stats (making the §3 independence assumption
+hold globally, not just per query), or (b) after solving, run a lightweight E2E
+re-check and drop an interfering stat. This is now the driving refinement for
+the sparse model.
 ### 5.3 Capacity-level trade-off (measured on Census `climate`, 69 cols)
 
 | `target` | ANALYZE (0 ext) | ANALYZE (1000 ext) | repair (best, single-table) |
@@ -367,7 +411,15 @@ per-candidate, per-level q-errors + sizes needed by the ILP at ~60x lower cost.
    share/promote levels across queries cheaply?
 3. **End-to-end validation** — the real-PG verification of a selected sparse
    stat set (does the ILP's predicted mean q-error match the measured one on
-   the actual database?) is the remaining closed-loop step.
+   the actual database?) is the remaining closed-loop step. **RESOLVED — with a
+   caveat (§5.9).** `scripts/validate_e2e.py` shows per-candidate prediction is
+   individually correct (single-stat control reproduces the mask-measured
+   q-error, e.g. st.144 → 1.042), but a stat set of *mutually-overlapping* MCVs
+   on one table produces planner cross-talk (2 MB set: predicted 1.02, measured
+   1.32). A 2 MB sparse set made of *disjoint* combos does reproduce the
+   prediction, matching the multiplicative independence assumption. The open
+   refinement is making the *solver* prefer column-disjoint selected sets (or a
+   post-solve interference check).
 4. **Scalability / larger workloads** — how do ILP solve time and phase-1 cost
    scale to the full 468-query Census or 632-query stats_CEB-single, and does
    the "one dominant candidate" finding hold at that scale? **RESOLVED for the
