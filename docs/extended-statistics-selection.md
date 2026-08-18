@@ -47,6 +47,41 @@ subject to a **storage budget** on the physical statistics actually created.
 
 ---
 
+## 1.1 Benchmarks & candidate distribution
+
+The project ships four query workloads (parsers in `src/extstats/parsers/`):
+
+| benchmark | structure | tables | queries | DB |
+|-----------|-----------|--------|---------|----|
+| **Census** | single table | 1 (`climate`, 69 cols, ~2.45 M rows) | 468 | `census` |
+| **JOB / IMDB** | multi-table joins | many | 113 | `imdb` |
+| **stats_CEB** (join) | multi-table joins | 8 (StackExchange) | 146 | `stats` |
+| **stats_CEB_single** | single-table sub-plans of the same schema | 8 (each used alone) | 632 | `stats` |
+
+The two single-table workloads (Census and stats_CEB_single) are where extended
+statistics can act (§1: only single-table selection predicates are fixable); the
+join workloads serve as the negative control.
+
+**Candidate distribution** (2- and 3-column combos from each query's selection
+predicates; `generate_candidates_per_query`):
+
+| benchmark | total candidates (per-query) | queries with any | global dedup | per-query candidates (min / med / max) |
+|-----------|------------------------------|------------------|--------------|----------------------------------------|
+| Census | 30856 | 467 / 468 | 19245 | 1 / **56** / 455 |
+| JOB | 50 | 37 / 113 | 7 | 1 / 1 / 4 |
+| stats_CEB | 609 | 108 / 146 | 79 | 1 / 4 / 39 |
+| stats_CEB_single | 616 | 180 / 632 | 79 | 1 / 1 / 35 |
+
+Census per-query candidate counts are right-skewed (median 56, 75th pct 84, 90th
+pct 165, max 455) — a single Census query can have hundreds of candidate
+combinations, which is why wide-table measurement required the catalog-mask
+protocol (§5.4). In contrast, JOB has almost no candidates (median 1, global
+dedup only 7) because its predicates are mostly single-column or join-based;
+stats_CEB_single has many queries but few candidates each (median 1), and its
+few candidates are highly shared (global dedup 79).
+
+---
+
 ## 2. Two decision dimensions
 
 A "statistic" is not atomic; each has a **capacity level** controlled by its
