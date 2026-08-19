@@ -846,6 +846,56 @@ level mix shows budget spent on capacity (L100/L1000/L10000), not just coverage.
 \label{fig:budgetquality}
 \end{figure}
 
+\subsubsection{What-only vs.\ what+how-much.}
+The claim that capacity is a real decision axis requires isolating it: does
+free choice of \texttt{statistics\_target} beat \emph{fixed-capacity
+column-only} selection under the \emph{same} budget? We solve the sparse MILP,
+at each budget, for four variants on the full 632-query workload: the full
+\emph{what+how-much} model (free level choice) and three \emph{what-only}
+models that lock every selected statistic to a single level (all L100, all
+L1000, or all L10000). Table \ref{tab:whathowmuch} reports, for each budget,
+the full model's mean/max q-error against the \emph{best} what-only variant.
+
+\begin{table}[t]
+\caption{What-only (fixed capacity) vs.\ what+how-much (capacity-aware) MILP on
+the 632-query workload. ``Best what-only'' is the best of the all-L100 /
+all-L1000 / all-L10000 column-selection variants at that budget. The full model
+is never worse, and at generous budgets it keeps collapsing the \emph{tail}
+(max) where fixed-capacity selection saturates.}
+\label{tab:whathowmuch}
+\small
+\begin{tabular}{lcc@{\hskip 6pt}cc}
+\toprule
+ & \multicolumn{2}{c}{what+how-much} & \multicolumn{2}{c}{best what-only}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+budget & mean & max & mean & max\\
+\midrule
+5\,\,KB    & 1.0327 & 2.23 & 1.0327 & 2.23\\
+10\,KB   & 1.0264 & 2.19 & 1.0264 & 2.19\\
+20\,KB   & 1.0237 & 2.19 & 1.0243 & 2.19\\
+40\,KB   & 1.0188 & 2.19 & 1.0212 & 2.19\\
+100\,KB  & 1.0156 & 2.19 & 1.0158 & 2.19\\
+250\,KB  & \textbf{1.0040} & \textbf{1.45} & 1.0117 & 2.19\\
+500\,KB  & \textbf{1.0014} & \textbf{1.17} & 1.0018 & 1.26\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three observations. First, the capacity-aware model is \emph{never worse} than
+the best fixed-capacity variant at any budget --- free level choice dominates
+choosing any single level. Second, the advantage is concentrated in the tail:
+at 250--500\,KB the what-only variants saturate (all-L100 / all-L1000 keep a
+maximum q-error of 2.19 at every budget), whereas the full model keeps driving
+the maximum down (1.45 at 250\,KB, 1.17 at 500\,KB), because it spends the
+allocated budget \emph{upgrading} the dominant combinations' capacity rather
+than merely adding more coverage. Third, the mechanism is visible in the chosen
+level mix: at 250\,KB the full model deploys 14 statistics spread across
+L100/L1000/L10000 (4/6/4) --- it mixes capacities --- while what-only-L10000
+spends the same budget on 12 all-heavy statistics and still leaves a larger
+tail. This is the same capacity-reallocation behaviour that separates the MILP
+from greedy (above) and from a column-only optimizer: the ``how much'' axis is
+not a modelling luxury but the component that buys the last, hardest repairs.
+
 \subsection{RQ4: Does the Approach Scale?}
 \label{sec:rq4}
 
@@ -907,7 +957,10 @@ full (ours)         & \textbf{1.0327} & \textbf{1.0156}\\
 
 Disabling the \emph{capacity} axis (allowing only L10000) hurts clearly at
 tight budgets (1.033 $\to$ 1.057 at 5 KB), confirming that capacity allocation
---- the ``how much'' dimension --- is a real, load-bearing component. In
+--- the ``how much'' dimension --- is a real, load-bearing component; the full
+budget sweep in \S\ref{sec:rq3} (Table \ref{tab:whathowmuch}) shows the same
+advantage of capacity awareness over every fixed what-only level, concentrated
+in the tail. In
 contrast, both the sparse per-query cap and the worse-than-baseline pruning are
 \emph{free}: they reproduce the full quality while shrinking the problem
 (pruning cuts 2{,}085 to 1{,}178 variables at 100 KB with identical quality).
