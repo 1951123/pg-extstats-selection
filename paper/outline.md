@@ -112,12 +112,14 @@ Extended Statistics*
 ### 6. Empirical Findings（按 RQ 结构）
 - **RQ1 Capacity matters?** → Yes。t100/t1000/t10000 质量 ~2.1-2.3 / ~1.2-2.1 /
   ~1.0。target 直接决定精度，不只是存储。
-- **RQ2 One stat per query?** → Yes。k=1≈2≈3（stats_CEB_single + CENSUS 宽表）。
-  **这是论文最漂亮的一张图**。
-- **RQ3 MILP vs budgeted greedy?** → 诚实表述：充足预算下 greedy 并集 == ILP
-  （同 5 stats, mean 1.021）。ILP 独特价值在**紧预算**：重分配 capacity 而非
-  删覆盖（20KB→1.864, 40KB→1.821, 100KB→1.632, 2MB→1.021 平滑曲线）。
-  需补 **budgeted-greedy 对照**（greedy 也在预算内降档）以量化紧预算优势。
+- **RQ2 One stat per query?** → Yes。k=1≈2≈3（stats_CEB + CENSUS 宽表）。
+  **已升级为分布级证据(P4)**：全 632 查询中 base>1.2 的 35 条，top-1 coverage
+  median=0.999，94.3% ≥0.9，77.1% ≥0.99；base 2-10 的 32 条中 97% 单候选即达
+  下界(≤1.05)。图 fig/sparsity_cdf.pdf。B 不再是 anecdotal。
+- **RQ3 MILP vs budgeted greedy?** → 诚实表述 + **已补预算内 greedy 对照(P6)**：
+  充足预算下 greedy 并集 == ILP（同 5 stats, mean 1.021）；**紧预算下 MILP
+  一致胜**（5KB: MILP 1.033 vs greedy 1.080；100KB: 1.016 vs 1.024），差距随
+  预算越紧越大。ILP 独特价值=capacity 重分配而非列选择。表 tab:greedy。
 - **RQ4 Scale?** → 无瓶颈。MILP <5s；真正瓶颈是 phase-1 测量。
 - **RQ5 Prediction survives real PG?** → 拆解：
   - RQ5a 单候选可预测？Yes（单统计对照 st.144→1.042 等）。
@@ -197,6 +199,36 @@ Extended Statistics*
 = 1071.5/332.5/2542.9/**4162.1** → selected 1.10/1.09/1.18/**1.41**。
 > objective 用 mean，但 evaluation 报告全分布；headline 是 tail 崩塌（4162→1.4）。
 
+### ~~P4 — Top-1 sparsity 分布级证据~~ ✅ 已完成
+`scripts/analyze_sparsity.py` + 图 `paper/figures/sparsity_cdf.pdf`；
+`results/p4_sparsity.json`。
+全 632 查询，base>1.2 的 35 条可修查询：top-1 coverage **median=0.999**，
+94.3% ≥0.9，77.1% ≥0.99；base 2-10 的 32 条中 **97% 单候选即达下界(≤1.05)**。
+> B 从 anecdotal（q184/q382）升级为**分布级结构发现**。注意：coverage 公式
+> (base-best)/(base-1) 只在 base>1.2 有意义（近 1 基线分母爆炸，需如实限定）。
+
+### ~~P5 — Component ablation~~ ✅ 已完成
+`scripts/ablate_components.py`（`results/p5_ablation.json`）。
+| 配置 | 5KB | 100KB |
+|------|-----|-------|
+| baseline | 1.095 | 1.095 |
+| full | 1.0327 | 1.0156 |
+| 去 capacity(仅L10000) | **1.0569** | 1.0233 |
+| 去 sparse cap(multi-select) | 1.0327 | 1.0154 |
+| 去 pruning | 1.0327 | 1.0156 (2085→1178 vars) |
+> **capacity 轴是必要组件**（紧预算下最重要）；sparse cap 与 pruning 零质量损失。
+> 实证"每个设计选择都是 justified 的"。
+
+### ~~P6 — Budgeted greedy vs MILP~~ ✅ 已完成
+`scripts/compare_greedy_budget.py`（预算内 greedy，improvement/byte 排序）+ 表 tab:greedy。
+| 预算 | MILP | budgeted greedy | 差距 |
+|------|------|----------------|------|
+| 5KB | 1.0327 | 1.0798 | 4.7pts |
+| 20KB | 1.0237 | 1.0553 | 3.2pts |
+| 100KB | 1.0156 | 1.0238 | 0.8pts |
+> 充足预算 greedy 并集 == ILP（同 5 stats 1.021）；**紧预算下 MILP 一致胜，
+> 差距随预算越紧越大**——实证"capacity 重分配而非列选择"是 MILP 的价值。
+> 替代旧 TODO：不再只是"标注待补"，而是有真实数据。
 
 ---
 

@@ -436,8 +436,29 @@ within 0.02--0.03; on the wide CENSUS table, \texttt{query.184} (4162 baseline,
 165 candidates) and \texttt{query.382} (378, 56 candidates) are identical at
 $k{=}1,2,3$ at both targets (Table \ref{tab:multi}). This is not an artefact of
 a small candidate space: it holds on the widest, highest-error,
-most-candidate-dense workload in our study. One dominant column cluster drives a
-single-table query's error, and one well-chosen 3-column MCV captures it.
+most-candidate-dense workload in our study.
+
+This is not just anecdotal. Fig.~\ref{fig:sparsity} characterises the 
+\emph{distribution} over the whole 632-query workload. For every query with
+candidate statistics, we ask what fraction of the attainable single-statistic
+improvement its best candidate captures (the ``top-1 coverage ratio''); the
+ratio is meaningful for the 35 queries with real repair room (baseline $>1.2$),
+and there it has \textbf{median 0.999}, with $94.3\%$ of such queries exceeding
+$0.9$ and $77.1\%$ exceeding $0.99$. By baseline regime, a single candidate
+reaches the estimation floor ($\le1.05$) for $94\%$ of near-baseline queries
+(base 1--1.1) and $97\%$ of the genuinely repairable queries (base 2--10, $n{=}32$).
+One dominant column cluster drives a single-table query's error, and one
+well-chosen 3-column MCV captures it.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/sparsity_cdf}
+\caption{Top-1 coverage over the full 632-query stats\_CEB\_single workload
+(queries with baseline $>1.2$, $n{=}35$): the best single candidate captures a
+median $0.999$ of attainable improvement. Sparsity is a distribution-level
+property, not a few anecdotes.}
+\label{fig:sparsity}
+\end{figure}
 
 \begin{table}[t]
 \caption{Adding a 2nd/3rd non-overlapping candidate does not help (k=1,2,3 joint
@@ -457,12 +478,46 @@ CENSUS q.382 & 378  & 56  & 1.12 & 1.12 / 1.12\\
 \subsection{RQ3: Does the MILP Beat a Budgeted Greedy?}
 \label{sec:rq3}
 
-We are careful here. With a \emph{generous} budget, the per-query-best greedy
-union already equals the ILP solution (same 5 statistics, mean 1.021) --- on a
-workload of independent single-table queries, greedy is already near-optimal.
-The ILP's distinctive value appears under \emph{tight} budgets, where it
-reallocates \emph{capacity} rather than dropping coverage. On the full 632-query
-stats\_CEB\_single workload (Fig.~\ref{fig:budgetquality}), the budget is
+We are careful here, and distinguish two greedy baselines. With a
+\emph{generous} budget, the per-query-best greedy \emph{union} (ignoring the
+budget) already equals the ILP solution (same 5 statistics, mean 1.021) --- on
+a workload of independent single-table queries, greedy is already near-optimal
+when nothing constrains it. The interesting question is under \emph{tight}
+budgets, where a greedy that must stay within budget spends it on many cheap
+statistics and cannot reallocate \emph{capacity}. Table \ref{tab:greedy} compares
+the MILP against a budget-respecting greedy (each query's highest
+improvement-per-byte statistic, within budget): the MILP wins at every budget,
+and the gap is largest exactly when the budget is tightest (4.7 q-error points
+at 5 KB, shrinking to 0.8 at 100 KB).
+
+\begin{table}[t]
+\caption{Budgeted greedy vs.\ MILP on the 632-query stats\_CEB\_single workload.
+The MILP's advantage is largest under tight budgets --- where it reallocates
+capacity rather than merely dropping coverage.}
+\label{tab:greedy}
+\small
+\begin{tabular}{lccr}
+\toprule
+budget & MILP & greedy (budgeted) & MILP advantage\\
+\midrule
+5 KB    & 1.0327 & 1.0798 & 4.7 pts\\
+10 KB   & 1.0264 & 1.0704 & 4.4 pts\\
+20 KB   & 1.0237 & 1.0553 & 3.2 pts\\
+40 KB   & 1.0188 & 1.0376 & 1.9 pts\\
+100 KB  & 1.0156 & 1.0238 & 0.8 pts\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Qualitatively, the MILP's edge comes from capacity allocation: it spends the
+budget upgrading already-chosen combinations to a higher target rather than
+adding many under-powered ones (e.g.\ at 100 KB the MILP builds 17 statistics,
+greedy builds 40, yet MILP is better). This is precisely the ``what and how
+much'' resource-allocation view of \S\ref{sec:intro}: MILP is needed not because
+greedy picks the wrong columns, but because the problem has a capacity-allocation
+trade-off under tight budgets.
+
+On the full 632-query workload (Fig.~\ref{fig:budgetquality}), the budget is
 visibly spent on capacity: the number of high-capacity selections grows with
 budget (L10000: $1\to\cdots\to15$, L1000: $1\to\cdots\to15$), and the clearest
 case, \texttt{posts(AnswerCount,ViewCount)}, upgrades from L100 to L1000 to
@@ -516,6 +571,41 @@ its errors are dominated by joins (which extended statistics cannot touch,
 \S\ref{sec:mechanisms}), no amount of capacity tuning helps. This is the
 expected null result for the negative control: the method does not optimise for
 coverage's sake.
+
+\subsection{Ablation: Are the Components Necessary?}
+\label{sec:ablation}
+
+To show each design choice is not accidental, we switch off one component at a
+time at a fixed budget and compare the achieved mean q-error
+(Table \ref{tab:ablation}). On the 632-query workload at 5 KB and 100 KB:
+
+\begin{table}[t]
+\caption{Component ablation on the 632-query workload at two budgets.
+The capacity axis matters most, especially under tight budgets; the sparse cap
+and pruning cost nothing in quality.}
+\label{tab:ablation}
+\small
+\begin{tabular}{lcc}
+\toprule
+configuration & 5 KB & 100 KB\\
+\midrule
+baseline (no stats) & 1.095 & 1.095\\
+full (ours)         & \textbf{1.0327} & \textbf{1.0156}\\
+-- capacity (L10000 only) & 1.0569 & 1.0233\\
+-- sparse cap (multi-select) & 1.0327 & 1.0154\\
+-- pruning (skip worse than base) & 1.0327 & 1.0156\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Disabling the \emph{capacity} axis (allowing only L10000) hurts clearly at
+tight budgets (1.033 $\to$ 1.057 at 5 KB), confirming that capacity allocation
+--- the ``how much'' dimension --- is a real, load-bearing component. In
+contrast, both the sparse per-query cap and the worse-than-baseline pruning are
+\emph{free}: they reproduce the full quality while shrinking the problem
+(pruning cuts 2{,}085 to 1{,}178 variables at 100 KB with identical quality).
+The global-disjointness component does not change the predicted quality but
+restores deployment predictability (\S\ref{sec:p1}).
 
 \section{End-to-End Validation}
 \label{sec:e2e}
