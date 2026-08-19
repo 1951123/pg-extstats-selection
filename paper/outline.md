@@ -131,8 +131,17 @@ Extended Statistics*
   - RQ5b 并发重叠统计独立？No（planner cross-talk：1.32 vs 1.02）。
 - **RQ6 Help where it cannot?** → No meaningful benefit（JOB 负对照）= sanity check。
 
-### 7. End-to-End Validation
-- 把 RQ5 展开为完整 E2E 节（实验、归因到重叠干扰、对模型的意义）。
+### 7. End-to-End Validation（已扩为三阶段 causal story）
+- 7.1 **Stage 1 Singleton (RQ5a)**：单统计部署==掩码预测（st.144 1.04 vs 1.042），
+  验证 Protocol-M correctness。
+- 7.2 **Stage 2 Co-installed (RQ5b)**：5 个重叠 MCV 一起部署 → 预测 1.021 vs
+  实测 1.32（ratio 1.29）；被 3 条引退（st.144 1.04→2.13）。同一统计 single
+  vs co-installed 对比 → 精确定位 planner 串扰是唯一失效点。
+- 7.3 **Stage 3 Global-disjoint (P1)**：不相交约束 → ratio 1.000 恢复精确可预测，
+  代价可量化（2.00 vs 1.02）。
+- 7.4 **Causal Takeaway**：三阶段链 (i)单统计可预测 (ii)重叠并发是唯一失效点
+  (iii)不相交修复。不否定方法而精确界定适用边界 + Option B fallback。
+- 表 tab:p1 升级为"deployment × 三阶段"汇总表。
 
 ### 8. Discussion & Open Questions
 - 为什么单一主导候选；storage vs maintenance scope；

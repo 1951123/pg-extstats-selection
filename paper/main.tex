@@ -673,66 +673,97 @@ restores deployment predictability (\S\ref{sec:p1}).
 \section{End-to-End Validation}
 \label{sec:e2e}
 
-\subsection{Experiment}
+We close the loop by building ILP-selected sets on the real database and asking
+a causal question with three stages: \emph{Is a single deployed statistic
+predictable? Is a co-installed overlapping set predictable? And can we restore
+predictability?} Each stage controls the previous one, so together they isolate
+exactly where the model is sound and where it is not.
 
-We close the loop by building the ILP-selected set on the real database and
-comparing predicted to measured q-error. For the 2 MB solution on
-stats\_CEB\_single (5 statistics, predicted mean 1.021) we create each object
-with its per-object \texttt{statistics\_target} and ANALYZE once; the measured
-mean is \textbf{1.32} --- a 1.29$\times$ gap. Five of the eight queries match
-their prediction almost exactly (e.g.\ st.562: 1.003, st.308: 1.000), while
-three (st.144, st.588, st.284) degrade from $\approx$1.0 to 2.13 / 2.07 / 1.90.
+\subsection{Stage 1: A Single Deployed Statistic Is Predictable (RQ5a)}
+\label{sec:e2e-singleton}
 
-\subsection{Attribution: Concurrent Overlapping Stats Interfere}
+We first confirm that the mask-measured q-error of a single statistic matches
+what it delivers when deployed alone. For the statistic
+\texttt{posts(AnswerCount,FavoriteCount,ViewCount)} the catalog-mask measurement
+predicts q-errors of 1.04 / 1.03 / 1.02 for queries st.144 / st.588 / st.284.
+Building \emph{only} that statistic and re-measuring on the real table gives
+1.042 / 1.029 / 1.025 --- matching the prediction almost exactly. This is the
+grounding for \S\ref{sec:measure-correct}: per-candidate measurement is sound,
+and it validates the economic premise of the whole pipeline (measure each
+candidate in isolation, then compose).
 
-The three degraded queries are all served by the same statistic,
-\texttt{posts(AnswerCount,FavoriteCount,ViewCount)}. Building \emph{only} that
-statistic gives 1.042 / 1.029 / 1.025 --- matching the mask prediction --- but
-with all five co-installed (all pairwise-overlapping MCVs over
-\{AnswerCount, FavoriteCount, ViewCount, PostTypeId\}) the planner switches
-those queries to a different overlapping statistic. This precisely isolates the
-cause: \textbf{per-candidate measurement is sound} (the singleton control is
-the predicted value), and the residual error at deployment is a second-order
-planner interaction \emph{among co-installed overlapping statistics}, exactly
-the independence assumption that the sparse model relies on. Note this is not a
-failure to predict a single statistic; it is a joint effect the per-candidate
-model cannot see.
+\subsection{Stage 2: Co-installed Overlapping Statistics Break Predictability
+(RQ5b)}
+\label{sec:e2e-coinstalled}
 
-\subsection{Option-A Ablation: Global Disjointness Restores Exact Predictability}
+Next we deploy the 2 MB ILP solution for stats\_CEB\_single: five statistics,
+all pairwise-overlapping MCVs over \{AnswerCount, FavoriteCount, ViewCount,
+PostTypeId\}, predicted mean q-error 1.021. Measured on the real table the mean
+is \textbf{1.32} --- a 1.29$\times$ gap. Five of the eight queries match their
+prediction (st.562: 1.003, st.308: 1.000, st.182: 1.000, st.398: 1.060, st.314:
+1.008), but the three queries served by the \emph{same} statistic
+\texttt{(AnswerCount,FavoriteCount,ViewCount)} degrade from their Stage-1
+predictions (1.04/1.03/1.02) to 2.13 / 2.07 / 1.90.
+
+Compare Stage 1 and Stage 2 for the very same statistic: alone it delivers
+1.042; co-installed with four overlapping siblings it gives 2.13.
+The \emph{statistic did not change, and its measurement was exact} (Stage 1);
+what changed is that the planner now picks \emph{a different} overlapping
+statistic for those queries. This is a second-order interaction among
+co-installed overlapping statistics --- exactly the independence assumption that
+the per-candidate sparse model relies on. It is not a failure to predict a
+single statistic; it is a joint effect the per-candidate measurement cannot see
+by construction.
+
+\subsection{Stage 3: Global Disjointness Restores Exact Predictability}
 \label{sec:p1}
 
-We implement the Option-A fix --- a global-disjointness constraint
-($y_a+y_b\le 1$ whenever the column sets of $a,b$ overlap) --- and measure
-predicted vs E2E for both models at two budgets (Table \ref{tab:p1}).
+We fix the gap with the Option-A model: a \emph{global-disjointness} constraint
+($y_a+y_b\le 1$ whenever the column sets of $a,b$ overlap) forces the deployed
+set to be pairwise column-disjoint, so the planner cannot cross-talk. Table
+\ref{tab:p1} measures predicted vs E2E for both models at two budgets.
 
 \begin{table}[t]
-\caption{Option-A ablation. The global-disjoint solution is exactly predictable
-(ratio 1.000) because the deployed set is pairwise column-disjoint, at a
-quantified nominal-quality cost (predicted 2.00 vs 1.02).}
+\caption{Three-stage causal summary and Option-A ablation. The global-disjoint
+solution reproduces its prediction exactly (ratio 1.000) because the deployed
+set is pairwise column-disjoint, at a quantified nominal-quality cost.}
 \label{tab:p1}
 \small
 \begin{tabular}{lccccc}
 \toprule
-budget & model & stats & predicted & E2E & ratio\\
+deployment & budget & stats & predicted & E2E & ratio\\
 \midrule
-2 MB   & overlap allowed & 5 & 1.021 & 1.320 & 1.294\\
-2 MB   & \textbf{global-disjoint} & 2 & 2.004 & 2.004 & \textbf{1.000}\\
-100 KB & overlap allowed & 7 & 1.632 & 1.933 & 1.184\\
-100 KB & \textbf{global-disjoint} & 2 & 2.004 & 2.004 & \textbf{1.000}\\
+singleton (Stage 1)      & --    & 1 & 1.02--1.04 & 1.025--1.042 & $\approx$1.000\\
+co-installed overlap (Stage 2) & 2 MB & 5 & 1.021 & 1.320 & 1.294\\
+global-disjoint (Stage 3) & 2 MB & 2 & 2.004 & \textbf{2.004} & \textbf{1.000}\\
+overlap allowed & 100 KB & 7 & 1.632 & 1.933 & 1.184\\
+global-disjoint & 100 KB & 2 & 2.004 & \textbf{2.004} & \textbf{1.000}\\
 \bottomrule
 \end{tabular}
 \end{table}
 
 The global-disjoint solution is \emph{exactly} predictable (ratio 1.000 at both
-budgets), because the deployed set is pairwise column-disjoint and the planner
+budgets), because the deployed set is pairwise column-disjoint so the planner
 cannot cross-talk --- the independence assumption holds structurally rather than
 per-query. The cost is a well-defined nominal-quality loss (predicted 2.00 vs
 1.02): disjointness forces the solver to forgo overlapping-but-high-value
-dominant candidates. This sharply isolates the two facts: (i) per-candidate
-measurement is sound (disjoint ratios are 1.000); (ii) the overlap model's
-residual error is entirely planner interference among co-installed overlapping
-statistics (ratio 1.18--1.29). Option A therefore yields a \emph{trustworthy}
-deployment at a quantified quality cost.
+dominant candidates.
+
+\subsection{The Causal Takeaway}
+\label{sec:e2e-takeaway}
+
+The three stages form a clean causal chain. (i) Per-candidate measurement is
+sound, and a single deployed statistic is exactly predictable (Stage 1);
+(ii) the only place prediction diverges is under co-installed \emph{overlapping}
+statistics, where the planner's joint choice violates the per-candidate
+independence assumption (Stage 2); and (iii) enforcing pairwise column
+disjointness removes that interaction and restores ratio 1.000 (Stage 3), at a
+quantified quality cost. This does not undermine the method --- it precisely
+delimits where the sparse model holds, and provides a validated, deployable fix.
+It is the empirical ``surprise'' that turns validation into a contribution; the
+practical alternative when the quality cost of disjointness is unacceptable is
+Option B: solve without the constraint, run a lightweight EXPLAIN-based check,
+drop any interfering statistic, and re-solve.
 
 \section{Discussion and Open Questions}
 \label{sec:disc}
