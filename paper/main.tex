@@ -769,9 +769,9 @@ exactly where the model is sound and where it is not.
 We first confirm that the mask-measured q-error of a single statistic matches
 what it delivers when deployed alone. For the statistic
 \texttt{posts(AnswerCount,FavoriteCount,ViewCount)} the catalog-mask measurement
-predicts q-errors of 1.04 / 1.03 / 1.02 for queries st.144 / st.588 / st.284.
+predicts q-errors of 1.042 / 1.029 / 1.025 for queries st.144 / st.588 / st.284.
 Building \emph{only} that statistic and re-measuring on the real table gives
-1.042 / 1.029 / 1.025 --- matching the prediction almost exactly. This is the
+1.042 / 1.029 / 1.025 --- matching the prediction exactly. This is the
 grounding for \S\ref{sec:measure-correct}: per-candidate measurement is sound,
 and it validates the economic premise of the whole pipeline (measure each
 candidate in isolation, then compose).
@@ -787,7 +787,7 @@ is \textbf{1.32} --- a 1.29$\times$ gap. Five of the eight queries match their
 prediction (st.562: 1.003, st.308: 1.000, st.182: 1.000, st.398: 1.060, st.314:
 1.008), but the three queries served by the \emph{same} statistic
 \texttt{(AnswerCount,FavoriteCount,ViewCount)} degrade from their Stage-1
-predictions (1.04/1.03/1.02) to 2.13 / 2.07 / 1.90.
+predictions (1.042/1.029/1.025) to 2.13 / 2.07 / 1.90.
 
 Compare Stage 1 and Stage 2 for the very same statistic: alone it delivers
 1.042; co-installed with four overlapping siblings it gives 2.13.

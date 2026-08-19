@@ -303,3 +303,31 @@ Extended Statistics*
 ## 写作顺序建议
 RQ2/RQ3 图先行（最能"卖"）→ §3/§4 形式化 → §2 背景 → §5 基建 → §7 E2E →
 §1 引言（最后写）→ §8/§9。
+
+---
+
+## Coherence Audit（数值一致性核查，2026-08-19）
+
+对论文全部关键数值与 `results/` 权威源逐一比对，**未发现事实性错误**；仅一处
+无害的取整表述（见下）。核对结果：
+
+| 论文位置 | 数值 | 源 | 一致 |
+|---------|------|----|:---:|
+| RQ1/tab:capacity | 0.28/3.97/21.85s; 2.03/31/264s; ~2.1-2.3/~1.2-2.1/~1.0 | docs §5.3 实测 | ✅ |
+| tab:bench | 30856/50/609/616; 19245/7/79/79; 56/455 等 | parsers 统计 | ✅ |
+| RQ2/tab:multi | q184 4162→1.08, q382 378→1.12, k=1=2=3 | phase1_census_mask_top10 | ✅ |
+| P4/图 sparsity | 0.999/94.3%/77.1%; base2-10 97% | p4_sparsity | ✅ |
+| RQ3/tab:greedy | 5 预算 MILP vs greedy | p6_* 各档 | ✅ |
+| RQ3 | 100KB MILP 17 vs greedy 40; L10000 1→…→15 | p2_capacity | ✅ |
+| RQ3/P3 multi-metric | mean/median/P90/max | p3_metrics_full + p3_tail_census | ✅ |
+| Census huge-tail | (1071.5/332.5/2542.9/4162.1)→(1.10/1.09/1.18/1.41) | p3_tail_census | ✅ |
+| §5.4/tab:measurement | ANALYZE 21.9/24.3/46.1/143/264s; naive vs M 9x→132x | bench_analyze_scale + 运行时模型 | ✅ |
+| tab:ablation | full 1.0327/1.0156; 去cap 1.0569/1.0233; multi-select 1.0327/1.0154 | p5_ablation | ✅ |
+| §7/tab:p1 | 1.021/1.32/1.294; 2.004/2.004/1.000; 1.632/1.933/1.184 | p1_global_disjoint | ✅ |
+| §7 Stage2 | st.144/588/284 掩码 1.042/1.029/1.025, 并发 2.13/2.07/1.90 | phase1_top10_multi + validate_e2e | ✅ |
+| §4/RQ4 | 57,735/92,568/150,303→4.7s; 34,280/46,392/80,672→4.3s | bench_census_solve_scale | ✅ |
+
+**唯一可改进（非错误）**：§7 Stage1 用取整的 "1.04/1.03/1.02" 作掩码预测，而源
+值和单统计实测为 "1.042/1.029/1.025"。建议统一为精确三位小数，避免 reader 疑虑。
+
+**结论**：全文数值可信，可进入投稿前状态。如需，将 Stage 1 取整统一为精确值。
