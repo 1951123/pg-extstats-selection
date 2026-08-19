@@ -739,6 +739,47 @@ CENSUS q.382 & 378  & 56  & 1.12 & 1.12 / 1.12\\
 \end{tabular}
 \end{table}
 
+\subsubsection{Stress test: where sparsity fails.}
+The sparse regime is not a universal property --- so it deserves a controlled
+\emph{failure test}. We build a synthetic table (100K rows) with \emph{two
+independent, perfectly-correlated column clusters}, $A{=}\{a_1,a_2,a_3\}$ and
+$B{=}\{b_1,b_2,b_3\}$ (each cluster's columns are equal-valued; the two
+clusters are mutually independent), plus an independent filler column $x$.
+Candidates are again the 2/3-column subsets. Table \ref{tab:stress} reports the
+joint q-error of the best $k{=}1,2,3$ non-overlapping candidates per query.
+
+\begin{table}[t]
+\caption{Multi-select stress test. A single \emph{dominant} cluster is
+fully repaired by top-1 (sparsity holds); a query driven by \emph{two
+independent} clusters needs top-2 --- top-1 leaves the second cluster's error
+at q-error 100, and only the second statistic repairs it (sparsity fails).}
+\label{tab:stress}
+\small
+\begin{tabular}{lcccc}
+\toprule
+query type & base & top-1 & top-2 & top-3\\
+\midrule
+single cluster A       & 100  & 1.00 & 1.00 & 1.00\\
+single cluster A+filler& 100  & 1.00 & 1.00 & 1.00\\
+single cluster B       & 100  & 1.00 & 1.00 & 1.00\\
+two independent clusters & 1000 & 100 & \textbf{1.00} & \textbf{1.00}\\
+two clusters + filler  & 100  & 100 & \textbf{1.00} & \textbf{1.00}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The contrast is sharp and matches the mechanistic hypothesis
+(\S\ref{sec:disc-sparsity}). For single-cluster queries, one dominant 3-column
+MCV captures the whole error and adding a second statistic changes nothing
+(top-1 $=$ top-2 $=$ top-3 $=1.00$). For the two-cluster query, the best
+\emph{single} statistic repairs only one cluster and the other is left to the
+independence assumption, so top-1 is still q-error 100; deploying \emph{both}
+cluster statistics (top-2) collapses it to 1.00. This is exactly the regime we
+flagged as the boundary of our claim in \S\ref{sec:formulation}: sparsity holds
+when a query's error is dominated by \emph{one} correlated cluster and fails
+when it is driven by \emph{several independent} ones --- in which case the
+multi-select model (\S\ref{sec:multi}) is required.
+
 \subsection{RQ3: Does the MILP Beat a Budgeted Greedy?}
 \label{sec:rq3}
 
@@ -1010,8 +1051,12 @@ than adding others (RQ3), and why the sparse cap costs no quality in the
 ablation (\S\ref{sec:ablation}). It also predicts the boundary of our claim:
 workloads where a query is genuinely driven by \emph{several} independent
 correlated clusters would violate sparsity and warrant the multi-select model
-($\S\ref{sec:formulation}$) instead. Characterising when that regime occurs is
-an open question (below) and a natural direction for future work.
+($\S\ref{sec:formulation}$) instead. Our controlled stress test
+(\S\ref{sec:rq2}, Table \ref{tab:stress}) confirms this predicted boundary
+directly: a query over two independent clusters goes from top-1 $=$ 100 to
+top-2 $=$ 1.00, exactly the many-cluster regime the hypothesis says breaks
+sparsity. Characterising how often that regime occurs on real workloads is an
+open question (below) and a natural direction for future work.
 
 \subsection{What Is Being Optimized}
 \label{sec:disc-objective}
