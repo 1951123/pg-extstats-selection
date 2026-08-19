@@ -823,6 +823,54 @@ much'' resource-allocation view of \S\ref{sec:intro}: MILP is needed not because
 greedy picks the wrong columns, but because the problem has a capacity-allocation
 trade-off under tight budgets.
 
+\subsubsection{Against \emph{stronger} greedy baselines.}
+A reviewer may object that the greedy in Table \ref{tab:greedy} is too naive. We
+therefore compare the MILP against three progressively stronger greedy
+baselines, all capacity-aware (they may choose L100/L1000/L10000):
+\textbf{G1} per-query best improvement-per-byte (Table \ref{tab:greedy}'s
+greedy); \textbf{G2} a \emph{marginal} shared-resource greedy that re-picks the
+statistic with the highest total improvement-per-byte across still-unserved
+queries after every selection; and \textbf{G3} an \emph{add-or-upgrade} greedy
+that, in addition to G2, may \emph{raise} an already-deployed combination's
+capacity level (paying only the price delta) --- the strongest of the three.
+Table \ref{tab:greedy2} reports the MILP against the \emph{best} of the three at
+each budget.
+
+\begin{table}[t]
+\caption{MILP vs.\ the strongest greedy baseline (best of per-query benefit/byte
+G1, marginal G2, and add-or-upgrade G3) on the 632-query workload. Even this
+strong adversary loses at every budget; the advantage is largest under tight
+budgets. ``best-is'' names the winning greedy.}
+\label{tab:greedy2}
+\small
+\begin{tabular}{lcccl}
+\toprule
+budget & MILP & best greedy & MILP adv ($\Delta$q) & best-is\\
+\midrule
+5\,\,KB    & 1.0327 & 1.0798 & 0.047 & G1\\
+10\,KB   & 1.0264 & 1.0704 & 0.044 & G1\\
+20\,KB   & 1.0237 & 1.0553 & 0.032 & G1\\
+40\,KB   & 1.0188 & 1.0376 & 0.019 & G1\\
+100\,KB  & 1.0156 & 1.0238 & 0.008 & G1\\
+250\,KB  & \textbf{1.0040} & 1.0236 & 0.020 & G1\\
+500\,KB  & \textbf{1.0014} & 1.0096 & 0.008 & G2\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two observations. First, the MILP beats even the \emph{strongest} greedy at
+every budget --- sophistication in the greedy (marginal re-evaluation, explicit
+upgrades) does not make it competitive, because greedy still cannot globally
+reallocate the shared capacity budget. Second, the advantage never disappears:
+under tight budgets (5 KB) it is 0.047, and --- notably --- it \emph{grows again}
+at 250 KB (0.020) because the best greedy saturates: once G1/G2 have spent their
+budget on cheap L100 coverage they cannot spend remaining budget on \emph{capacity}
+upgrades, whereas the MILP drives the mean from 1.0156 to 1.0040. Only at the
+generous 500 KB budget does the add-or-upgrade greedy (G2/G3) close some of the
+gap (1.0096, and G3 alone performs 4 upgrades), confirming that capacity
+allocation is the specific capability greedy lacks --- the same conclusion as
+\S\ref{sec:rq3} and Table \ref{tab:whathowmuch}.
+
 On the full 632-query workload (Fig.~\ref{fig:budgetquality}), the budget is
 visibly spent on capacity: the number of high-capacity selections grows with
 budget (L10000: $1\to\cdots\to15$, L1000: $1\to\cdots\to15$), and the clearest
