@@ -9,17 +9,29 @@ Extended Statistics*
 
 ---
 
-## 论文 Spine（一段话）
+## 论文 Spine（一段话 + genre 定位）
 
-> PostgreSQL extended-statistics selection should be treated as a joint
-> *"which statistic"* and *"how much capacity"* decision. Empirical evaluation
-> across single-table workloads (stats_CEB_single and the wide 69-column CENSUS)
-> shows the benefit is strikingly **sparse** — one well-chosen multivariate
-> statistic usually captures nearly all attainable improvement per query —
-> making a **budgeted MILP** both effective and scalable. However,
-> simultaneously installed **overlapping** statistics can interfere in the
-> PostgreSQL planner, motivating global disjointness or post-selection
-> validation. Join-heavy workloads are a clean negative control.
+> **This is an empirical systems/optimization paper that reframes
+> extended-statistics selection as budgeted what-and-how-much allocation,
+> discovers an unexpectedly sparse structure that makes the optimization
+> tractable, and builds a scalable measurement/deployment pipeline to validate
+> it on PostgreSQL.**
+
+### Hierarchy：A → B → C → D（ChatGPT 建议，已采纳）
+| 代号 | 角色 | 一句话 | Novelty | 风险 |
+|------|------|--------|---------|------|
+| **A** | **thesis（论文回答什么）** | selection × capacity = budget allocation | ★★★★（"which" 已被 Chaudhuri&Narasayya 2000 做过；"how much" 轴 + upgrade-vs-add 是新） | 需精准措辞 |
+| **B** | **core empirical insight（为什么可解）** | 看似多选，实测几乎全 sparse：一个 dominant statistic 捕获全部可获 improvement | ★★★★★（最漂亮） | 证据只到"workload 上观察到"，不足以说 inherently；当 headline 要承担解释 burden |
+| **C** | **enabling system（怎么做出来）** | catalog-mask 测量让 massive candidate×capacity 空间可测；MILP 只是易的部分（57k stats <5s） | ★★★☆（MILP 本身不新，catalog-mask 是真贡献） | 别把 MILP 当卖点 |
+| **D** | **validation surprise** | 重叠统计 planner interference；global-disjoint 恢复精确可预测（ratio 1.000） | ★★★★ | – |
+
+**关键定位原则**：
+- A 的 "what" 部分不新 → headline 必须强调 **"how much" 轴 / resource allocation**
+  （upgrade 已有统计 vs add 新统计），而非 "automatic selection"。
+- B 是 insight 不是 assumption → Intro 里先展示"看似多选、实测稀疏"的 surprise，
+  再引出稀疏 formulation（不是"我们假设每查询一个"）。
+- C 的 novelty 在 **measurement + PG deployment semantics**，不在 MILP。
+- **MILP 求解便宜（<5s），measurement 才是 pipeline bottleneck** —— 保留此观察。
 
 ---
 

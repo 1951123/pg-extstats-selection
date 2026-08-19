@@ -93,12 +93,19 @@ orders of magnitude. PostgreSQL exposes \emph{extended statistics}
 store them --- is left to the database administrator. This paper asks whether
 that choice can be automated, and what structure it has in practice.
 
-A statistic is not atomic. Each has a \emph{capacity}, the number of MCV
-entries it stores, controlled by its \texttt{statistics\_target} (100, 1000, or
-10000). Capacity determines both storage and estimation precision: a
-3-column correlation that is invisible at target 100 becomes accurate at 1000
-and exact at 10000. Extended-statistics selection is therefore a joint
-decision over two dimensions:
+\textbf{(A) The problem: a joint ``what and how much'' allocation.} A statistic
+is not atomic. Each has a \emph{capacity}, the number of MCV entries it stores,
+controlled by its \texttt{statistics\_target} (100, 1000, or 10000). Capacity
+determines both storage and estimation precision: a 3-column correlation that is
+invisible at target 100 becomes accurate at 1000 and exact at 10000. Automated
+statistics management is a well-studied problem (Chaudhuri and Narasayya
+\cite{chaudhuri2000automating}), but it chooses \emph{which} statistics to
+create. Extended-statistics selection is richer: a storage budget can be spent
+either by \emph{adding} a statistic or by \emph{upgrading an existing one}
+from L100 to L1000 to L10000. The right question is therefore a
+\emph{resource-allocation} one --- given a budget, which
+$(\text{table},\text{columns},\text{capacity})$ objects to instantiate --- not
+merely which column combinations:
 \[
   \underbrace{\text{which }(\text{table},\text{columns})}_{\text{what}}
   \;\times\;
@@ -106,39 +113,50 @@ decision over two dimensions:
 \]
 compounded by a combinatorial explosion in candidates --- a single CENSUS query
 can have up to 455 candidate column combinations (19{,}245 deduplicated across
-the workload). We are not aware of prior work that optimizes this joint
-``selection $\times$ capacity'' problem under a storage budget.
+the workload). To our knowledge, no prior work optimizes this joint
+selection-and-capacity problem under a storage budget.
 
-Three empirical observations, all verified end-to-end on PostgreSQL 16, shape
-our approach. \textbf{First, capacity materially affects repair quality.}
-An ANALYZE at target 100 loses 3-column correlation, while 1000 captures it and
-10000 is exact; under a budget, the right move is often to \emph{degrade
-capacity} (store a statistic at a lower target) rather than to drop it --- a
-\emph{graceful degradation} that a pure ``which columns'' view cannot express.
-\textbf{Second, the benefit is strikingly sparse.} Across single-table
-workloads (stats\_CEB and the wide 69-column CENSUS), one well-chosen
-multivariate statistic suffices per query: building a second or third
-non-overlapping candidate adds almost nothing. This makes the objective
-\emph{exactly linear} (Prop.~\ref{prop:linear}) and the resulting budgeted
-mixed-integer program solvable in seconds at full-workload scale. \textbf{Third,
-co-installed overlapping statistics interfere.} When several overlapping MCVs
-are active on one table, the planner can pick a sub-optimal one; end-to-end
-measurement shows predictions are individually accurate but jointly violated by
-this interaction, which a global-disjointness constraint removes.
+\textbf{(B) The surprise: the benefit is almost entirely sparse.} At first
+glance the problem looks like a combinatorial multi-select: a query could
+benefit from several statistics at once. Our measurements show otherwise.
+Across both single-table workloads (the wide 69-column CENSUS and
+stats\_CEB\_single), one well-chosen multivariate statistic captures nearly all
+attainable improvement for a query: adding a second or third non-overlapping
+candidate gives almost no benefit, and on the hardest CENSUS queries the top-1,
+top-2 and top-3 joint q-errors are identical. This was not assumed --- it was
+\textbf{discovered} --- and it has a direct consequence: restricted to at most
+one statistic per query, the objective has no interaction term and is
+\emph{exactly linear} (Prop.~\ref{prop:linear}), turning a hard nonlinear
+selection problem into a budgeted mixed-integer program.
 
-We make the following contributions. (i) We reformulate extended-statistics
-selection as \emph{capacity-aware selection} --- a budgeted MILP over
-$(\text{table},\text{columns},\text{capacity})$ objects (\S\ref{sec:formulation},
-\S\ref{sec:milp}). (ii) We report the sparse empirical structure that makes it
-tractable: one dominant statistic per query (\S\ref{sec:rq2}), with a
-formal linearity proposition. (iii) We contribute a catalog-mask measurement
-protocol (\S\ref{sec:measure}) that makes per-candidate, per-capacity estimation
-feasible on wide tables at $\sim$60$\times$ lower cost. (iv) We validate
-end-to-end: predictions are sound, and expose the planner-interference effect
-with a fix that restores exact predictability (\S\ref{sec:p1}). The approach
-scales to the full CENSUS workload --- 57{,}735 physical statistics, 150{,}303
-binary variables --- solved optimally in under five seconds
-(\S\ref{sec:rq4}).
+\textbf{(C) The enabler: measuring the massive candidate space.} Instantiating
+this optimization requires a per-candidate, per-capacity q-error for every
+surviving option. On wide tables the naive protocol (CREATE--ANALYZE--EXPLAIN
+per candidate) is infeasible --- a single CENSUS ANALYZE at target 10000 takes
+$\sim$20s. Our \emph{catalog-mask protocol} (\S\ref{sec:measure}) builds all
+candidates in one ANALYZE and isolates each by masking the others'
+\texttt{pg\_statistic\_ext\_data} payloads, cutting measurement cost by
+$\sim$60$\times$ and making the enormous candidate $\times$ capacity space
+actually measurable. The resulting MILP is then the easy part: the full CENSUS
+workload --- 57{,}735 physical statistics, 150{,}303 binary variables --- solves
+optimally in under five seconds (\S\ref{sec:rq4}).
+
+\textbf{(D) The validation surprise: overlapping statistics interfere.}
+End-to-end deployment on real PostgreSQL shows per-candidate predictions are
+accurate, but co-installed \emph{overlapping} statistics let the planner switch
+queries to a sub-optimal statistic (predicted mean 1.02 vs.\ measured 1.32). A
+\emph{global-disjointness} constraint restores exact predictability
+(ratio 1.000) at a quantified quality cost (\S\ref{sec:p1}). This is not a
+failure of our measurement --- it is a second-order planner interaction that the
+per-candidate model cannot see, and a concrete, validated fix.
+
+In summary, we contribute (i) a reformulation of extended-statistics selection
+as budgeted \emph{what-and-how-much allocation} (\S\ref{sec:formulation},
+\S\ref{sec:milp}); (ii) an empirical sparse-structure finding with a formal
+linearity proposition that makes the problem tractable (\S\ref{sec:rq2}); (iii)
+the catalog-mask measurement protocol that makes the candidate space measurable
+(\S\ref{sec:measure}); and (iv) an end-to-end validation that isolates --- and
+fixes --- the planner-interference effect (\S\ref{sec:e2e}).
 
 \section{Background and Related Work}
 \label{sec:back}
@@ -189,20 +207,25 @@ the ANALYZE cost of 10000.
 Four bodies of work are relevant. (a) \emph{Cardinality estimation}: histogram
 and MCV-based selectivity, the independence assumption, and q-error as a
 quality metric; our problem is not estimate \emph{construction} but statistic
-\emph{deployment}. (b) \emph{Automatic statistics} in commercial systems:
-these choose \emph{which} column combinations to create, typically under a
-maintenance budget, but to our knowledge do not jointly optimize the
-per-statistic capacity (\texttt{statistics\_target}). The capacity dimension,
-and the budget-as-capacity-reallocation view, is our distinguishing novelty.
-(c) \emph{Physical-design selection} (index and materialized-view selection)
-solves budget-constrained structure selection with MILP and greedy heuristics;
-our MILP follows the same methodology but targets statistics with a capacity
-axis, and exploits an empirically validated sparsity that linearizes the
-objective. (d) \emph{Learned cardinality estimation} trains models to estimate
-selectivity directly; unlike those, we drive the \emph{real} PostgreSQL planner
-and measure its actual q-error, so no synthetic model accuracy is involved.
-A more complete citation set is the subject of ongoing work (see
-\texttt{references.bib}).
+\emph{deployment}. (b) \emph{Automatic statistics management}: Chaudhuri and
+Narasayya \cite{chaudhuri2000automating} already showed that the optimizer's
+needed statistics can be identified from a workload and pruned to a small
+effective set. The \emph{which} dimension is therefore not new. What is new
+here is the second, \emph{capacity} axis: prior work chooses column
+combinations under a cost/budget but does not jointly decide each statistic's
+\emph{capacity} (\texttt{statistics\_target}), i.e.\ whether to spend budget on
+\emph{adding} a statistic or \emph{upgrading} an existing one from L100 to
+L1000 to L10000. This is a resource-allocation view, closer to physical-design
+selection than to the "which columns" question. (c) \emph{Physical-design
+selection} (index and materialized-view selection) solves budget-constrained
+structure selection with MILP and greedy heuristics \cite{indexselection}; our
+MILP follows the same methodology but targets statistics with a capacity axis,
+and exploits an empirically validated, discovered sparsity that linearizes the
+objective --- a structure those settings do not exhibit. (d) \emph{Learned
+cardinality estimation} trains models to estimate selectivity directly; unlike
+those, we drive the \emph{real} PostgreSQL planner and measure its actual
+q-error, so no synthetic model accuracy is involved. A more complete citation
+set is the subject of ongoing work.
 
 \section{Problem Formulation}
 \label{sec:formulation}
@@ -241,10 +264,12 @@ approach is the multiplicative approximation in log space,
 \]
 which is exact only when the chosen statistics act independently, and can
 break when overlapping statistics coexist (we return to this in
-\S\ref{sec:e2e}). Our experiments ($\S\ref{sec:rq2}$) reveal that per query a
-\emph{single dominant statistic} suffices, so we specialise to the
-\emph{sparse} model: each query selects at most one statistic,
-$\sum_s x_{is}\le 1$. Under this restriction the objective is exactly linear.
+\S\ref{sec:e2e}). Our measurements (\S\ref{sec:rq2}) reveal --- surprisingly ---
+that per query a \emph{single dominant statistic} already captures nearly all
+attainable improvement, so we specialise to the \emph{sparse} model: each query
+selects at most one statistic, $\sum_s x_{is}\le 1$. This restriction is not a
+modelling convenience but an observed property of the workloads, and under it
+the objective is exactly linear.
 
 \begin{proposition}[Exact linearity under per-query unit cap]
 \label{prop:linear}
