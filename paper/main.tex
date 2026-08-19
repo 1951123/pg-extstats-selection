@@ -49,18 +49,19 @@
 \email{first.last@example.com}
 
 \begin{abstract}
-TODO: one-paragraph abstract. Draft: we observe that PostgreSQL
-\texttt{CREATE STATISTICS} selection is not just ``which column combinations''
-but a joint decision of \emph{which} (table, columns) and \emph{how much}
-capacity (each statistic's \texttt{statistics\_target}). We re-frame it as
-\emph{capacity-aware selection}: under a storage budget, is the right choice a
-smaller set of statistics, or the same statistics stored at a lower capacity?
-Across single-table workloads (statistics\_CEB and the wide 69-column CENSUS
-benchmark) we find a strikingly sparse structure: one well-chosen multivariate
-statistic captures nearly all attainable improvement per query, making the
-objective exactly linear and the resulting budgeted MILP solvable in seconds at
-full-workload scale. End-to-end validation on PostgreSQL 16 shows individual
-candidate measurements are predictive, but reveals that co-installed
+We observe that PostgreSQL \texttt{CREATE STATISTICS} selection is not just
+``which column combinations'' but a joint decision of \emph{which}
+(table, columns) and \emph{how much} capacity (each statistic's
+\texttt{statistics\_target}). We re-frame it as \emph{capacity-aware
+selection}: under a storage budget, should we spend on adding a statistic or
+on upgrading an existing one to a higher-capacity target? Across single-table
+workloads (stats\_CEB and the wide 69-column CENSUS benchmark) we find a
+strikingly sparse structure: one well-chosen multivariate statistic captures
+nearly all attainable improvement per query, which makes the objective exactly
+linear and the resulting budgeted MILP solvable in seconds at full-workload
+scale. A catalog-mask protocol makes the enormous candidate $\times$ capacity
+space measurable on wide tables. End-to-end validation on PostgreSQL 16 shows
+individual candidate measurements are predictive, but reveals that co-installed
 overlapping statistics cause planner interference --- motivating global
 disjointness or post-selection validation. Join-heavy workloads act as a
 negative control.
@@ -122,13 +123,14 @@ selection-and-capacity problem under a storage budget.
 \texttt{posts(AnswerCount, ViewCount)}. A statistic over this combination can
 be stored at L100, L1000, or L10000. Measured on our workload, L100 is too
 coarse to capture the correlation (q-error stays $\sim$4.7), while L10000
-drives it to $\approx$1.0. So the answer to ``should we build this statistic?'' is
-incomplete without the second question: ``\emph{at what capacity}?'' --- and
-since L10000 costs $\sim$100KB while L100 costs $\sim$2KB, the choice under a
-budget is genuinely a \emph{how much} decision. This is the ``what and how much''
-allocation we optimize: the same combination can be deployed at DIFFERENT
-capacities depending on the budget, and spending on \emph{upgrading} it competes
-directly with spending on \emph{adding} another combination.
+drives it to $\approx$1.0. How much capacity is enough is therefore itself a
+decision: ``should we build this statistic?'' admits no useful answer without
+``\emph{at what capacity}?''. And because L10000 costs $\sim$100\,KB while L100
+costs $\sim$2\,KB, that choice is \emph{quantitative} under a budget. This is
+the ``what and how much'' allocation we optimize: the same combination can be
+deployed at different capacities depending on the budget, and spending on
+\emph{upgrading} it competes directly with spending on \emph{adding} another
+combination.
 
 \textbf{(B) The surprise: the benefit is almost entirely sparse.} At first
 glance the problem looks like a combinatorial multi-select: a query could
@@ -158,7 +160,7 @@ optimally in under five seconds (\S\ref{sec:rq4}).
 \textbf{(D) The validation surprise: overlapping statistics interfere.}
 End-to-end deployment on real PostgreSQL shows per-candidate predictions are
 accurate, but co-installed \emph{overlapping} statistics let the planner switch
-queries to a sub-optimal statistic (predicted mean 1.02 vs.\ measured 1.32). A
+queries to a suboptimal statistic (predicted mean 1.02 vs.\ measured 1.32). A
 \emph{global-disjointness} constraint restores exact predictability
 (ratio 1.000) at a quantified quality cost (\S\ref{sec:p1}). This is not a
 failure of our measurement --- it is a second-order planner interaction that the
@@ -205,7 +207,7 @@ own \texttt{statistics\_target} via \texttt{ALTER STATISTICS ... SET STATISTICS}
 equal to the maximum \texttt{statistics\_target} over the relation's
 statistics}, so one high-target statistic drags the whole ANALYZE to a larger
 sample (a full scan at 10000). This couples capacity to \emph{maintenance cost},
-not only storage. Because of this coupling we deliberately optimise a
+not only storage. Because of this coupling we deliberately optimize a
 \emph{storage} budget --- the persistent bytes of the selected statistics and the
 estimation quality they deliver --- and treat ANALYZE maintenance cost
 separately (it is a property of the maximum, not the sum, of targets).
@@ -267,7 +269,7 @@ scale.
 \cite{indexselection}, knob/configuration optimization, and workload-aware
 index advisors share our high-level framing (workload $\to$ candidates $\to$
 optimizer evaluation $\to$ global selection). What distinguishes our accuracy
-criterion is that we optimise \emph{prediction quality under a storage budget}
+criterion is that we optimize \emph{prediction quality under a storage budget}
 (mean q-error), not wall-clock latency or a cost-benchmark proxy, and that we
 validate the resulting deployment end-to-end against the real optimizer ---
 surfacing a planner-interaction effect no tuning system that assumes independent
@@ -314,7 +316,7 @@ break when overlapping statistics coexist (we return to this in
 that per query a \emph{single dominant statistic} already captures nearly all
 attainable improvement, so we specialise to the \emph{sparse} model: each query
 selects at most one statistic, $\sum_s x_{is}\le 1$. This restriction is not a
-modelling convenience but an observed property of the workloads, and under it
+modeling convenience but an observed property of the workloads, and under it
 the objective is exactly linear.
 
 \begin{proposition}[Exact linearity under per-query unit cap]
@@ -486,7 +488,7 @@ saving at 10 candidates grows to $\sim$60$\times$ at 100 and $\sim$130$\times$
 at 1000. For a single Census query the masked measurement completes in minutes
 where the naive protocol would take hours. This is why the catalog-mask
 protocol --- not the MILP --- is the enabling component that makes the massive
-candidate $\times$ capacity space measurable, and why we emphasise that the
+candidate $\times$ capacity space measurable, and why we emphasize that the
 optimization (\S\ref{sec:rq4}) is the cheap part of the pipeline.
 
 \begin{table}[t]
@@ -672,7 +674,7 @@ the real effect is \emph{tail repair}, with the maximum q-error falling from
 4.7 to 1.1. On the huge-tail CENSUS top-10 the improvement is across the whole
 distribution: baseline (mean / median / P90 / max) $=$
 (1071.5 / 332.5 / 2542.9 / 4162.1) collapses to $(1.10 / 1.09 / 1.18 / 1.41)$.
-We optimise mean but evaluate the full distribution; the headline is the tail
+We optimize mean but evaluate the full distribution; the headline is the tail
 collapse, e.g.\ a 4162 $\to$ 1.4 maximum.
 
 \begin{figure}[t]
@@ -702,7 +704,7 @@ We split this into two parts (detailed in \S\ref{sec:e2e}).
 single selected statistic alone reproduces its mask-measured q-error exactly.
 \emph{(b) Are co-installed overlapping statistics independent?} No --- when
 several overlapping MCVs coexist, the planner can switch a query to a
-sub-optimal overlapping statistic. This second-order interaction is the one
+suboptimal overlapping statistic. This second-order interaction is the one
 place where the sparse model's prediction and the real system diverge, and it is
 removed by the global-disjointness constraint (\S\ref{sec:p1}).
 
@@ -714,7 +716,7 @@ removed by the global-disjointness constraint (\S\ref{sec:p1}).
 candidate and, after deduplication, just 7 distinct combinations exist; because
 its errors are dominated by joins (which extended statistics cannot touch,
 \S\ref{sec:mechanisms}), no amount of capacity tuning helps. This is the
-expected null result for the negative control: the method does not optimise for
+expected null result for the negative control: the method does not optimize for
 coverage's sake.
 
 \subsection{Ablation: Are the Components Necessary?}
@@ -877,10 +879,10 @@ correlated clusters would violate sparsity and warrant the multi-select model
 ($\S\ref{sec:formulation}$) instead. Characterising when that regime occurs is
 an open question (below) and a natural direction for future work.
 
-\subsection{What Is Being Optimised}
+\subsection{What Is Being Optimized}
 \label{sec:disc-objective}
 
-We optimise a \emph{storage} budget (persistent bytes and estimation quality);
+We optimize a \emph{storage} budget (persistent bytes and estimation quality);
 ANALYZE maintenance cost is handled separately because PostgreSQL couples its
 sampling effort to the \emph{maximum} target on a relation. This keeps the
 objective clean and lets us treat capacity as an allocation of persistent
@@ -904,7 +906,7 @@ then structurally independent, not just measured independently.
 
 (1) \emph{Level monotonicity}: enforcing that a higher capacity never yields a
 worse q-error could prune options and speed the solve, but is not required for
-correctness. (2) \emph{Maintenance-aware selection}: jointly modelling ANALYZE
+correctness. (2) \emph{Maintenance-aware selection}: jointly modeling ANALYZE
 cost (as a function of the \emph{max} target) rather than storage alone is a
 natural extension, replacing the storage-only budget with an end-to-end
 maintenance budget. (3) \emph{When to upgrade vs.\ add}: our data show a smooth
