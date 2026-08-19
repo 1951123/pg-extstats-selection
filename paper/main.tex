@@ -496,12 +496,12 @@ candidate.
   arr/.style={-{Stealth[length=2.5mm]}, thick}
 ]
 % ---- left: all built ----
-\node[font=\small, anchor=south] at (0,3.0) {\textbf{(a) all built,\ one ANALYZE}};
+\node[font=\small, anchor=south] at (0,1.2) {\textbf{(a) all built,\ one ANALYZE}};
 \foreach \i/\nm in {0/S1,1/S2,2/S3,3/S4}{
   \node[stat, fill=white] (l\i) at (0,-0.9*\i) {\nm\\[0.5mm]{\scriptsize\color{blue!70!black}payload}};
 }
 % ---- right: masked (S1 measured) ----
-\node[font=\small, anchor=south] at (5.4,3.0) {\textbf{(b) mask all but S1}};
+\node[font=\small, anchor=south] at (5.4,1.2) {\textbf{(b) mask all but S1}};
 \node[stat, fill=green!12] (r0) at (5.4,0.0)  {S1\\[0.5mm]{\scriptsize\color{blue!70!black}payload}};
 \foreach \i/\nm in {1/S2,2/S3,3/S4}{
   \node[stat, fill=black!4] (r\i) at (5.4,-0.9*\i) {\nm\\[0.5mm]{\scriptsize\color{black!45}NULL}};
