@@ -116,6 +116,18 @@ can have up to 455 candidate column combinations (19{,}245 deduplicated across
 the workload). To our knowledge, no prior work optimizes this joint
 selection-and-capacity problem under a storage budget.
 
+\emph{Running example.} Consider a query filtering
+\texttt{posts(AnswerCount, ViewCount)}. A statistic over this combination can
+be stored at L100, L1000, or L10000. Measured on our workload, L100 is too
+coarse to capture the correlation (q-error stays $\sim$4.7), while L10000
+drives it to $\approx$1.0. So the answer to ``should we build this statistic?'' is
+incomplete without the second question: ``\emph{at what capacity}?'' --- and
+since L10000 costs $\sim$100KB while L100 costs $\sim$2KB, the choice under a
+budget is genuinely a \emph{how much} decision. This is the ``what and how much''
+allocation we optimize: the same combination can be deployed at DIFFERENT
+capacities depending on the budget, and spending on \emph{upgrading} it competes
+directly with spending on \emph{adding} another combination.
+
 \textbf{(B) The surprise: the benefit is almost entirely sparse.} At first
 glance the problem looks like a combinatorial multi-select: a query could
 benefit from several statistics at once. Our measurements show otherwise.
@@ -800,27 +812,72 @@ drop any interfering statistic, and re-solve.
 \section{Discussion and Open Questions}
 \label{sec:disc}
 
-Three observations frame the broader picture. \textbf{Why one dominant
-candidate.} A single correlated column cluster drives single-table selection
-error, so one well-chosen MCV captures nearly all attainable improvement; this
-is the source of the sparsity that linearizes the problem. \textbf{What is being
-optimised.} We optimise a \emph{storage} budget (persistent bytes and estimation
-quality); ANALYZE maintenance cost is handled separately because PostgreSQL
-couples its sampling effort to the \emph{maximum} target on a relation. This
-keeps the objective clean. \textbf{The interference fix.} The validated fix
-(Option A, global disjointness) is the trustworthy main model; as a practical
-fallback (Option B) one can solve without the constraint and then run a
-lightweight EXPLAIN-based check, dropping any interfering statistic and
-re-solving.
+\subsection{Why Does Sparsity Occur? A Mechanistic Hypothesis}
+\label{sec:disc-sparsity}
 
-Open questions remain. (1) \emph{Level monotonicity}: enforcing that a higher
-capacity never yields a worse q-error could prune options and speed the solve,
-but is not required for correctness. (2) \emph{Maintenance-aware selection}:
-jointly modelling ANALYZE cost (as a function of the max target) rather than
-storage alone is a natural extension. (3) \emph{Where the budget is best spent}:
-our data show a smooth capacity-only curve for stats\_CEB\_single and a large
-tail on CENSUS, but a principled characterisation of ``when to upgrade capacity
-vs add coverage'' is open. (4) \emph{Limits}: we consider MCV statistics on
+The sparse finding (\S\ref{sec:rq2}) is what makes the whole approach work, so
+it deserves a mechanistic account -- though we stress it is a \emph{hypothesis},
+not a theorem. Our view is that a single-table selection query's error is
+typically dominated by \emph{one} correlated column cluster. Concretely: a
+restriction clause is a conjunction of predicates, and its selectivity error is
+largest where the columns are most strongly correlated (the independence
+assumption fails hardest). The planner's default estimate for such a clause is
+about as wrong as its worst correlated sub-clause; a single MCV over exactly
+that dominant cluster removes the largest source of error, and residual errors
+in the remaining (weakly-correlated) predicates contribute little to the total
+q-error. Hence \emph{one} well-chosen statistic captures nearly all attainable
+improvement, and a second non-overlapping statistic finds no independent
+``second cluster'' worth capturing.
+
+This hypothesis is consistent with every observation we report: it explains why
+$k{=}2,3$ add nothing (RQ2), why the top-1 coverage CDF is sharply peaked near
+1.0 (P4), why capacity \emph{upgrading} the dominant statistic matters more
+than adding others (RQ3), and why the sparse cap costs no quality in the
+ablation (\S\ref{sec:ablation}). It also predicts the boundary of our claim:
+workloads where a query is genuinely driven by \emph{several} independent
+correlated clusters would violate sparsity and warrant the multi-select model
+($\S\ref{sec:formulation}$) instead. Characterising when that regime occurs is
+an open question (below) and a natural direction for future work.
+
+\subsection{What Is Being Optimised}
+\label{sec:disc-objective}
+
+We optimise a \emph{storage} budget (persistent bytes and estimation quality);
+ANALYZE maintenance cost is handled separately because PostgreSQL couples its
+sampling effort to the \emph{maximum} target on a relation. This keeps the
+objective clean and lets us treat capacity as an allocation of persistent
+storage rather than a proxy for maintenance cost. The budget-quality curves
+(\S\ref{sec:rq3}) and the capacity-level mix (Fig.~\ref{fig:budgetquality}) are
+the concrete evidence that a storage budget is, in practice, spent on the
+``how much'' axis.
+
+\subsection{The Interference Fix}
+\label{sec:disc-fix}
+
+The validated fix (Option A, global disjointness) is the trustworthy main model:
+it restores exact predictability at a quantified quality cost (\S\ref{sec:p1}).
+As a practical fallback (Option B), one can solve without the constraint and
+then run a lightweight EXPLAIN-based check, drop any interfering statistic, and
+re-solve. We recommend A as the default because it makes the deployment semantics
+match the measurement model (\S\ref{sec:measure-correct}) --- the deployment is
+then structurally independent, not just measured independently.
+
+\subsection{Open Questions}
+
+(1) \emph{Level monotonicity}: enforcing that a higher capacity never yields a
+worse q-error could prune options and speed the solve, but is not required for
+correctness. (2) \emph{Maintenance-aware selection}: jointly modelling ANALYZE
+cost (as a function of the \emph{max} target) rather than storage alone is a
+natural extension, replacing the storage-only budget with an end-to-end
+maintenance budget. (3) \emph{When to upgrade vs.\ add}: our data show a smooth
+capacity-only curve for stats\_CEB\_single and a large tail on CENSUS, but a
+principled characterisation of the ``upgrade vs.\ add'' decision boundary is
+open; a marginal-value heuristic (quality gained per storage unit for an upgrade
+vs.\ a new statistic) would make the resource-allocation view of
+\S\ref{sec:intro} more precise. (4) \emph{When does sparsity fail?}:
+identifying workloads with multiple independent correlated clusters (the regime
+where the multi-select model is needed) is the most important open question.
+(5) \emph{Limits}: we consider MCV statistics on
 single-table workloads; join workloads need other techniques, and the real
 system has a limit on the number of statistics per relation.
 

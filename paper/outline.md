@@ -72,6 +72,9 @@ Extended Statistics*
 ### 1. Introduction
 - 提出问题：extended stats 改善相关谓词基数估计，但物理表示有可调 **capacity**
   (`statistics_target`)；已有 selection 只考虑 "which" 忽略 "how much"。
+- **Running example（已加）**：`posts(AnswerCount,ViewCount)` —— L100 太粗(q~4.7)
+  → L10000 精确(q~1)；L10000 100KB vs L100 2KB → 同一组合可按预算以不同 capacity
+  部署，upgrade 与 add 竞争 budget。让 A 直观。
 - 三个 empirical observations：capacity matters / sparse structure / planner interference。
 - 我们：capacity-aware budgeted MILP + 利用稀疏结构获得可扩展优化问题。
 - Contribution bullets（见上，5 条，main.tex 已写）。
@@ -148,9 +151,15 @@ Extended Statistics*
   (iii)不相交修复。不否定方法而精确界定适用边界 + Option B fallback。
 - 表 tab:p1 升级为"deployment × 三阶段"汇总表。
 
-### 8. Discussion & Open Questions
-- 为什么单一主导候选；storage vs maintenance scope；
-  全局不相交 (A) vs post-check (B)；局限。
+### 8. Discussion & Open Questions（已扩为 4 个子节）
+- **8.1 Why sparsity?（mechanistic hypothesis，已加）**：单表查询误差由"一个主导相关
+  列簇"驱动——worst correlated sub-clause 主导，单个 MCV 去掉最大误差源，残余弱相关
+  谓词贡献小。与 RQ2/P4/RQ3/ablation 一致，并界定条件：多独立簇的 workload 会违反。
+- **8.2 What's optimized**：storage budget（persistent bytes + quality）；ANALYZE
+  维护成本单独处理（max target 耦合）。
+- **8.3 Interference fix**：Option A(全局不相交) 主模型；Option B(post-check) fallback。
+- **8.4 Open questions**：level monotonicity / maintenance-aware / upgrade-vs-add
+  (边际价值启发式) / **sparsity 何时失效**(最重要) / limits。
 
 ### 9. Conclusion
 
