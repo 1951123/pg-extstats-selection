@@ -110,4 +110,56 @@
   booktitle = {Proceedings of the International Conference on Very Large Data Bases (VLDB)},
   year      = {2000}
 }
+
+% --- Automatic correlation discovery / statistics configuration (added per
+%     review: most direct prior art, must be positioned) ---
+@article{chaudhuri2001automating,
+  author  = {Chaudhuri, Surajit and Narasayya, Vivek},
+  title   = {Automating Statistics Management for Query Optimizers},
+  journal = {IEEE Transactions on Knowledge and Data Engineering},
+  volume  = {13},
+  number  = {1},
+  pages   = {7--20},
+  year    = {2001},
+  doi     = {10.1109/69.908978}
+}
+
+@inproceedings{ilyas2004cords,
+  author    = {Ilyas, Ihab F. and Markl, Volker and Haas, Peter J. and
+               Brown, Paul and Aboulnaga, Ashraf},
+  title     = {CORDS: Automatic Discovery of Correlations and Soft Functional
+               Dependencies},
+  booktitle = {Proceedings of the ACM SIGMOD International Conference on
+               Management of Data},
+  pages     = {647--658},
+  year      = {2004},
+  doi       = {10.1145/1007568.1007641}
+}
+
+@inproceedings{haas2007dependencies,
+  author    = {Haas, Peter J. and Hueske, Fabian and Markl, Volker},
+  title     = {Detecting Attribute Dependencies from Query Feedback},
+  booktitle = {Proceedings of the 33rd International Conference on Very Large
+               Data Bases (VLDB)},
+  pages     = {830--841},
+  year      = {2007}
+}
+
+% --- PostgreSQL-ecosystem statistics advisors (production prior art) ---
+@misc{edbstatsadvisor,
+  author = {{EDB}},
+  title  = {EDB Postgres Query Advisor: Statistics Advisor},
+  howpublished = {\url{https://www.enterprisedb.com/docs/pg_extensions/query_advisor/}},
+  year   = {2024},
+  note   = {Accessed 2026}
+}
+
+@misc{pgqualstats,
+  author = {Ferret, Julien},
+  title  = {pg\_qualstats: An extension for collecting statistics about
+            predicates},
+  howpublished = {\url{https://github.com/powa-team/pg_qualstats}},
+  year   = {2024},
+  note   = {Accessed 2026}
+}
 \endinput

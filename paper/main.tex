@@ -57,10 +57,11 @@ selection}: under a storage budget, should we spend on adding a statistic or
 on upgrading an existing one to a higher-capacity target? Across the single-table
 workloads we evaluate (stats\_CEB and the wide 69-column CENSUS benchmark) we find a
 strikingly sparse structure: one well-chosen multivariate statistic captures
-nearly all attainable improvement per query. We exploit this by restricting each
-query to a single statistic, under which the objective is \emph{exactly linear}
-and the resulting budgeted MILP solves in seconds at full-workload
-scale. A catalog-mask protocol makes the enormous candidate $\times$ capacity
+nearly all improvement attainable from the evaluated 2-/3-column MCV candidates
+per query. We exploit this by restricting each
+query to a single statistic, under which the surrogate objective is
+\emph{exactly linear} and the resulting budgeted MILP solves in seconds at
+full-workload scale. A catalog-mask protocol makes the enormous candidate $\times$ capacity
 space measurable on wide tables. End-to-end validation on PostgreSQL 16 shows
 individual candidate measurements are predictive, but reveals that co-installed
 overlapping statistics cause planner interference --- motivating global
@@ -120,8 +121,11 @@ compounded by a combinatorial explosion in candidates --- a single CENSUS query
 can have up to 455 candidate column combinations (30{,}856 is the sum of
 per-query candidate counts before any deduplication; after globally
 deduplicating identical column combinations across the workload only 19{,}245
-distinct combinations remain). To our knowledge, no prior work optimizes this joint
-selection-and-capacity problem under a storage budget.
+distinct combinations remain). To our knowledge, prior work on automatic
+statistics configuration has focused on discovering or selecting useful column
+groups; we are not aware of prior work that explicitly treats PostgreSQL's
+per-statistic \texttt{statistics\_target} as a competing resource-allocation
+dimension under a shared storage budget (\S\ref{sec:back}).
 
 \emph{Running example.} Consider a query filtering
 \texttt{posts(AnswerCount,}\allowbreak\texttt{ViewCount)}. A statistic over
@@ -142,16 +146,20 @@ glance the problem looks like a combinatorial multi-select: a query could
 benefit from several statistics at once. Our measurements show otherwise.
 Across both single-table workloads (the wide 69-column CENSUS and
 stats\_CEB\_single), one well-chosen multivariate statistic captures nearly all
-attainable improvement for a query: adding a second or third non-overlapping
+improvement attainable from the evaluated 2-/3-column MCV candidates for a
+query: adding a second or third non-overlapping
 candidate gives almost no benefit, and on the hardest CENSUS queries the top-1,
 top-2 and top-3 joint q-errors are identical. This was not assumed --- it was
 \textbf{discovered} --- and it has a direct consequence: \emph{restricted to at
 most one statistic per query}, the objective has no interaction term and is
 \emph{exactly linear} (Prop.~\ref{prop:linear}). We do not claim this makes the
-general multi-select problem tractable in the abstract; rather, sparsity is an
+general multi-select problem tractable in the abstract, nor that it describes
+the raw deployment objective; rather, sparsity is an
 \emph{empirically characterized regime} of the workloads we evaluate, and the
 linear model is exact \emph{conditional on} the one-statistic-per-query
-restriction that this regime justifies.
+restriction that this regime justifies --- for the \emph{surrogate}, with the
+E2E experiments (\S\ref{sec:e2e}) determining when that surrogate remains
+faithful to PostgreSQL's real statistic selection.
 
 \textbf{(C) The enabler: measuring the massive candidate space.} Instantiating
 this optimization requires a per-candidate, per-capacity q-error for every
@@ -161,17 +169,18 @@ $\sim$20s. Our \emph{catalog-mask protocol} (\S\ref{sec:measure}) builds all
 candidates in one ANALYZE and isolates each by masking the others'
 \texttt{pg\_statistic\_ext\_data} payloads, cutting measurement cost by
 $\sim$60$\times$ and making the enormous candidate $\times$ capacity space
-actually measurable. The resulting MILP is then the easy part: the full CENSUS
-workload --- 57{,}735 physical-statistic variables ($y_s$) and 92{,}568
+actually measurable. The resulting MILP is then the tractable part: the full
+CENSUS workload --- 57{,}735 physical-statistic variables ($y_s$) and 92{,}568
 query--statistic assignment variables ($x_{is}$), i.e.\ 150{,}303 binary
-variables in total --- solves optimally in under five seconds
-(\S\ref{sec:rq4}).
+variables in total --- is solved optimally in under five seconds
+(\S\ref{sec:rq4}) --- optimization is not the dominant runtime bottleneck.
 
 \textbf{(D) The validation surprise: overlapping statistics interfere.}
 End-to-end deployment on real PostgreSQL shows per-candidate predictions are
 accurate, but co-installed \emph{overlapping} statistics let the planner switch
 queries to a suboptimal statistic (predicted mean 1.02 vs.\ measured 1.32). A
-\emph{global-disjointness} constraint restores exact predictability
+\emph{global-disjointness} constraint restores (empirically) near-exact
+predictability
 (ratio 1.000) at a quantified quality cost (\S\ref{sec:p1}). This is not a
 failure of our measurement --- it is a second-order planner interaction that the
 per-candidate model cannot see, and a concrete, validated fix.
@@ -206,21 +215,25 @@ model. \textbf{Scope.} Extended statistics are consulted only for
 \emph{restriction} (WHERE) clauses on a \emph{single relation}:
 the selectivity entry point is gated by a single-relation check, and
 \texttt{eqjoinsel} never consults \texttt{pg\_statistic\_ext}. Consequently
-\textbf{extended statistics cannot improve JOIN estimation} --- their value is
-confined to single-table selection predicates. This is why our evaluation
-separates single-table workloads (where they act) from join workloads (a
-negative control).
+\textbf{extended statistics do not directly estimate cross-relation join
+selectivity} --- they act on single-table restriction clauses, so their direct
+effect is confined to single-relation selection predicates (they can influence a
+join plan only indirectly, through base-cardinality estimates). This is why our
+evaluation separates single-table workloads (where they act directly) from join
+workloads (a negative control).
 
 \textbf{Capacity is per-object and tunable.} Each statistic can be assigned its
 own \texttt{statistics\_target} via \texttt{ALTER STATISTICS ... SET STATISTICS}
-(stored in \texttt{stxstattarget}). But \textbf{ANALYZE samples a number of rows
-equal to the maximum \texttt{statistics\_target} over the relation's
-statistics}, so one high-target statistic drags the whole ANALYZE to a larger
-sample (a full scan at 10000). This couples capacity to \emph{maintenance cost},
-not only storage. Because of this coupling we deliberately optimize a
-\emph{storage} budget --- the persistent bytes of the selected statistics and the
-estimation quality they deliver --- and treat ANALYZE maintenance cost
-separately (it is a property of the maximum, not the sum, of targets).
+(stored in \texttt{stxstattarget}). The ANALYZE sampling effort is coupled to the
+\emph{largest relevant statistics target} on the relation (including the
+extended statistics' own targets) \cite{pgstats}; consequently, raising an
+extended-statistics target can increase maintenance cost beyond the persistent
+storage cost our objective models (a full scan at 10000). This couples capacity
+to \emph{maintenance cost}, not only storage. Because of this coupling we
+deliberately optimize a \emph{storage} budget --- the persistent bytes of the
+selected statistics and the estimation quality they deliver --- and treat ANALYZE
+maintenance cost separately (it is a property of the maximum, not the sum, of
+targets).
 
 \textbf{Capacity-quality trade-off.} Measured on the CENSUS \texttt{climate}
 table (69 columns), the repair quality of the best single statistic is roughly
@@ -245,20 +258,28 @@ accurate \cite{chaudhuri1998overview}. In particular, we drive the \emph{real}
 planner and measure its actual q-error, so no synthetic model accuracy is
 involved.
 
-\textbf{(b) Automatic statistics management.} Chaudhuri and Narasayya
-\cite{chaudhuri2000automating} showed that a workload's needed statistics can be
-identified and pruned to a small effective set. This establishes the
-\emph{which} dimension as a solved (or at least heavily-studied) problem --- and
-is exactly why we do \emph{not} claim novelty for ``automatically selecting
-statistics.'' The gap we address is the second axis: prior work chooses column
-combinations under a cost but does not jointly choose each statistic's
-\emph{capacity} (\texttt{statistics\_target}). Concretely, prior work decides
-\emph{whether to add} a statistic; we additionally decide \emph{whether to
-upgrade} an already-chosen one from L100 to L1000 to L10000. That is the shift
-from ``selection'' to ``budget allocation.'' We are careful to note that
-capacity (\texttt{statistics\_target}) \emph{tuning} appears incidentally in
-database-tuning practice and in general knob-optimization literature; what is
-missing there is a \emph{joint} treatment in which capacity and column choice
+\textbf{(b) Automatic statistics configuration.} Chaudhuri and Narasayya
+\cite{chaudhuri2000automating,chaudhuri2001automating} showed that a workload's
+needed statistics can be identified and pruned to a small effective set. This
+establishes the \emph{which} dimension as well-studied --- and is exactly why we
+do \emph{not} claim novelty for ``automatically selecting statistics.'' Two
+subsequent lines are the most direct prior art and frame the boundary of our
+claim. \emph{CORDS} \cite{ilyas2004cords} automatically discovers correlations
+and soft functional dependencies among columns and recommends column-group
+statistics to avoid the independence assumption; \emph{Haas et al.}
+\cite{haas2007dependencies} detect dependent attribute pairs from query
+feedback and \emph{rank} them so that only the most valuable multivariate
+statistics are kept under a catalog-space budget. Both pre-frame our concern
+(candidate explosion, catalog budget), but both operate at the level of
+\emph{which column groups} and \emph{pairwise} independence --- they do not
+jointly choose each statistic's \emph{capacity} and do not optimize a shared
+storage budget across the \texttt{statistics\_target} axis. Concretely, prior
+work decides \emph{whether to add} a statistic; we additionally decide
+\emph{whether to upgrade} an already-chosen one from L100 to L1000 to L10000.
+That is the shift from ``selection'' to ``budget allocation.'' We are careful to
+note that capacity (\texttt{statistics\_target}) \emph{tuning} appears
+incidentally in database-tuning practice and knob-optimization literature; what
+is missing there is a \emph{joint} treatment in which capacity and column choice
 compete for a \emph{single} storage budget, so that upgrading one statistic
 trades off against adding another. That joint resource-allocation view, with a
 provably linear objective on an empirically validated sparse regime, is our
@@ -290,10 +311,51 @@ scale.
 index advisors share our high-level framing (workload $\to$ candidates $\to$
 optimizer evaluation $\to$ global selection). What distinguishes our accuracy
 criterion is that we optimize \emph{prediction quality under a storage budget}
-(mean q-error), not wall-clock latency or a cost-benchmark proxy, and that we
-validate the resulting deployment end-to-end against the real optimizer ---
-surfacing a planner-interaction effect no tuning system that assumes independent
-statistics would hit (\S\ref{sec:e2e}).
+(mean q-error), not wall-clock latency or a cost-benchmark proxy. Learned
+cardinality estimators \cite{kipf2019learned} are orthogonal in the same sense:
+they \emph{change the estimator}, whereas we leave PostgreSQL's estimator
+unchanged and optimize the physical statistics supplied to it.
+
+\textbf{(f) PostgreSQL-ecosystem statistics advisors.} Production tools already
+recommend extended statistics on PostgreSQL workloads: EDB's Query Advisor
+\emph{Statistics Advisor} \cite{edbstatsadvisor} monitors multi-column filters
+and selectivity-error, explores column combinations, and weights candidates by
+benefited-query count, but limits to at most two columns and does not tune
+capacity; \texttt{pg\_qualstats} \cite{pgqualstats} collects predicate
+statistics that can surface correlated columns for manual extended-statistics
+creation. Both answer essentially \emph{which} statistics to recommend; neither
+optimizes the joint \emph{which $\times$ how much} (capacity) decision against a
+single shared storage budget, nor provides an E2E planner-interference fix.
+
+Table \ref{tab:taxonomy} situates our contribution against this lineage. The
+column that distinguishes us from every prior system is \emph{capacity tuning
+under a shared storage budget} --- treating \texttt{statistics\_target} as a
+first-class competing resource --- together with \emph{E2E planner validation}.
+
+\begin{table*}[t]
+\caption{Positioning against automatic statistics configuration. Prior work
+discovers or selects column groups under a workload and (sometimes) a budget;
+none treats PostgreSQL's per-statistic \texttt{statistics\_target} (capacity) as
+a competing resource dimension against a single shared storage budget, nor
+validates the deployed set against the real planner. \checkmark\;\,= yes,
+\;$\sim$\;= partial, -- = no/depends.}
+\label{tab:taxonomy}
+\small
+\begin{tabular}{lccccccl}
+\toprule
+ & cand. & multi-var & workload & budget & capacity & Postgre- & E2E \\
+ & disc. & stats & driven & --un-- & tuning & SQL & planner\\
+ & & (colgroups)& & & & & valid.\\
+\midrule
+Chaudhuri \& Narasayya & \checkmark & -- & \checkmark & storage & -- & -- & --\\
+CORDS \cite{ilyas2004cords} & \checkmark & $\sim$(pair) & -- & catalog & -- & -- & --\\
+Haas et al.\ \cite{haas2007dependencies} & \checkmark & $\sim$(pair) & \checkmark & catalog & -- & -- & --\\
+EDB Statistics Advisor \cite{edbstatsadvisor} & \checkmark & $\sim$($\le$2 col) & \checkmark & weighting & $\sim$ & \checkmark & --\\
+pg\_qualstats \cite{pgqualstats} & \checkmark & -- & \checkmark & -- & -- & \checkmark & --\\
+\textbf{This work} & \checkmark & MCV & \checkmark & \textbf{storage} & \checkmark & \checkmark & \checkmark\\
+\bottomrule
+\end{tabular}
+\end{table*}
 
 \section{Problem Formulation}
 \label{sec:formulation}
@@ -345,8 +407,8 @@ statistics coexist (we return to this in \S\ref{sec:e2e}).
 \label{sec:sparse}
 
 Our measurements (\S\ref{sec:rq2}) reveal --- surprisingly --- that per query a
-\emph{single dominant statistic} already captures nearly all attainable
-improvement. This observation motivates a \emph{restricted} optimization model:
+\emph{single dominant statistic} already captures nearly all improvement
+attainable from the evaluated candidate family. This observation motivates a \emph{restricted} optimization model:
 the \emph{sparse} special case, in which each query selects at most one
 statistic, $\sum_s x_{is}\le 1$. We stress that this is an \emph{empirically
 justified restriction}, not a modeling assumption that holds by definition: it
@@ -357,25 +419,33 @@ hard: with at most one statistic per query, $e_i(T_i)$ is either $e_i^0$ (no
 statistic) or $e_{is}$ (the single selected statistic), so no joint term
 arises.
 
-\begin{proposition}[Exact linearity under per-query unit cap]
+\begin{proposition}[Exact linearity of the singleton-effect surrogate]
 \label{prop:linear}
-If each query selects at most one statistic ($\sum_s x_{is} \le 1$), then the
-per-query q-error is exactly
+Consider the \emph{surrogate} model in which a query's error is $e_i^0$ if no
+statistic is assigned and $e_{is}$ if it is assigned the single statistic $s$
+(i.e.\ the per-query error \emph{as the model computes it}, not necessarily what
+the real planner produces). If each query is assigned at most one statistic
+($\sum_s x_{is} \le 1$), then the surrogate objective is exactly
 \[
   e_i\big(T_i\big)\;=\;e_i^0\;-\;\sum_s \big(e_i^0-e_{is}\big)\,x_{is},
 \]
-with no interaction term, so the workload objective is linear in the selection
-variables.
+with no interaction term, so the surrogate workload objective is linear in the
+selection variables.
 \end{proposition}
 \begin{proof}[Proof sketch]
-For a fixed query $i$, the selected set $T_i$ is either empty or a singleton
-$\{s\}$. In the former case $e_i(T_i)=e_i^0$; in the latter,
-$e_i(T_i)=e_{is}$. Since at most one $x_{is}$ equals $1$, no two statistics
-co-occur and there is no joint term.
+For a fixed query $i$, the assigned set $T_i$ is either empty or a singleton
+$\{s\}$. In the former case the surrogate error is $e_i^0$; in the latter,
+$e_{is}$. Since at most one $x_{is}$ equals $1$, no two statistics co-occur and
+there is no joint term. This is a statement about the \emph{model}; whether the
+real planner reproduces $e_{is}$ for the chosen $s$ is a separate, empirical
+question answered by the E2E validation (\S\ref{sec:e2e}).
 \end{proof}
 
 The log-space approximation used for multi-select is therefore unnecessary for
-the sparse case; we solve the linear form exactly. We call this the
+the sparse surrogate; we solve the linear form exactly. This makes the
+\emph{surrogate optimization problem} an exact MILP under the singleton-effect
+restriction; \S\ref{sec:p1} then determines when that surrogate remains faithful
+to PostgreSQL's actual statistic selection after deployment. We call this the
 \emph{capacity-aware} selection problem: because each capacity level is a
 distinct physical statistic, choosing \emph{which} level of a combination to
 build is expressed by selecting the corresponding $y_{(table,cols,level)}$,
@@ -420,11 +490,15 @@ must exist to be used, $x_{is}\le y_s$ (shared across queries); (3) sparse
 per-query cap $\sum_s x_{is}\le 1$; and (4) capacity-level exclusivity
 $\sum_{\ell} y_{(cols,\ell)}\le 1$ --- a real object has a single
 \texttt{statistics\_target}, so at most one level of a given combination is
-created. A fifth, optional constraint enforces \emph{global disjointness}:
-$y_a+y_b\le 1$ whenever the column sets of $a$ and $b$ overlap. This is
-stronger than (4) (which only forbids two levels of the \emph{same}
-combination) and removes the residual planner cross-talk among co-installed
-overlapping MCVs ($\S\ref{sec:p1}$).
+created. A fifth constraint enforces \emph{global disjointness}: $y_a+y_b\le 1$
+whenever the column sets of $a$ and $b$ overlap. This is stronger than (4)
+(which only forbids two levels of the \emph{same} combination). We call the
+model with constraint (5) the \emph{deployment-valid} model: it guarantees the
+deployed set is pairwise column-disjoint, so the planner cannot cross-talk among
+co-installed overlapping MCVs and the surrogate's per-candidate predictions
+remain composable after deployment (\S\ref{sec:p1}). The model without (5)
+(overlap allowed) optimizes the surrogate more aggressively but may require
+post-selection validation (Option B, \S\ref{sec:disc-fix}).
 
 \subsection{Pruning and Solve Scalability}
 \label{sec:scale}
@@ -477,7 +551,8 @@ Masking NULLs the
 other candidates' payload in \texttt{pg\_statistic\_ext\_data}; the planner's
 \texttt{statext\_is\_kind\_built()} test then omits a NULL-payload statistic from
 \texttt{rel->statlist}, so the planner behaves as if that statistic did not
-exist --- an exact isolation that costs no ANALYZE. Payloads are restored from a
+exist --- an implementation-exact isolation for PostgreSQL 16 that costs no
+ANALYZE. Payloads are restored from a
 temporary backup table via \texttt{UPDATE ... FROM} (the \texttt{pg\_mcv\_list}
 type has no bytea cast, so the round-trip must happen inside the server).
 Multiple capacity levels are measured with one object per (candidate, level)
@@ -762,42 +837,54 @@ target & ANALYZE(0 ext) & ANALYZE(1000 ext) & repair \\
 
 \textbf{Surprisingly, yes.} For each query we greedily rank non-overlapping
 candidates by single q-error and measure the \emph{joint} q-error of keeping the
-top-1/2/3. On stats\_CEB\_single the joint q-error at $k=2,3$ equals $k=1$
-within 0.02--0.03; on the wide CENSUS table, \texttt{query.184} (4162 baseline,
-165 candidates) and \texttt{query.382} (378, 56 candidates) are identical at
-$k{=}1,2,3$ at both targets (Table \ref{tab:multi}). This is not an artefact of
-a small candidate space: it holds on the widest, highest-error,
+top-1/2/3. On stats\_CEB\_single, adding a 2nd/3rd non-overlapping candidate
+changes nothing for $93\%$ of the 180 queries with candidates (the joint
+$k{=}2,3$ q-error equals $k{=}1$ exactly), and the largest $k{=}2$-$k{=}1$ gap
+over the whole workload is $0.027$ (Table \ref{tab:multi}); on the wide CENSUS
+table the two hardest queries are identical at $k{=}1,2,3$. This is not an
+artefact of a small candidate space: it holds on the widest, highest-error,
 most-candidate-dense workload in our study.
 
 This is not just anecdotal. Fig.~\ref{fig:sparsity} characterises the 
-\emph{distribution} over the whole 632-query workload. For every query with
-candidate statistics, we ask what fraction of its \emph{best
-single-statistic} improvement the best candidate captures (the ``top-1 coverage
-ratio'',
-$\textstyle\frac{e_i^0-e_{i,\text{best}}}{e_i^0-e_i^{\text{best single}}}$;
-note this measures coverage of the best \emph{single} statistic, not the best
-\emph{subset}, so it is well-defined without enumerating subsets); the
-ratio is meaningful for the 35 queries with real repair room (baseline $>1.2$),
-and there it has \textbf{median 0.999}, with $94.3\%$ of such queries exceeding
-$0.9$ and $77.1\%$ exceeding $0.99$. By baseline regime, a single candidate
+\emph{distribution} over the whole 632-query workload. The natural sparsity
+question is \emph{non-circular}: how much of the improvement of the measured
+\emph{best $k$-subset} does a single statistic already capture? We define the
+top-1 coverage ratio against the measured joint q-error of the best $k$
+non-overlapping subsets (obtained by the mask protocol, not by a model),
+\[
+  \operatorname{coverage}_k(i)\;=\;
+  \frac{e_i^0 - e_i(\{s_1\})}{e_i^0 - e_i(\{s_1,\dots,s_k\})},
+\]
+where $e_i(\{s_1\})$ and $e_i(\{s_1,\dots,s_k\})$ are the \emph{measured} joint
+q-errors of the best 1- and $k$-statistic subsets (a value of $1$ means the
+single best statistic already realizes the entire multi-statistic gain; the
+denominator is not the single-statistic value, so this is not a tautology).
+Across the 35 queries with real repair room (baseline $>1.2$), this ratio
+against the best \emph{2-subset} has \textbf{median 1.000}, with $100\%$ of such
+queries exceeding $0.9$; against the best \emph{3-subset} it is also median
+$1.000$. Equivalently, for $93\%$ of the 180 queries with candidates the joint
+q-error at $k{=}2$ equals $k{=}1$ exactly, and the largest $k{=}2$-$k{=}1$ gap
+over the whole workload is $0.027$. By baseline regime, a single candidate
 reaches the estimation floor ($\le1.05$) for $94\%$ of near-baseline queries
 (base 1--1.1) and $97\%$ of the genuinely repairable queries (base 2--10, $n{=}32$).
 One dominant column cluster drives a single-table query's error, and one
-well-chosen 3-column MCV captures it.
+well-chosen 3-column MCV captures it --- measured, not assumed.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/sparsity_cdf}
-\caption{Top-1 coverage over the full 632-query stats\_CEB\_single workload
-(queries with baseline $>1.2$, $n{=}35$): the best single candidate captures a
-median $0.999$ of attainable improvement. Sparsity is a distribution-level
-property, not a few anecdotes.}
+\caption{Top-1 coverage vs.\ the \emph{measured} best-2-subset over the full
+632-query stats\_CEB\_single workload (queries with baseline $>1.2$, $n{=}35$):
+the best single candidate captures a median $1.000$ of the improvement of the
+best two-statistic set. Sparsity is a measured, distribution-level property.}
 \label{fig:sparsity}
 \end{figure}
 
 \begin{table}[t]
 \caption{Adding a 2nd/3rd non-overlapping candidate does not help (k=1,2,3 joint
-q-error). ``Single dominant statistic suffices per query.''}
+q-error). The last row aggregates the full 180-query stats\_CEB\_single workload
+at L10000: median joint q-error across queries. ``Single dominant statistic
+suffices per query.''}
 \label{tab:multi}
 \small
 \begin{tabular}{lcccc}
@@ -806,6 +893,7 @@ query & baseline & cands & k=1 & k=2 / k=3 \\
 \midrule
 CENSUS q.184 & 4162 & 165 & 1.08 & 1.08 / 1.08\\
 CENSUS q.382 & 378  & 56  & 1.12 & 1.12 / 1.12\\
+stats\_CEB\_single (median, n=180) & 1.06 & -- & 1.00 & 1.00 / 1.00\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -850,6 +938,47 @@ flagged as the boundary of our claim in \S\ref{sec:formulation}: sparsity holds
 when a query's error is dominated by \emph{one} correlated cluster and fails
 when it is driven by \emph{several independent} ones --- in which case the
 multi-select model (\S\ref{sec:multi}) is required.
+
+\subsubsection{How sparsity decays with the number of clusters.}
+The two-cluster result is not a knife-edge: sparsity degrades smoothly as a
+query is driven by more independent clusters. We sweep the number of
+\emph{mutually independent} perfectly-correlated clusters $K=1,2,3,4$ (a query
+filters on all $K$ clusters), and report the top-1 vs.\ top-$K$ coverage ratio
+\[
+  \operatorname{cov}_K = \frac{e^0 - e(\{s_1\})}{e^0 - e(\{s_1,\dots,s_K\})},
+\]
+i.e.\ the fraction of the best $K$-statistic improvement the \emph{single}
+best statistic captures (equal to 1 = sparsity holds perfectly).
+Table \ref{tab:sweep} shows it is $1.000$ at $K{=}1$, drops to $0.90$ at
+$K{=}2$, and collapses to $\approx 0$ once three or more independent clusters
+coexist --- exactly the monotone failure regime the mechanistic hypothesis
+(\S\ref{sec:disc-sparsity}) predicts, and the regime where the multi-select
+model is needed.
+
+\begin{table}[t]
+\caption{Controlled sparsity decay. As a query is driven by $K$ mutually
+independent correlated clusters, the single best statistic captures a shrinking
+fraction ($\operatorname{cov}_K$) of the improvement of the best $K$-statistic
+set. Sparsity holds ($1.000$) only for $K{=}1$; it fails once $K\ge 3$.}
+\label{tab:sweep}
+\small
+\begin{tabular}{lcccc}
+\toprule
+$K$ clusters & base & top-1 & top-$K$ & $\operatorname{cov}_K$\\
+\midrule
+1 & 100 & 1.00 & 1.00 & \textbf{1.000}\\
+2 & 1000 & 100 & 1.00 & 0.90\\
+3 & 100 & 100 & 1.00 & \textbf{$\approx$0}\\
+4 & 10  & 10  & 1.00 & \textbf{$\approx$0}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This characterization turns ``why sparsity?'' from a hypothesis into a
+measured, parameterized statement: single-table queries are sparse because
+their error is typically concentrated in \emph{one} correlated cluster, and the
+regime inverts cleanly (and predictably) once several independent clusters
+drive the same query.
 
 \subsection{RQ3: Does the MILP Beat a Budgeted Greedy?}
 \label{sec:rq3}
@@ -1043,8 +1172,8 @@ removed by the global-disjointness constraint (\S\ref{sec:p1}).
 \textbf{No meaningful benefit --- as a sanity check.} On the join-heavy
 \texttt{JOB} workload only 37/113 queries even have a multi-column selection
 candidate and, after deduplication, just 7 distinct combinations exist; because
-its errors are dominated by joins (which extended statistics cannot touch,
-\S\ref{sec:mechanisms}), no amount of capacity tuning helps. This is the
+its errors are dominated by joins (which extended statistics cannot directly
+repair, \S\ref{sec:mechanisms}), no amount of capacity tuning helps. This is the
 expected null result for the negative control: the method does not optimize for
 coverage's sake.
 
@@ -1135,7 +1264,7 @@ the per-candidate sparse model relies on. It is not a failure to predict a
 single statistic; it is a joint effect the per-candidate measurement cannot see
 by construction.
 
-\subsection{Stage 3: Global Disjointness Restores Exact Predictability}
+\subsection{Stage 3: Global Disjointness Restores Near-Exact Predictability}
 \label{sec:p1}
 
 We fix the gap with the Option-A model: a \emph{global-disjointness} constraint
@@ -1270,8 +1399,8 @@ assumption fails hardest). The planner's default estimate for such a clause is
 about as wrong as its worst correlated sub-clause; a single MCV over exactly
 that dominant cluster removes the largest source of error, and residual errors
 in the remaining (weakly-correlated) predicates contribute little to the total
-q-error. Hence \emph{one} well-chosen statistic captures nearly all attainable
-improvement, and a second non-overlapping statistic finds no independent
+q-error. Hence \emph{one} well-chosen statistic captures nearly all improvement
+attainable from the 2-/3-column MCV candidates, and a second non-overlapping statistic finds no independent
 ``second cluster'' worth capturing.
 
 This hypothesis is consistent with every observation we report: it explains why
@@ -1319,7 +1448,8 @@ question rather than a modeling obstacle.
 \label{sec:disc-fix}
 
 The validated fix (Option A, global disjointness) is the trustworthy main model:
-it restores exact predictability at a quantified quality cost (\S\ref{sec:p1}).
+it restores empirically near-exact predictability at a quantified quality cost
+(\S\ref{sec:p1}).
 As a practical fallback (Option B), one can solve without the constraint and
 then run a lightweight EXPLAIN-based check, drop any interfering statistic, and
 re-solve. We recommend A as the default because it makes the deployment semantics
@@ -1357,7 +1487,8 @@ through a catalog-mask protocol that makes per-candidate, per-capacity
 measurement feasible on wide tables. End-to-end validation shows per-candidate
 prediction is sound and isolates the residual risk to planner cross-talk among
 co-installed overlapping statistics; a global-disjointness
-constraint restores exact predictability. Join-heavy workloads are the negative
+constraint restores empirically near-exact predictability. Join-heavy workloads
+are the negative
 control. The result is a principled, scalable, and honestly-validated recipe
 for automating PostgreSQL extended-statistics deployment under a storage
 budget.
