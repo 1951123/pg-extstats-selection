@@ -24,6 +24,8 @@
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{positioning,fit,arrows.meta}
 
 \begin{document}
 
@@ -412,7 +414,8 @@ candidates is not a tractable phase-1.
 
 Our \textbf{catalog-mask protocol} builds all of a table's candidate statistics
 \emph{once}, in a single ANALYZE (sampled at the maximum target), and measures
-each candidate in isolation by \emph{masking} the others. Masking NULLs the
+each candidate in isolation by \emph{masking} the others (Fig.~\ref{fig:mask}).
+Masking NULLs the
 other candidates' payload in \texttt{pg\_statistic\_ext\_data}; the planner's
 \texttt{statext\_is\_kind\_built()} test then omits a NULL-payload statistic from
 \texttt{rel->statlist}, so the planner behaves as if that statistic did not
@@ -424,6 +427,41 @@ via \texttt{ALTER STATISTICS ... SET STATISTICS}, again built by a single
 ANALYZE at the maximum target. Protocol-M therefore costs one ANALYZE (for the
 whole table) plus a cheap EXPLAIN per candidate, instead of two ANALYZEs per
 candidate.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  stat/.style={draw, rounded corners=2pt, inner sep=3pt, font=\small,
+               text width=22mm, align=center},
+  pay/.style={text=blue!70!black},
+  null/.style={text=black!45},
+  arr/.style={-{Stealth[length=2.5mm]}, thick}
+]
+% ---- left: all built ----
+\node[font=\small, anchor=south] at (0,3.0) {\textbf{(a) all built,\ one ANALYZE}};
+\foreach \i/\nm in {0/S1,1/S2,2/S3,3/S4}{
+  \node[stat, fill=white] (l\i) at (0,-0.9*\i) {\nm\\[0.5mm]{\scriptsize\color{blue!70!black}payload}};
+}
+% ---- right: masked (S1 measured) ----
+\node[font=\small, anchor=south] at (5.4,3.0) {\textbf{(b) mask all but S1}};
+\node[stat, fill=green!12] (r0) at (5.4,0.0)  {S1\\[0.5mm]{\scriptsize\color{blue!70!black}payload}};
+\foreach \i/\nm in {1/S2,2/S3,3/S4}{
+  \node[stat, fill=black!4] (r\i) at (5.4,-0.9*\i) {\nm\\[0.5mm]{\scriptsize\color{black!45}NULL}};
+}
+% ---- planner box (right of the masked list) ----
+\node[draw, rounded corners=2pt, fill=blue!8, inner sep=5pt, font=\small,
+      anchor=west, text width=20mm] (pln) at (8.6,-1.8)
+      {planner\\[-0.5mm]{\scriptsize sees only S1}};
+\draw[arr] (r0.east) -- (pln.west);
+\end{tikzpicture}
+\caption{The catalog-mask protocol (Protocol-M). All candidate statistics
+(S1--S4) are built in one ANALYZE (left). To measure S1 in isolation we NULL the
+other candidates' payloads in \texttt{pg\_statistic\_ext\_data} (right); the
+planner's \texttt{statext\_is\_kind\_built()} test then includes only S1 in
+\texttt{rel->statlist}. Measuring each candidate costs an EXPLAIN, not an
+ANALYZE.}
+\label{fig:mask}
+\end{figure}
 
 \subsection{Correctness of Masked Measurement}
 \label{sec:measure-correct}

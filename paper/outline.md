@@ -119,8 +119,9 @@ Extended Statistics*
   / 5.3 Correctness(掩码测量==单统计真实部署, 用 §7 st.144 1.04 vs 1.042 提前验证)
   / 5.4 Runtime 表(tab:measurement: naive vs Protocol-M 随 N 9x→132x, 基于实测
   ANALYZE 缩放 0→21.9s, 1000→264s)。
+- **Fig 1 (mask diagram, 已加)**：TikZ 示意图 (a)全构建一次 ANALYZE S1-S4 各带
+  payload; (b)掩码 S2-S4 payload=NULL → planner 只看到 S1。让 Protocol-M 直观。
 - **核心：measurement 才是 pipeline bottleneck，MILP 是便宜的部分**。
-  这是 C(enabler) 的 systems 定位。
 
 ### 6. Empirical Findings（按 RQ 结构）
 - **RQ1 Capacity matters?** → Yes。t100/t1000/t10000 质量 ~2.1-2.3 / ~1.2-2.1 /
