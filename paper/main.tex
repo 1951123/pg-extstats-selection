@@ -204,28 +204,60 @@ the ANALYZE cost of 10000.
 
 \subsection{Related Work}
 
-Four bodies of work are relevant. (a) \emph{Cardinality estimation}: histogram
-and MCV-based selectivity, the independence assumption, and q-error as a
-quality metric; our problem is not estimate \emph{construction} but statistic
-\emph{deployment}. (b) \emph{Automatic statistics management}: Chaudhuri and
-Narasayya \cite{chaudhuri2000automating} already showed that the optimizer's
-needed statistics can be identified from a workload and pruned to a small
-effective set. The \emph{which} dimension is therefore not new. What is new
-here is the second, \emph{capacity} axis: prior work chooses column
-combinations under a cost/budget but does not jointly decide each statistic's
-\emph{capacity} (\texttt{statistics\_target}), i.e.\ whether to spend budget on
-\emph{adding} a statistic or \emph{upgrading} an existing one from L100 to
-L1000 to L10000. This is a resource-allocation view, closer to physical-design
-selection than to the "which columns" question. (c) \emph{Physical-design
-selection} (index and materialized-view selection) solves budget-constrained
-structure selection with MILP and greedy heuristics \cite{indexselection}; our
-MILP follows the same methodology but targets statistics with a capacity axis,
-and exploits an empirically validated, discovered sparsity that linearizes the
-objective --- a structure those settings do not exhibit. (d) \emph{Learned
-cardinality estimation} trains models to estimate selectivity directly; unlike
-those, we drive the \emph{real} PostgreSQL planner and measure its actual
-q-error, so no synthetic model accuracy is involved. A more complete citation
-set is the subject of ongoing work.
+We position our work against five bodies of literature; for each we say what it
+\emph{optimizes}, \emph{measures}, and why it does not solve the
+\emph{what} $\times$ \emph{how much} question.
+
+\textbf{(a) Cardinality estimation.} Histograms and MCVs \cite{ioannidis2003cardinality},
+selectivity from query feedback \cite{chendependencies}, and -- more recently --
+\emph{learned} cardinality models \cite{kipf2019learned} all aim to improve the
+estimate itself. Our problem is orthogonal: we do not estimate, we decide
+\emph{which statistics to deploy} so that PostgreSQL's own estimator is
+accurate. In particular, we drive the \emph{real} planner and measure its actual
+q-error, so no synthetic model accuracy is involved.
+
+\textbf{(b) Automatic statistics management.} Chaudhuri and Narasayya
+\cite{chaudhuri2000automating} showed that a workload's needed statistics can be
+identified and pruned to a small effective set. This establishes the
+\emph{which} dimension as a solved (or at least heavily-studied) problem --- and
+is exactly why we do \emph{not} claim novelty for ``automatically selecting
+statistics.'' The gap we address is the second axis: prior work chooses column
+combinations under a cost but does not jointly choose each statistic's
+\emph{capacity} (\texttt{statistics\_target}). Concretely, prior work decides
+\emph{whether to add} a statistic; we additionally decide \emph{whether to
+upgrade} an already-chosen one from L100 to L1000 to L10000. That is the shift
+from ``selection'' to ``budget allocation.''
+
+\textbf{(c) Physical database design and index selection.} Budget-constrained
+structure selection is a classic problem: which indexes to build, typically
+solved by cost-driven candidate generation plus MILP or greedy
+\cite{chaudhuri1997index,indexselection}. Our MILP follows the same methodology.
+The novelty is twofold: our candidates carry a \emph{capacity} axis (an index
+has no analogue of $\texttt{statistics\_target}$), and our objective is
+\emph{provably linear} because we exploit a \emph{discovered sparse structure}
+($\S\ref{sec:rq2}$) --- a property index-selection workloads do not exhibit. The
+result is that the hard part of the problem is not the optimization (seconds at
+full scale) but the \emph{measurement} of the candidate space
+(\S\ref{sec:measure}).
+
+\textbf{(d) PostgreSQL extended statistics.} The mechanics of
+\texttt{CREATE STATISTICS} --- MCV / ndistinct / dependencies, per-object
+\texttt{statistics\_target}, the restriction to single relations, and the
+ANALYZE sampling coupling \cite{pgstats,pgmv} --- are the substrate of our
+model (\S\ref{sec:mechanisms}). To our knowledge no prior work formulates
+extended-statistics \emph{deployment} as a budgeted joint selection-and-capacity
+problem, nor provides a catalog-mask protocol to measure the candidate space at
+scale.
+
+\textbf{(e) Workload-driven database tuning.} Automated physical tuning
+\cite{indexselection}, knob/configuration optimization, and workload-aware
+index advisors share our high-level framing (workload $\to$ candidates $\to$
+optimizer evaluation $\to$ global selection). What distinguishes our accuracy
+criterion is that we optimise \emph{prediction quality under a storage budget}
+(mean q-error), not wall-clock latency or a cost-benchmark proxy, and that we
+validate the resulting deployment end-to-end against the real optimizer ---
+surfacing a planner-interaction effect no tuning system that assumes independent
+statistics would hit (\S\ref{sec:e2e}).
 
 \section{Problem Formulation}
 \label{sec:formulation}

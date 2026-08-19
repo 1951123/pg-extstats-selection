@@ -77,13 +77,18 @@ Extended Statistics*
 - Contribution bullets（见上，5 条，main.tex 已写）。
 
 ### 2. Background & Related Work
-- **A. Cardinality estimation**：histogram/MCV、独立性假设、q-error。
-- **B. PostgreSQL extended statistics**：dependencies / ndistinct / MCV /
-  statistics target / planner integration。
-- **C. Statistics selection（最重要）**：现有方法选 *which*，是否联合优化
-  *capacity*？答案"很少/没有" → novelty 清晰。需补文献检索。
-- **D. Physical design / index selection / knob tuning**：方法学锚点——把
-  physical-design style budget allocation 引入 extended stats。
+- **A. Cardinality estimation**：histogram/MCV (Ioannidis)、query feedback
+  (Chen&Roussopoulos)、learned CE (Kipf 2019)。我们是"部署"而非"估计"。
+- **B. Automatic statistics management**：Chaudhuri&Narasayya 2000 做了
+  "which" 层 → 明确 A 的 novelty 在 "how much" 轴/upgrade-vs-add，
+  = selection → budget allocation。
+- **C. Physical design / index selection**：Chaudhuri 1997/2005 budget-constrained
+  structure selection (MILP/greedy)。我们的差异 = capacity 轴 + 发现式稀疏线性。
+- **D. PostgreSQL extended statistics**：MCV/ndistinct/deps、per-object
+  stxstattarget、单关系限制、ANALYZE 采样耦合；我们的模型 substrate。
+- **E. Workload-driven tuning**：自动调优/knob/index advisor 共享框架；我们
+  的差异 = 优化"存储预算下的预测质量(mean qerror)"而非 latency，且端到端验证。
+- 每类都回答：优化什么/测什么/为何解不了 what×how much（novelty 落地）。
 
 ### 3. Problem Formulation
 - 记号：$s=(R,C,\ell)$，$c_s=\text{storage}(s)$，$e_{is}$=仅 s 时查询 i 的 q-error，
