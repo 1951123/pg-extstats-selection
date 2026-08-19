@@ -448,7 +448,7 @@ ANALYZE at the maximum target. Protocol-M therefore costs one ANALYZE (for the
 whole table) plus a cheap EXPLAIN per candidate, instead of two ANALYZEs per
 candidate.
 
-\begin{figure}[t]
+\begin{figure*}[t]
 \centering
 \begin{tikzpicture}[
   stat/.style={draw, rounded corners=2pt, inner sep=3pt, font=\small,
@@ -481,7 +481,7 @@ planner's \texttt{statext\_is\_kind\_built()} test then includes only S1 in
 \texttt{rel->statlist}. Measuring each candidate costs an EXPLAIN, not an
 ANALYZE.}
 \label{fig:mask}
-\end{figure}
+\end{figure*}
 
 \subsection{Correctness of Masked Measurement}
 \label{sec:measure-correct}
@@ -509,7 +509,7 @@ protocol --- not the MILP --- is the enabling component that makes the massive
 candidate $\times$ capacity space measurable, and why we emphasize that the
 optimization (\S\ref{sec:rq4}) is the cheap part of the pipeline.
 
-\begin{table}[t]
+\begin{table*}[t]
 \caption{ANALYZE cost with $N$ extended statistics on CENSUS \texttt{climate}
 (measured at the given target), and the implied naive (Protocol-A) vs.\
 catalog-mask (Protocol-M) total phase-1 cost for $N$ candidates at target 10000.}
@@ -526,9 +526,9 @@ $N$ & ANALYZE & ANALYZE & naive & Protocol-M & speedup\\
 1000 & 21.9s & 264.0s & 44184s & 336s & 132$\times$\\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
-\begin{figure}[t]
+\begin{figure*}[t]
 \centering
 \begin{tikzpicture}[
   bs/.style={draw, rounded corners=2pt, inner sep=4pt, font=\small,
@@ -555,7 +555,7 @@ cheaper with the catalog-mask protocol, yet still dominant -- whereas the sparse
 MILP solves in under five seconds (\S\ref{sec:rq4}). The bottleneck is obtaining
 the data the optimization needs, not the optimization itself.}
 \label{fig:pipeline}
-\end{figure}
+\end{figure*}
 
 \section{Empirical Findings}
 \label{sec:findings}
@@ -571,7 +571,7 @@ of each query's selection predicates. We measure at \texttt{statistics\_target}
 10000 for exactness and report 1000 as the default operating point. We organize
 the results around six research questions.
 
-\begin{table}[t]
+\begin{table*}[t]
 \caption{Workload characteristics and candidate distribution.
 Per-query candidates are the 2/3-column subsets of each query's selection
 predicates; ``global dedup'' is the number of distinct combinations across the
@@ -589,7 +589,7 @@ stats\_CEB (join)& 146 & 609   & 108 & 79    & 4/39\\
 stats\_CEB\_single & 632 & 616 & 180 & 79    & 1/35\\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 \subsection{RQ1: Does Capacity Materially Affect Repair Quality?}
 \label{sec:rq1}
@@ -858,7 +858,7 @@ We fix the gap with the Option-A model: a \emph{global-disjointness} constraint
 set to be pairwise column-disjoint, so the planner cannot cross-talk. Table
 \ref{tab:p1} measures predicted vs E2E for both models at two budgets.
 
-\begin{table}[t]
+\begin{table*}[t]
 \caption{Three-stage causal summary and Option-A ablation. The global-disjoint
 solution reproduces its prediction exactly (ratio 1.000) because the deployed
 set is pairwise column-disjoint, at a quantified nominal-quality cost.}
@@ -875,7 +875,7 @@ overlap allowed & 100 KB & 7 & 1.632 & 1.933 & 1.184\\
 global-disjoint & 100 KB & 2 & 2.004 & \textbf{2.004} & \textbf{1.000}\\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 The global-disjoint solution is \emph{exactly} predictable (ratio 1.000 at both
 budgets), because the deployed set is pairwise column-disjoint so the planner
