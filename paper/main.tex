@@ -54,8 +54,8 @@ We observe that PostgreSQL \texttt{CREATE STATISTICS} selection is not just
 (table, columns) and \emph{how much} capacity (each statistic's
 \texttt{statistics\_target}). We re-frame it as \emph{capacity-aware
 selection}: under a storage budget, should we spend on adding a statistic or
-on upgrading an existing one to a higher-capacity target? Across single-table
-workloads (stats\_CEB and the wide 69-column CENSUS benchmark) we find a
+on upgrading an existing one to a higher-capacity target? Across the single-table
+workloads we evaluate (stats\_CEB and the wide 69-column CENSUS benchmark) we find a
 strikingly sparse structure: one well-chosen multivariate statistic captures
 nearly all attainable improvement per query, which makes the objective exactly
 linear and the resulting budgeted MILP solvable in seconds at full-workload
@@ -224,13 +224,16 @@ We position our work against five bodies of literature; for each we say what it
 \emph{optimizes}, \emph{measures}, and why it does not solve the
 \emph{what} $\times$ \emph{how much} question.
 
-\textbf{(a) Cardinality estimation.} Histograms and MCVs \cite{ioannidis2003cardinality},
+\textbf{(a) Cardinality estimation.} Selectivity estimation is one of the
+oldest problems in query optimization \cite{selinger1979access}: histograms
+\cite{piatetsky1984accurate,poosala1996improved,ioannidis2003cardinality},
 selectivity from query feedback \cite{chendependencies}, and -- more recently --
 \emph{learned} cardinality models \cite{kipf2019learned} all aim to improve the
 estimate itself. Our problem is orthogonal: we do not estimate, we decide
 \emph{which statistics to deploy} so that PostgreSQL's own estimator is
-accurate. In particular, we drive the \emph{real} planner and measure its actual
-q-error, so no synthetic model accuracy is involved.
+accurate \cite{chaudhuri1998overview}. In particular, we drive the \emph{real}
+planner and measure its actual q-error, so no synthetic model accuracy is
+involved.
 
 \textbf{(b) Automatic statistics management.} Chaudhuri and Narasayya
 \cite{chaudhuri2000automating} showed that a workload's needed statistics can be
@@ -245,16 +248,16 @@ upgrade} an already-chosen one from L100 to L1000 to L10000. That is the shift
 from ``selection'' to ``budget allocation.''
 
 \textbf{(c) Physical database design and index selection.} Budget-constrained
-structure selection is a classic problem: which indexes to build, typically
-solved by cost-driven candidate generation plus MILP or greedy
-\cite{chaudhuri1997index,indexselection}. Our MILP follows the same methodology.
-The novelty is twofold: our candidates carry a \emph{capacity} axis (an index
-has no analogue of $\texttt{statistics\_target}$), and our objective is
-\emph{provably linear} because we exploit a \emph{discovered sparse structure}
-($\S\ref{sec:rq2}$) --- a property index-selection workloads do not exhibit. The
-result is that the hard part of the problem is not the optimization (seconds at
-full scale) but the \emph{measurement} of the candidate space
-(\S\ref{sec:measure}).
+structure selection is a classic problem: which indexes and materialized views
+to build, typically solved by cost-driven candidate generation plus MILP or
+greedy \cite{chaudhuri1997index,indexselection,agrawal2000automated}. Our MILP
+follows the same methodology. The novelty is twofold: our candidates carry a
+\emph{capacity} axis (an index or materialized view has no analogue of
+$\texttt{statistics\_target}$), and our objective is \emph{provably linear}
+because we exploit a \emph{discovered sparse structure} ($\S\ref{sec:rq2}$) --- a
+property index-selection workloads do not exhibit. The result is that the hard
+part of the problem is not the optimization (seconds at full scale) but the
+\emph{measurement} of the candidate space (\S\ref{sec:measure}).
 
 \textbf{(d) PostgreSQL extended statistics.} The mechanics of
 \texttt{CREATE STATISTICS} --- MCV / ndistinct / dependencies, per-object
@@ -301,23 +304,38 @@ we use the assignment $x_{is}\le y_s$ so each \emph{physical} object is built
 once and its storage paid once in the budget --- the shared-resource semantics
 that make global selection different from per-query greedy.
 
-\subsection{Multi-select vs.\ the Sparse Special Case}
-\label{sec:sparse}
+\subsection{The General Multi-select Problem Is Intractable to Measure}
+\label{sec:multi}
 
-In the general \emph{multi-select} case a query may use several statistics, and
-the joint effect is not directly measurable for every subset. A standard
-approach is the multiplicative approximation in log space,
+Read naively, the objective over $T_i$ is a \emph{combinatorial} problem: each
+query could use any subset of its candidate statistics, and the joint q-error
+$e_i(T_i)$ of a \emph{set} $T_i$ depends on how those statistics interact in the
+planner. Optimizing over $\{y_s\}$ then requires knowing $e_i(T)$ for arbitrary
+subsets --- which in general cannot be composed from the per-statistic values
+$e_{is}$. Even \emph{measuring} all subsets is infeasible, let alone optimizing
+over them.
+
+A standard workaround is the multiplicative approximation in log space
+\cite{ioannidis2003cardinality},
 \[
   \log e_i(T_i)\;\approx\;\log e_i^0 + \sum_{s\in T_i}\log\!\Big(\tfrac{e_{is}}{e_i^0}\Big),
 \]
-which is exact only when the chosen statistics act independently, and can
-break when overlapping statistics coexist (we return to this in
-\S\ref{sec:e2e}). Our measurements (\S\ref{sec:rq2}) reveal --- surprisingly ---
-that per query a \emph{single dominant statistic} already captures nearly all
-attainable improvement, so we specialise to the \emph{sparse} model: each query
-selects at most one statistic, $\sum_s x_{is}\le 1$. This restriction is not a
-modeling convenience but an observed property of the workloads, and under it
-the objective is exactly linear.
+which treats each statistic's contribution as independent. This is exact only
+when the chosen statistics act independently, and can break when overlapping
+statistics coexist (we return to this in \S\ref{sec:e2e}).
+
+\subsection{The Sparse Special Case: Exact and Linear}
+\label{sec:sparse}
+
+Our measurements (\S\ref{sec:rq2}) reveal --- surprisingly --- that per query a
+\emph{single dominant statistic} already captures nearly all attainable
+improvement. This observation reduces the general multi-select problem to the
+\emph{sparse} special case, in which each query selects at most one statistic,
+$\sum_s x_{is}\le 1$. The restriction is not a modeling convenience but an
+observed property of the workloads, and it removes the interaction that makes
+the general problem hard: with at most one statistic per query, $e_i(T_i)$ is
+either $e_i^0$ (no statistic) or $e_{is}$ (the single selected statistic), so
+no joint term arises.
 
 \begin{proposition}[Exact linearity under per-query unit cap]
 \label{prop:linear}
@@ -336,12 +354,12 @@ $e_i(T_i)=e_{is}$. Since at most one $x_{is}$ equals $1$, no two statistics
 co-occur and there is no joint term.
 \end{proof}
 
-The log-space formulation used for multi-select is therefore unnecessary here;
-we solve the linear form directly. We call this the \emph{capacity-aware}
-selection problem: because each capacity level is a distinct physical
-statistic, choosing \emph{which} level of a combination to build is expressed
-by selecting the corresponding $y_{(table,cols,level)}$, subject to a global
-budget.
+The log-space approximation used for multi-select is therefore unnecessary for
+the sparse case; we solve the linear form exactly. We call this the
+\emph{capacity-aware} selection problem: because each capacity level is a
+distinct physical statistic, choosing \emph{which} level of a combination to
+build is expressed by selecting the corresponding $y_{(table,cols,level)}$,
+subject to a global budget.
 
 \section{Optimization: Sparse MILP with Capacity Levels}
 \label{sec:milp}
@@ -509,6 +527,35 @@ $N$ & ANALYZE & ANALYZE & naive & Protocol-M & speedup\\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  bs/.style={draw, rounded corners=2pt, inner sep=4pt, font=\small,
+             align=center, text width=30mm, minimum height=10mm},
+  exp/.style={fill=red!12},
+  cheap/.style={fill=green!12},
+  arr/.style={-{Stealth[length=2.5mm]}, thick}
+]
+\node[bs] (a) at (0,0) {candidate\\[-0.5mm]generation};
+\node[bs] (b) at (3.1,0) {candidate $\times$ capacity\\[-0.5mm]\textbf{measurement}};
+\node[bs] (c) at (6.2,0) {sparse\\[-0.5mm]MILP};
+\node[bs] (d) at (9.2,0) {\\[-0.5mm]\textbf{deploy}};
+\node[bs, exp] (b2) at (3.1,-1.9) {expensive\\[-0.5mm]($\sim$60$\times$ na\"ive)};
+\node[bs, cheap] (c2) at (6.2,-1.9) {cheap\\[-0.5mm]($<$5\,s)};
+\draw[arr] (a.east) -- (b.west);
+\draw[arr] (b.east) -- (c.west);
+\draw[arr] (c.east) -- (d.west);
+\draw (b2.north) -- (b.south);
+\draw (c2.north) -- (c.south);
+\end{tikzpicture}
+\caption{Pipeline cost profile. The candidate $\times$ capacity
+\emph{measurement} (\S\ref{sec:measure}) is the expensive step -- $\sim$60$\times$
+cheaper with the catalog-mask protocol, yet still dominant -- whereas the sparse
+MILP solves in under five seconds (\S\ref{sec:rq4}). The bottleneck is obtaining
+the data the optimization needs, not the optimization itself.}
+\label{fig:pipeline}
+\end{figure}
 
 \section{Empirical Findings}
 \label{sec:findings}
@@ -752,7 +799,11 @@ contrast, both the sparse per-query cap and the worse-than-baseline pruning are
 \emph{free}: they reproduce the full quality while shrinking the problem
 (pruning cuts 2{,}085 to 1{,}178 variables at 100 KB with identical quality).
 The global-disjointness component does not change the predicted quality but
-restores deployment predictability (\S\ref{sec:p1}).
+restores deployment predictability (\S\ref{sec:p1}). Altogether the ablation
+separates \emph{modeling assumptions} (the capacity axis; global disjointness at
+deployment) from \emph{computational conveniences} (the sparse cap; pruning):
+the former drive the quality and predictability our formulation delivers, while
+the latter cost nothing but solve and measurement time.
 
 \section{End-to-End Validation}
 \label{sec:e2e}
@@ -925,13 +976,14 @@ system has a limit on the number of statistics per relation.
 \label{sec:concl}
 
 Extended-statistics selection should be treated as a joint \emph{which} and
-\emph{how much} decision. Across single-table workloads we find the benefit is
-strikingly sparse---one dominant statistic per query---which makes the
-budget-constrained problem an exactly-linear MILP solvable in seconds at
-full-workload scale, through a catalog-mask protocol that makes per-candidate,
-per-capacity measurement feasible on wide tables. End-to-end validation shows
-per-candidate prediction is sound and isolates the residual risk to planner
-cross-talk among co-installed overlapping statistics; a global-disjointness
+\emph{how much} decision. Across the single-table workloads we evaluated
+(stats\_CEB\_single and the wide CENSUS benchmark) the benefit is strikingly
+sparse---one dominant statistic per query---which makes the budget-constrained
+problem an exactly-linear MILP solvable in seconds at full-workload scale,
+through a catalog-mask protocol that makes per-candidate, per-capacity
+measurement feasible on wide tables. End-to-end validation shows per-candidate
+prediction is sound and isolates the residual risk to planner cross-talk among
+co-installed overlapping statistics; a global-disjointness
 constraint restores exact predictability. Join-heavy workloads are the negative
 control. The result is a principled, scalable, and honestly-validated recipe
 for automating PostgreSQL extended-statistics deployment under a storage

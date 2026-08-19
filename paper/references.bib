@@ -72,19 +72,42 @@
   year      = {2019}
 }
 
-% =====================================================================
-% TODO placeholders below: replace with real entries after literature search
-% =====================================================================
-
-% Learned / ML cardinality estimation baselines.
-@misc{todo-learned-cardest,
-  title  = {TODO: learned cardinality estimation references (e.g. deep cardinality estimation)},
-  note   = {Fill from literature search}
+% --- Classic query optimization / selectivity estimation (stable) ---
+@inproceedings{selinger1979access,
+  author    = {Selinger, Patricia G. and Astrahan, Morton M. and Chamberlin,
+               Donald D. and Lorie, Raymond A. and Price, Thomas G.},
+  title     = {Access Path Selection in a Relational Database Management System},
+  booktitle = {Proceedings of the ACM SIGMOD International Conference on Management of Data},
+  year      = {1979}
 }
 
-% Other budget-constrained structure selection (index selection via MILP).
-@misc{todo-index-milp,
-  title  = {TODO: index selection / physical design MILP references},
-  note   = {Fill from literature search}
+@inproceedings{piatetsky1984accurate,
+  author    = {Piatetsky-Shapiro, Gregory and Connell, Charles},
+  title     = {Accurate Estimation of the Number of Tuples Satisfying a Condition},
+  booktitle = {Proceedings of the ACM SIGMOD International Conference on Management of Data},
+  year      = {1984}
+}
+
+@inproceedings{poosala1996improved,
+  author    = {Poosala, Viswanath and Ioannidis, Yannis E. and Haas, Peter J.
+               and Shekita, Eugene J.},
+  title     = {Improved Histograms for Selectivity Estimation of Range Predicates},
+  booktitle = {Proceedings of the ACM SIGMOD International Conference on Management of Data},
+  year      = {1996}
+}
+
+@inproceedings{chaudhuri1998overview,
+  author    = {Chaudhuri, Surajit},
+  title     = {An Overview of Query Optimization in Relational Systems},
+  booktitle = {Proceedings of the ACM Symposium on Principles of Database Systems (PODS)},
+  year      = {1998}
+}
+
+% --- Combined index + materialized view selection (stable) ---
+@inproceedings{agrawal2000automated,
+  author    = {Agrawal, Sanjay and Chaudhuri, Surajit and Narasayya, Vivek},
+  title     = {Automated Selection of Materialized Views and Indexes in SQL Databases},
+  booktitle = {Proceedings of the International Conference on Very Large Data Bases (VLDB)},
+  year      = {2000}
 }
 \endinput
