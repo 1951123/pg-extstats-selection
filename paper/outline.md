@@ -105,9 +105,14 @@ Extended Statistics*
 - **RQ4 支撑数据**：全 Census no-prune 57,735 / 92,568 / 150,303 → ~4.7s；
   prune 34,280 / 46,392 / 80,672 → ~4.3s；均 HiGHS Optimal。
 
-### 5. Measurement Infrastructure
-- Protocol-A 宽表不可行；**Protocol-M（目录掩码）** 一次 ANALYZE 构建全部候选、
-  掩码隔离逐候选逐档测量、~60x 降本、多档经 ALTER STATISTICS。
+### 5. Measurement Infrastructure（已扩为完整 systems section）
+- 拆成 5.1 Naive(Protocol-A 每候选 2 ANALYZE, 宽表不可行)
+  / 5.2 Catalog-Mask(Protocol-M: 一次 ANALYZE 全构建 + 掩码隔离 + UPDATE..FROM 恢复)
+  / 5.3 Correctness(掩码测量==单统计真实部署, 用 §7 st.144 1.04 vs 1.042 提前验证)
+  / 5.4 Runtime 表(tab:measurement: naive vs Protocol-M 随 N 9x→132x, 基于实测
+  ANALYZE 缩放 0→21.9s, 1000→264s)。
+- **核心：measurement 才是 pipeline bottleneck，MILP 是便宜的部分**。
+  这是 C(enabler) 的 systems 定位。
 
 ### 6. Empirical Findings（按 RQ 结构）
 - **RQ1 Capacity matters?** → Yes。t100/t1000/t10000 质量 ~2.1-2.3 / ~1.2-2.1 /

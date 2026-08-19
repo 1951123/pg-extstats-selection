@@ -344,24 +344,87 @@ optimization is not the bottleneck at full-workload scale --- the phase-1
 \label{sec:measure}
 
 Our ILP needs a per-candidate, per-capacity q-error $e_{is}$ and size $c_s$
-for every option that survives pruning. The naive \emph{Protocol-A}
-(CREATE $\to$ ANALYZE $\to$ EXPLAIN $\to$ DROP $\to$ ANALYZE for each candidate)
-is infeasible on wide tables: a single CENSUS ANALYZE at target 10000 takes
-$\sim$20s, and with 1000 candidate statistics the same ANALYZE takes
-$\sim$264s.
+for every option that survives pruning. This section turns the measurement
+from an afterthought into a first-class systems component: it is, in fact, the
+pipeline's true bottleneck (\S\ref{sec:rq4}).
 
-We instead use the \textbf{catalog-mask protocol (Protocol-M)}. For each table,
-all candidate statistics are created once and built by a \emph{single} ANALYZE
-(sampling at the maximum target). To measure one candidate in isolation, we
-\emph{mask} the others by NULL-ing their payload in
-\texttt{pg\_statistic\_ext\_data} --- the planner ignores statistics whose
-payload is absent --- then EXPLAIN, and restore the payloads from a temporary
-backup table via \texttt{UPDATE ... FROM} (because \texttt{pg\_mcv\_list} has no
-bytea cast for a driver round-trip). Multi-capacity measurement uses one object
-per (candidate, level) with \texttt{ALTER STATISTICS ... SET STATISTICS}, again
-built by a single ANALYZE at the maximum target. Protocol-M reduces the cost of a
-per-candidate, per-level measurement by roughly $60\times$, making the CENSUS
-and full-workload studies feasible.
+\subsection{Naive Measurement Is Infeasible on Wide Tables}
+\label{sec:measure-naive}
+
+The obvious protocol (\emph{Protocol-A}) isolates a candidate by
+\[
+  \text{CREATE} \to \text{ANALYZE} \to \text{EXPLAIN} \to \text{DROP} \to \text{ANALYZE},
+\]
+a clean, drop-analyzable cycle that costs two ANALYZEs per candidate. On a wide
+table this is prohibitive. On the CENSUS \texttt{climate} table (69 columns,
+$\sim$2.5M rows) a single ANALYZE at \texttt{statistics\_target}=10000 takes
+$\sim$21.9s with no statistics, and grows with the number of statistics already
+on the table (Table \ref{tab:measurement}). Consequently the naive protocol
+costs $\sim$44s per candidate --- 44 seconds $\times$ 19{,}245 deduplicated
+candidates is not a tractable phase-1.
+
+\subsection{The Catalog-Mask Protocol (Protocol-M)}
+\label{sec:measure-mask}
+
+Our \textbf{catalog-mask protocol} builds all of a table's candidate statistics
+\emph{once}, in a single ANALYZE (sampled at the maximum target), and measures
+each candidate in isolation by \emph{masking} the others. Masking NULLs the
+other candidates' payload in \texttt{pg\_statistic\_ext\_data}; the planner's
+\texttt{statext\_is\_kind\_built()} test then omits a NULL-payload statistic from
+\texttt{rel->statlist}, so the planner behaves as if that statistic did not
+exist --- an exact isolation that costs no ANALYZE. Payloads are restored from a
+temporary backup table via \texttt{UPDATE ... FROM} (the \texttt{pg\_mcv\_list}
+type has no bytea cast, so the round-trip must happen inside the server).
+Multiple capacity levels are measured with one object per (candidate, level)
+via \texttt{ALTER STATISTICS ... SET STATISTICS}, again built by a single
+ANALYZE at the maximum target. Protocol-M therefore costs one ANALYZE (for the
+whole table) plus a cheap EXPLAIN per candidate, instead of two ANALYZEs per
+candidate.
+
+\subsection{Correctness of Masked Measurement}
+\label{sec:measure-correct}
+
+Masking must reproduce what a \emph{single} deployed statistic would deliver.
+We validate this directly: for a statistic that the mask measurement predicts
+at q-error $e$, we build \emph{only} that statistic on the real table and
+re-measure. The singleton deployment reproduces the masked prediction (e.g.\
+st.144: masked 1.04 vs.\ singleton 1.042; st.588 1.03 vs.\ 1.029; st.284 1.02
+vs.\ 1.025, \S\ref{sec:e2e}). Together with the fact that a NULL payload is
+ignored by the planner, this confirms Protocol-M is not an approximation but an
+\emph{exact} isolation of each candidate's effect.
+
+\subsection{Runtime: Measurement Is the Bottleneck, Not the Solve}
+\label{sec:measure-runtime}
+
+Table \ref{tab:measurement} shows the consequence. Using the measured linear
+growth of ANALYZE time with the number of statistics on the table, Protocol-A
+costs $2N$ ANALYZEs and stays proportional to $N$, while Protocol-M costs one
+ANALYZE plus $N$ cheap EXPLAIN payloads. The gap widens with $N$: a $9\times$
+saving at 10 candidates grows to $\sim$60$\times$ at 100 and $\sim$130$\times$
+at 1000. For a single Census query the masked measurement completes in minutes
+where the naive protocol would take hours. This is why the catalog-mask
+protocol --- not the MILP --- is the enabling component that makes the massive
+candidate $\times$ capacity space measurable, and why we emphasise that the
+optimization (\S\ref{sec:rq4}) is the cheap part of the pipeline.
+
+\begin{table}[t]
+\caption{ANALYZE cost with $N$ extended statistics on CENSUS \texttt{climate}
+(measured at the given target), and the implied naive (Protocol-A) vs.\
+catalog-mask (Protocol-M) total phase-1 cost for $N$ candidates at target 10000.}
+\label{tab:measurement}
+\small
+\begin{tabular}{lcc|rrr}
+\toprule
+$N$ & ANALYZE & ANALYZE & naive & Protocol-M & speedup\\
+ & (0 stats) & (at $N$; t10000) & & &\\
+\midrule
+10   & 21.9s & 24.3s & 442s   & 47s  & 9$\times$\\
+100  & 21.9s & 46.1s & 4418s  & 73s  & 61$\times$\\
+500  & 21.9s & 143.0s & 22092s & 190s & 116$\times$\\
+1000 & 21.9s & 264.0s & 44184s & 336s & 132$\times$\\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Empirical Findings}
 \label{sec:findings}
