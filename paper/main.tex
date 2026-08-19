@@ -57,8 +57,9 @@ selection}: under a storage budget, should we spend on adding a statistic or
 on upgrading an existing one to a higher-capacity target? Across the single-table
 workloads we evaluate (stats\_CEB and the wide 69-column CENSUS benchmark) we find a
 strikingly sparse structure: one well-chosen multivariate statistic captures
-nearly all attainable improvement per query, which makes the objective exactly
-linear and the resulting budgeted MILP solvable in seconds at full-workload
+nearly all attainable improvement per query. We exploit this by restricting each
+query to a single statistic, under which the objective is \emph{exactly linear}
+and the resulting budgeted MILP solves in seconds at full-workload
 scale. A catalog-mask protocol makes the enormous candidate $\times$ capacity
 space measurable on wide tables. End-to-end validation on PostgreSQL 16 shows
 individual candidate measurements are predictive, but reveals that co-installed
@@ -91,7 +92,8 @@ ISSN 2150-8097. \\
 Modern query optimizers rely on cardinality estimates to choose plans, and when
 columns are correlated the default independence assumption can misestimate by
 orders of magnitude. PostgreSQL exposes \emph{extended statistics}
-(\texttt{CREATE STATISTICS}) to capture multivariate correlation, yet deciding
+(\texttt{CREATE}\allowbreak\texttt{ STATISTICS}) to capture multivariate
+correlation, yet deciding
 \emph{which} statistics to create --- and, crucially, \emph{how precisely} to
 store them --- is left to the database administrator. This paper asks whether
 that choice can be automated, and what structure it has in practice.
@@ -115,13 +117,16 @@ merely which column combinations:
   \underbrace{\text{which }\texttt{statistics\_target}}_{\text{how much}},
 \]
 compounded by a combinatorial explosion in candidates --- a single CENSUS query
-can have up to 455 candidate column combinations (19{,}245 deduplicated across
-the workload). To our knowledge, no prior work optimizes this joint
+can have up to 455 candidate column combinations (30{,}856 is the sum of
+per-query candidate counts before any deduplication; after globally
+deduplicating identical column combinations across the workload only 19{,}245
+distinct combinations remain). To our knowledge, no prior work optimizes this joint
 selection-and-capacity problem under a storage budget.
 
 \emph{Running example.} Consider a query filtering
-\texttt{posts(AnswerCount, ViewCount)}. A statistic over this combination can
-be stored at L100, L1000, or L10000. Measured on our workload, L100 is too
+\texttt{posts(AnswerCount,}\allowbreak\texttt{ViewCount)}. A statistic over
+this combination can be stored at L100, L1000, or L10000. Measured on our
+workload, L100 is too
 coarse to capture the correlation (q-error stays $\sim$4.7), while L10000
 drives it to $\approx$1.0. How much capacity is enough is therefore itself a
 decision: ``should we build this statistic?'' admits no useful answer without
@@ -140,10 +145,13 @@ stats\_CEB\_single), one well-chosen multivariate statistic captures nearly all
 attainable improvement for a query: adding a second or third non-overlapping
 candidate gives almost no benefit, and on the hardest CENSUS queries the top-1,
 top-2 and top-3 joint q-errors are identical. This was not assumed --- it was
-\textbf{discovered} --- and it has a direct consequence: restricted to at most
-one statistic per query, the objective has no interaction term and is
-\emph{exactly linear} (Prop.~\ref{prop:linear}), turning a hard nonlinear
-selection problem into a budgeted mixed-integer program.
+\textbf{discovered} --- and it has a direct consequence: \emph{restricted to at
+most one statistic per query}, the objective has no interaction term and is
+\emph{exactly linear} (Prop.~\ref{prop:linear}). We do not claim this makes the
+general multi-select problem tractable in the abstract; rather, sparsity is an
+\emph{empirically characterized regime} of the workloads we evaluate, and the
+linear model is exact \emph{conditional on} the one-statistic-per-query
+restriction that this regime justifies.
 
 \textbf{(C) The enabler: measuring the massive candidate space.} Instantiating
 this optimization requires a per-candidate, per-capacity q-error for every
@@ -154,8 +162,10 @@ candidates in one ANALYZE and isolates each by masking the others'
 \texttt{pg\_statistic\_ext\_data} payloads, cutting measurement cost by
 $\sim$60$\times$ and making the enormous candidate $\times$ capacity space
 actually measurable. The resulting MILP is then the easy part: the full CENSUS
-workload --- 57{,}735 physical statistics, 150{,}303 binary variables --- solves
-optimally in under five seconds (\S\ref{sec:rq4}).
+workload --- 57{,}735 physical-statistic variables ($y_s$) and 92{,}568
+query--statistic assignment variables ($x_{is}$), i.e.\ 150{,}303 binary
+variables in total --- solves optimally in under five seconds
+(\S\ref{sec:rq4}).
 
 \textbf{(D) The validation surprise: overlapping statistics interfere.}
 End-to-end deployment on real PostgreSQL shows per-candidate predictions are
@@ -245,7 +255,14 @@ combinations under a cost but does not jointly choose each statistic's
 \emph{capacity} (\texttt{statistics\_target}). Concretely, prior work decides
 \emph{whether to add} a statistic; we additionally decide \emph{whether to
 upgrade} an already-chosen one from L100 to L1000 to L10000. That is the shift
-from ``selection'' to ``budget allocation.''
+from ``selection'' to ``budget allocation.'' We are careful to note that
+capacity (\texttt{statistics\_target}) \emph{tuning} appears incidentally in
+database-tuning practice and in general knob-optimization literature; what is
+missing there is a \emph{joint} treatment in which capacity and column choice
+compete for a \emph{single} storage budget, so that upgrading one statistic
+trades off against adding another. That joint resource-allocation view, with a
+provably linear objective on an empirically validated sparse regime, is our
+point of departure.
 
 \textbf{(c) Physical database design and index selection.} Budget-constrained
 structure selection is a classic problem: which indexes and materialized views
@@ -329,13 +346,16 @@ statistics coexist (we return to this in \S\ref{sec:e2e}).
 
 Our measurements (\S\ref{sec:rq2}) reveal --- surprisingly --- that per query a
 \emph{single dominant statistic} already captures nearly all attainable
-improvement. This observation reduces the general multi-select problem to the
-\emph{sparse} special case, in which each query selects at most one statistic,
-$\sum_s x_{is}\le 1$. The restriction is not a modeling convenience but an
-observed property of the workloads, and it removes the interaction that makes
-the general problem hard: with at most one statistic per query, $e_i(T_i)$ is
-either $e_i^0$ (no statistic) or $e_{is}$ (the single selected statistic), so
-no joint term arises.
+improvement. This observation motivates a \emph{restricted} optimization model:
+the \emph{sparse} special case, in which each query selects at most one
+statistic, $\sum_s x_{is}\le 1$. We stress that this is an \emph{empirically
+justified restriction}, not a modeling assumption that holds by definition: it
+is exact \emph{conditional on} the one-statistic-per-query regime
+(\S\ref{sec:rq2} characterizes when it holds and when it fails). Within that
+regime, the restriction removes the interaction that makes the general problem
+hard: with at most one statistic per query, $e_i(T_i)$ is either $e_i^0$ (no
+statistic) or $e_{is}$ (the single selected statistic), so no joint term
+arises.
 
 \begin{proposition}[Exact linearity under per-query unit cap]
 \label{prop:linear}
@@ -366,8 +386,25 @@ subject to a global budget.
 
 \subsection{Variables and Objective}
 
+Before defining the program, we make explicit the \emph{role} of the model's
+variables, because a reviewer's natural question is whether the system can
+really dictate which statistic a query uses. It cannot: PostgreSQL's planner,
+not the optimizer, decides at plan time which installed extended statistic
+applies to a query. We therefore treat the MILP as an \emph{upper-level
+deployment optimization} over a \emph{singleton-effect surrogate model}. The
+assignment $x_{is}$ is a \emph{model} variable, not a plan directive: it states
+that \emph{if} the surrogate is faithful, query $i$'s error under the deployed
+set is $e_{is}$ for the level at which $s$ is created ($\S\ref{sec:sparse}$).
+The surrogate is exact when each query's best statistic can be isolated ---
+which is what the one-statistic-per-query regime guarantees. The end-to-end
+validation (\S\ref{sec:e2e}) is precisely the experiment that checks whether the
+surrogate assignment remains faithful after the real planner performs its own
+selection; \S\ref{sec:p1} shows it does under pairwise disjointness and does
+not under overlapping co-installation.
+
 We solve the sparse model as a mixed-integer linear program. Binary variables
-are $y_s$ (create physical statistic $s$) and $x_{is}$ (query $i$ uses $s$).
+are $y_s$ (create physical statistic $s$) and $x_{is}$ (query $i$ uses $s$
+in the surrogate model).
 By Prop.~\ref{prop:linear}, minimizing mean q-error is equivalent to
 maximizing total improvement,
 \[
@@ -392,7 +429,8 @@ overlapping MCVs ($\S\ref{sec:p1}$).
 \subsection{Pruning and Solve Scalability}
 \label{sec:scale}
 
-Two factors keep the MILP small. First, \texttt{skip\_worse\_than\_baseline}
+Two factors keep the MILP small. First,
+\texttt{skip\_}\allowbreak\texttt{worse\_}\allowbreak\texttt{than\_baseline}
 drops any option whose per-query q-error is not better than the no-stat
 baseline; because baseline estimates are usually already good, most options are
 pruned, leaving only genuine ``repairers''. Second, global deduplication means
@@ -493,7 +531,26 @@ re-measure. The singleton deployment reproduces the masked prediction (e.g.\
 st.144: masked 1.04 vs.\ singleton 1.042; st.588 1.03 vs.\ 1.029; st.284 1.02
 vs.\ 1.025, \S\ref{sec:e2e}). Together with the fact that a NULL payload is
 ignored by the planner, this confirms Protocol-M is not an approximation but an
-\emph{exact} isolation of each candidate's effect.
+\emph{exact} isolation of each candidate's effect on the queries we test.
+
+\textbf{Pragmatics and safety.} Protocol-M writes
+\texttt{pg\_}\allowbreak\texttt{statistic\_}\allowbreak\texttt{ext\_data}
+directly, so it requires superuser and must
+run in a dedicated, disposable database cluster (or with autovacuum and
+concurrent writes suspended) to avoid contaminating a production system. Two
+system facts make the manipulation safe and correct in practice.
+(i) \emph{No stale catalog state.} Every UPDATE to the catalog triggers the
+usual cache invalidation, so the relcache/syscache entries consulted by the
+planner's \texttt{statext\_}\allowbreak\texttt{is\_kind\_built()} test are
+rebuilt on the next command; we re-issue a fresh \texttt{EXPLAIN} per
+candidate, so we never reuse an estimate computed from a pre-update cache.
+(ii) \emph{Update-in-place, not rewrite.} NULLing a payload does not re-run
+ANALYZE, so masking cost is independent of the table size and of the number of
+candidates. Because the protocol relies on the layout of the system catalog (a
+\texttt{pg\_mcv\_list} without a bytea cast, so the round-trip happens inside
+the server via \texttt{UPDATE ... FROM}), it is specific to PostgreSQL 16; we
+have not verified it against other major versions. These are honest limits of
+the implementation, not of the model.
 
 \subsection{Runtime: Measurement Is the Bottleneck, Not the Solve}
 \label{sec:measure-runtime}
@@ -567,15 +624,24 @@ the data the optimization needs, not the optimization itself.}
 and \texttt{stats\_CEB\_single} (632 single-table sub-plans of the same schema).
 The two single-table workloads are where extended statistics act; the join
 workloads are the negative control. Candidates are the 2- and 3-column subsets
-of each query's selection predicates. We measure at \texttt{statistics\_target}
-10000 for exactness and report 1000 as the default operating point. We organize
+of each query's selection predicates. We restrict to 2/3-column subsets because
+these are the combinations whose correlation the single-relation restriction
+clauses actually exercise, MCV-list accuracy degrades with dimensionality, and
+the candidate set is already large at width 3 (e.g.\ 19{,}245 distinct
+combinations on CENSUS); 1-column predicates are already served well by
+per-column statistics, and higher-order combinations are a limitation rather
+than a hidden win ($\S\ref{sec:disc}$). We measure at the highest-capacity setting
+(\texttt{statistics\_target} 10000), which on the evaluated queries is
+near-exact, and report 1000 as the default operating point. We organize
 the results around six research questions.
 
 \begin{table*}[t]
 \caption{Workload characteristics and candidate distribution.
 Per-query candidates are the 2/3-column subsets of each query's selection
-predicates; ``global dedup'' is the number of distinct combinations across the
-workload.}
+predicates; ``cands/query (total)'' is the sum of per-query candidate counts
+before deduplication, ``global dedup'' the number of distinct column
+combinations across the workload, and ``per-query med/max'' the median and
+maximum candidate count per query.}
 \label{tab:bench}
 \small
 \begin{tabular}{lccccc}
@@ -634,8 +700,12 @@ most-candidate-dense workload in our study.
 
 This is not just anecdotal. Fig.~\ref{fig:sparsity} characterises the 
 \emph{distribution} over the whole 632-query workload. For every query with
-candidate statistics, we ask what fraction of the attainable single-statistic
-improvement its best candidate captures (the ``top-1 coverage ratio''); the
+candidate statistics, we ask what fraction of its \emph{best
+single-statistic} improvement the best candidate captures (the ``top-1 coverage
+ratio'',
+$\textstyle\frac{e_i^0-e_{i,\text{best}}}{e_i^0-e_i^{\text{best single}}}$;
+note this measures coverage of the best \emph{single} statistic, not the best
+\emph{subset}, so it is well-defined without enumerating subsets); the
 ratio is meaningful for the 35 queries with real repair room (baseline $>1.2$),
 and there it has \textbf{median 0.999}, with $94.3\%$ of such queries exceeding
 $0.9$ and $77.1\%$ exceeding $0.99$. By baseline regime, a single candidate
@@ -681,8 +751,9 @@ budgets, where a greedy that must stay within budget spends it on many cheap
 statistics and cannot reallocate \emph{capacity}. Table \ref{tab:greedy} compares
 the MILP against a budget-respecting greedy (each query's highest
 improvement-per-byte statistic, within budget): the MILP wins at every budget,
-and the gap is largest exactly when the budget is tightest (4.7 q-error points
-at 5 KB, shrinking to 0.8 at 100 KB).
+and the gap is largest exactly when the budget is tightest (an absolute q-error
+difference of 0.047, i.e.\ $\sim$4.7\% relative, at 5 KB, shrinking to 0.008,
+i.e.\ $\sim$0.8\%, at 100 KB).
 
 \begin{table}[t]
 \caption{Budgeted greedy vs.\ MILP on the 632-query stats\_CEB\_single workload.
@@ -692,13 +763,13 @@ capacity rather than merely dropping coverage.}
 \small
 \begin{tabular}{lccr}
 \toprule
-budget & MILP & greedy (budgeted) & MILP advantage\\
+budget & MILP & greedy (budgeted) & MILP advantage ($\Delta$q)\\
 \midrule
-5 KB    & 1.0327 & 1.0798 & 4.7 pts\\
-10 KB   & 1.0264 & 1.0704 & 4.4 pts\\
-20 KB   & 1.0237 & 1.0553 & 3.2 pts\\
-40 KB   & 1.0188 & 1.0376 & 1.9 pts\\
-100 KB  & 1.0156 & 1.0238 & 0.8 pts\\
+5 KB    & 1.0327 & 1.0798 & 0.047\\
+10 KB   & 1.0264 & 1.0704 & 0.044\\
+20 KB   & 1.0237 & 1.0553 & 0.032\\
+40 KB   & 1.0188 & 1.0376 & 0.019\\
+100 KB  & 1.0156 & 1.0238 & 0.008\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -718,8 +789,9 @@ case, \texttt{posts(AnswerCount,ViewCount)}, upgrades from L100 to L1000 to
 L10000 as the budget grows --- the same \emph{what}, more \emph{how much}. The
 multi-metric view confirms that mean is outlier-dominated (median stays 1.000);
 the real effect is \emph{tail repair}, with the maximum q-error falling from
-4.7 to 1.1. On the huge-tail CENSUS top-10 the improvement is across the whole
-distribution: baseline (mean / median / P90 / max) $=$
+4.7 to 1.1. On the hardest CENSUS queries --- the top-10, i.e.\ the ten
+single-table queries with the largest baseline q-error --- the improvement is
+across the whole distribution: baseline (mean / median / P90 / max) $=$
 (1071.5 / 332.5 / 2542.9 / 4162.1) collapses to $(1.10 / 1.09 / 1.18 / 1.41)$.
 We optimize mean but evaluate the full distribution; the headline is the tail
 collapse, e.g.\ a 4162 $\to$ 1.4 maximum.
@@ -737,11 +809,11 @@ level mix shows budget spent on capacity (L100/L1000/L10000), not just coverage.
 \label{sec:rq4}
 
 \emph{The optimization is not the bottleneck.} On the full 468-query CENSUS
-workload the worst-case (no-prune) MILP has 57{,}735 physical statistics, 92{,}568
-options and 150{,}303 binary variables and is solved optimally by HiGHS in
-$\approx$4.7s; with pruning it shrinks to 34{,}280 / 46{,}392 / 80{,}672 and
-solves in $\approx$4.3s. Measurement (\S\ref{sec:measure}) dominates the
-pipeline, not the solve.
+workload the worst-case (no-prune) MILP has 57{,}735 physical-statistic
+variables and 92{,}568 assignment variables (150{,}303 binary variables in
+total) and is solved optimally by HiGHS in $\approx$4.7s; with pruning it
+shrinks to 34{,}280 / 46{,}392 / 80{,}672 and solves in $\approx$4.3s.
+Measurement (\S\ref{sec:measure}) dominates the pipeline, not the solve.
 
 \subsection{RQ5: Does Prediction Survive Real PostgreSQL Execution?}
 \label{sec:rq5}
@@ -859,9 +931,13 @@ set to be pairwise column-disjoint, so the planner cannot cross-talk. Table
 \ref{tab:p1} measures predicted vs E2E for both models at two budgets.
 
 \begin{table*}[t]
-\caption{Three-stage causal summary and Option-A ablation. The global-disjoint
-solution reproduces its prediction exactly (ratio 1.000) because the deployed
-set is pairwise column-disjoint, at a quantified nominal-quality cost.}
+\caption{Three-stage causal summary and Option-A ablation (ratio $=$
+E2E$/_{}$predicted q-error; $1.000$ means the deployment reproduces the model's
+prediction exactly). The global-disjoint solution reproduces its prediction
+exactly (ratio 1.000) because the deployed set is pairwise column-disjoint, at
+a quantified nominal-quality cost. We report the deployments we ran; the
+generality of the ratio-1.000 result across a wider deployment space is an open
+question we flag in \S\ref{sec:p1}.}
 \label{tab:p1}
 \small
 \begin{tabular}{lccccc}
@@ -877,10 +953,17 @@ global-disjoint & 100 KB & 2 & 2.004 & \textbf{2.004} & \textbf{1.000}\\
 \end{tabular}
 \end{table*}
 
-The global-disjoint solution is \emph{exactly} predictable (ratio 1.000 at both
-budgets), because the deployed set is pairwise column-disjoint so the planner
-cannot cross-talk --- the independence assumption holds structurally rather than
-per-query. The cost is a well-defined nominal-quality loss (predicted 2.00 vs
+Across the deployments we ran, the global-disjoint solution is
+\emph{exactly} predictable (ratio 1.000 at both budgets), because the deployed
+set is pairwise column-disjoint so the planner cannot cross-talk --- the
+independence assumption holds structurally rather than per-query. We present
+this as an \emph{empirical observation} on the deployments we ran rather than a
+guaranteed property: column-disjointness removes the specific cross-talk we
+identified, and PostgreSQL's matching logic then admits at most one matching
+statistic per restriction clause, but we have not exhaustively enumerated the
+deployment space. Establishing how widely ratio-1.000 holds (more budgets,
+more query groups) is an explicit open question we flag in the Discussion. The
+cost of disjointness is a well-defined nominal-quality loss (predicted 2.00 vs
 1.02): disjointness forces the solver to forgo overlapping-but-high-value
 dominant candidates.
 
@@ -941,6 +1024,21 @@ storage rather than a proxy for maintenance cost. The budget-quality curves
 (\S\ref{sec:rq3}) and the capacity-level mix (Fig.~\ref{fig:budgetquality}) are
 the concrete evidence that a storage budget is, in practice, spent on the
 ``how much'' axis.
+
+\emph{Why arithmetic mean q-error.} We optimize the arithmetic mean of q-error,
+which is sensitive to extreme outliers --- and our workloads \emph{are} outlier
+dominated (median stays 1.000 even as the mean drops, \S\ref{sec:rq3}). We
+chose it deliberately: q-error is bounded below by 1 with a heavy upper tail,
+so the mean rewards repairing the worst queries, which is precisely the cost of
+a bad cardinality estimate. We report median/P90/max alongside the mean
+everywhere so that outlier-domination is visible rather than hidden (e.g.\ the
+CENSUS tail collapse, \S\ref{sec:rq3}). Because the objective is linear in the
+$\Delta_{is}$ terms, the arithmetic mean keeps the MILP linear; a geometric
+mean (equivalently $\min\sum_i\log e_i$, i.e.\ maximizing
+$\sum_s(\log e_i^0-\log e_{is})x_{is}$) would also stay linear while weighting
+\emph{relative} rather than \emph{absolute} improvement. We use the arithmetic
+mean as the headline and leave the geometric-mean variant as a robustness
+question rather than a modeling obstacle.
 
 \subsection{The Interference Fix}
 \label{sec:disc-fix}
