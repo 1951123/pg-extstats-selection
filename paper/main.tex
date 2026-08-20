@@ -234,11 +234,10 @@ selected statistics and the estimation quality they deliver --- and treat ANALYZ
 maintenance cost separately (it is a property of the maximum, not the sum, of
 targets).
 
-\textbf{Capacity-quality trade-off.} Measured on the CENSUS \texttt{climate}
-table (69 columns), the repair quality of the best single statistic is roughly
-2.1--2.3 at target 100, 1.2--2.1 at 1000, and $\approx$1.0 at 10000. Target 100
-loses 3-column correlation entirely; target 1000 captures it at a fraction of
-the ANALYZE cost of 10000.
+\textbf{Capacity-quality trade-off.} Capacity directly buys precision: the best
+single statistic on CENSUS \texttt{climate} repairs a high-error query to
+$\approx$2.1--2.3 at target 100, $\approx$1.2--2.1 at 1000, and $\approx$1.0 at
+10000 (\S\ref{sec:rq1}). This motivates treating capacity as a decision axis.
 
 \subsection{Related Work}
 
