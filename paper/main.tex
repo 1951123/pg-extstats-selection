@@ -137,22 +137,16 @@ capacity}?'' --- spending on \emph{upgrading} it competes directly with
 spending on \emph{adding} another combination.
 
 \textbf{(B) A measurable sparse regime, discovered, not assumed.} At first
-glance the problem looks like a combinatorial multi-select: a query could
-benefit from several statistics at once. Our measurements show otherwise.
-We do not claim that extended-statistics selection is inherently sparse;
-rather, we show that the two evaluated single-table workloads lie in a
-\emph{measurable sparse regime}: across them, one well-chosen multivariate
-statistic captures nearly all
-improvement attainable from the evaluated 2-/3-column MCV candidates per query
-(adding a second or third candidate helps ~nothing; \S\ref{sec:rq2} falsifies
-this in several ways). This was \textbf{discovered}, not assumed, and it has a
-direct consequence: restricted to at most one statistic per query, the
-objective has no interaction term and is \emph{exactly linear}
-(Prop.~\ref{prop:linear}) --- a formal property of the \emph{surrogate} within
-an empirically characterized regime, whose faithfulness to PostgreSQL's real
-statistic selection is determined by the E2E experiments (\S\ref{sec:e2e}).
-We do not claim this makes the general multi-select problem tractable in the
-abstract.
+glance the problem looks like a combinatorial multi-select. Our measurements
+show otherwise for the two evaluated single-table workloads: one well-chosen
+multivariate statistic captures nearly all improvement attainable from the
+evaluated 2-/3-column MCV candidates per query (adding a second or third helps
+~nothing; \S\ref{sec:rq2} falsifies this several ways). This was
+\textbf{discovered}, not assumed, and it has a direct consequence: restricted
+to at most one statistic per query, the objective has no interaction term and
+is \emph{exactly linear} (Prop.~\ref{prop:linear}) --- a formal property of the
+\emph{surrogate} within an empirically characterized regime, whose faithfulness
+to PostgreSQL is determined by the E2E experiments (\S\ref{sec:e2e}).
 
 \textbf{(C) The enabler: measuring the massive candidate space.} Instantiating
 this optimization requires a per-candidate, per-capacity q-error for every
@@ -161,10 +155,9 @@ per candidate) is infeasible --- a single CENSUS ANALYZE at target 10000 takes
 $\sim$20s. Our \emph{catalog-mask protocol} (\S\ref{sec:measure}) builds all
 candidates in one ANALYZE and isolates each by masking the others'
 \texttt{pg\_statistic\_ext\_data} payloads, cutting measurement cost by
-$9$--$132\times$ and making the enormous candidate $\times$ capacity space
-measurable. The resulting MILP then solves at full-workload scale in seconds
-(\S\ref{sec:rq4}) --- optimization is not the dominant runtime bottleneck;
-measurement is.
+$9$--$132\times$ and making the candidate $\times$ capacity space measurable;
+the resulting MILP then solves at full-workload scale in seconds
+(\S\ref{sec:rq4}). Measurement, not optimization, is the dominant bottleneck.
 
 \textbf{(D) The validation surprise: overlapping statistics interfere.}
 End-to-end deployment on real PostgreSQL shows per-candidate predictions are
