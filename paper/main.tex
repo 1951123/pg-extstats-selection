@@ -810,15 +810,12 @@ top-1 vs.\ top-$K$ coverage ratio
   \operatorname{cov}_K = \frac{e^0 - e(\{s_1\})}{e^0 - e(\{s_1,\dots,s_K\})},
 \]
 the fraction of the best $K$-statistic improvement a \emph{single} best
-statistic captures. For $K{=}1$ one 3-column MCV captures the whole error and
-adding a second statistic changes nothing (top-1 $=$ top-$K$ $=1.00$). For
-$K{=}2$ the best single statistic repairs only \emph{one} cluster (top-1 is
-still q-error 100) and only deploying \emph{both} collapses it to 1.00.
-Consequently sparsity holds exactly only for $K{=}1$ and
-\emph{decays} with $K$ (Table \ref{tab:sweep}): $\operatorname{cov}_K$ is
-$1.000$ at $K{=}1$, drops to $0.90$ at $K{=}2$, and collapses to $\approx 0$
-once three or more independent clusters coexist --- exactly the monotone
-failure regime where the multi-select model (\S\ref{sec:multi}) is required.
+statistic captures. Sparsity holds exactly only for $K{=}1$ (one 3-column MCV
+captures the whole error and a second changes nothing) and \emph{decays} with
+$K$ (Table \ref{tab:sweep}): $\operatorname{cov}_K$ is $1.000$ at $K{=}1$,
+drops to $0.90$ at $K{=}2$, and collapses to $\approx 0$ once three or more
+independent clusters coexist --- the monotone failure regime where the
+multi-select model (\S\ref{sec:multi}) is required.
 
 \begin{table}[t]
 \caption{Controlled sparsity decay. As a query is driven by $K$ mutually
@@ -838,11 +835,6 @@ $K$ clusters & base & top-1 & top-$K$ & $\operatorname{cov}_K$\\
 \bottomrule
 \end{tabular}
 \end{table}
-
-This parameterized decay turns ``why sparsity?'' into a measured statement:
-single-table queries lie in the $K{=}1$ regime because their error is
-concentrated in one correlated cluster, and the regime inverts predictably once
-several independent clusters drive the same query.
 
 \subsection{RQ3: Does the MILP Beat a Budgeted Greedy?}
 \label{sec:rq3}
@@ -896,13 +888,9 @@ close part of the gap (G3, 4 upgrades). Capacity allocation is exactly the
 capability greedy lacks --- not a failure of greedy column choice but of global
 \emph{budget reallocation} (the ``how much'' axis; \S\ref{sec:rq3}).
 
-On the full 632-query workload (Fig.~\ref{fig:budgetquality}), the budget is
-visibly spent on capacity: the number of high-capacity selections grows with
-budget, and the clearest case, \texttt{posts(AnswerCount,ViewCount)}, upgrades
-from L100 to L1000 to L10000 as the budget grows --- the same \emph{what}, more
-\emph{how much}. The multi-metric view confirms the real effect is \emph{tail
-repair}: the maximum q-error falls from 4.7 to 1.1 across the workload, and on
-the ten hardest CENSUS queries baseline (mean / median / P90 / max) $=$
+On the full 632-query workload (Fig.~\ref{fig:budgetquality}), the real effect
+is \emph{tail repair}: the maximum q-error falls from 4.7 to 1.1, and on the
+ten hardest CENSUS queries baseline (mean / median / P90 / max) $=$
 $(1071.5 / 332.5 / 2542.9 / 4162.1)$ collapses to $(1.10 / 1.09 / 1.18 / 1.41)$
 --- e.g.\ a 4162 $\to$ 1.4 maximum. We optimize mean but evaluate the full
 distribution.
