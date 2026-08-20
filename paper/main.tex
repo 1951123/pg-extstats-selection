@@ -1222,11 +1222,12 @@ the latter cost nothing but solve and measurement time.
 \section{End-to-End Validation}
 \label{sec:e2e}
 
-We close the loop by building ILP-selected sets on the real database and asking
-a causal question with three stages: \emph{Is a single deployed statistic
-predictable? Is a co-installed overlapping set predictable? And can we restore
-predictability?} Each stage controls the previous one, so together they isolate
-exactly where the model is sound and where it is not.
+We close the loop of the measurement $\to$ optimization $\to$ deployment
+pipeline (Fig.~\ref{fig:pipeline}) by building the ILP-selected sets on the real
+database and asking a causal question with three stages: \emph{Is a single
+deployed statistic predictable? Is a co-installed overlapping set predictable?
+And can we restore predictability?} Each stage controls the previous one, so
+together they isolate exactly where the model is sound and where it is not.
 
 \subsection{Stage 1: A Single Deployed Statistic Is Predictable (RQ5a)}
 \label{sec:e2e-singleton}
