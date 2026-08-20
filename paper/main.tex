@@ -56,7 +56,7 @@ We observe that PostgreSQL \texttt{CREATE STATISTICS} selection is not just
 selection}: under a storage budget, should we spend on adding a statistic or
 on upgrading an existing one to a higher-capacity target? Across the single-table
 workloads we evaluate (stats\_CEB and the wide 69-column CENSUS benchmark) we find a
-strikingly sparse structure: one well-chosen multivariate statistic captures
+sparse structure: one well-chosen multivariate statistic captures
 nearly all improvement attainable from the evaluated 2-/3-column MCV candidates
 per query. We exploit this by restricting each
 query to a single statistic, under which the surrogate objective is
@@ -168,8 +168,8 @@ per candidate) is infeasible --- a single CENSUS ANALYZE at target 10000 takes
 $\sim$20s. Our \emph{catalog-mask protocol} (\S\ref{sec:measure}) builds all
 candidates in one ANALYZE and isolates each by masking the others'
 \texttt{pg\_statistic\_ext\_data} payloads, cutting measurement cost by
-$\sim$60$\times$ and making the enormous candidate $\times$ capacity space
-actually measurable. The resulting MILP is then the tractable part: the full
+$9$--$132\times$ (growing with the number of candidates) and making the
+enormous candidate $\times$ capacity space actually measurable. The resulting MILP is then the tractable part: the full
 CENSUS workload --- 57{,}735 physical-statistic variables ($y_s$) and 92{,}568
 query--statistic assignment variables ($x_{is}$), i.e.\ 150{,}303 binary
 variables in total --- is solved optimally in under five seconds
@@ -406,7 +406,7 @@ statistics coexist (we return to this in \S\ref{sec:e2e}).
 \subsection{The Sparse Special Case: Exact and Linear}
 \label{sec:sparse}
 
-Our measurements (\S\ref{sec:rq2}) reveal --- surprisingly --- that per query a
+Our measurements (\S\ref{sec:rq2}) reveal that per query a
 \emph{single dominant statistic} already captures nearly all improvement
 attainable from the evaluated candidate family. This observation motivates a \emph{restricted} optimization model:
 the \emph{sparse} special case, in which each query selects at most one
@@ -587,10 +587,10 @@ candidate.
       {planner\\[-0.5mm]{\scriptsize sees only S1}};
 \draw[arr] (r0.east) -- (pln.west);
 \end{tikzpicture}
-\caption{The catalog-mask protocol (Protocol-M). All candidate statistics
-(S1--S4) are built in one ANALYZE (left). To measure S1 in isolation we NULL the
-other candidates' payloads in \texttt{pg\_statistic\_ext\_data} (right); the
-planner's \texttt{statext\_is\_kind\_built()} test then includes only S1 in
+\caption{The catalog-mask protocol (Protocol-M): all candidates (S1--S4) are
+built in one ANALYZE; to measure S1 we NULL the others' payloads in
+\texttt{pg\_statistic\_ext\_data}, so the planner's
+\texttt{statext\_is\_kind\_built()} includes only S1 in
 \texttt{rel->statlist}. Measuring each candidate costs an EXPLAIN, not an
 ANALYZE.}
 \label{fig:mask}
@@ -762,7 +762,7 @@ $N$ & ANALYZE & ANALYZE & naive & Protocol-M & speedup\\
 \node[bs] (b) at (3.1,0) {candidate $\times$ capacity\\[-0.5mm]\textbf{measurement}};
 \node[bs] (c) at (6.2,0) {sparse\\[-0.5mm]MILP};
 \node[bs] (d) at (9.2,0) {\\[-0.5mm]\textbf{deploy}};
-\node[bs, exp] (b2) at (3.1,-1.9) {expensive\\[-0.5mm]($\sim$60$\times$ na\"ive)};
+\node[bs, exp] (b2) at (3.1,-1.9) {expensive\\[-0.5mm]($9$--$132\times$ speedup)};
 \node[bs, cheap] (c2) at (6.2,-1.9) {cheap\\[-0.5mm]($<$5\,s)};
 \draw[arr] (a.east) -- (b.west);
 \draw[arr] (b.east) -- (c.west);
@@ -771,8 +771,8 @@ $N$ & ANALYZE & ANALYZE & naive & Protocol-M & speedup\\
 \draw (c2.north) -- (c.south);
 \end{tikzpicture}
 \caption{Pipeline cost profile. The candidate $\times$ capacity
-\emph{measurement} (\S\ref{sec:measure}) is the expensive step -- $\sim$60$\times$
-cheaper with the catalog-mask protocol, yet still dominant -- whereas the sparse
+\emph{measurement} (\S\ref{sec:measure}) is the expensive step -- $9$--$132\times$
+cheaper with the catalog-mask protocol (Tab.~\ref{tab:measurement}), yet still dominant -- whereas the sparse
 MILP solves in under five seconds (\S\ref{sec:rq4}). The bottleneck is obtaining
 the data the optimization needs, not the optimization itself.}
 \label{fig:pipeline}
@@ -827,13 +827,16 @@ and stays above $74\times$ out to $N{=}5000$.}
 \section{Empirical Findings}
 \label{sec:findings}
 
-\textbf{Setup.} We evaluate on PostgreSQL 16.14 with four workloads (Table
-\ref{tab:bench}): \texttt{CENSUS} (a single 69-column table, 468 queries; DB
-\texttt{census}), \texttt{JOB} (113 join queries over IMDB; DB \texttt{imdb}),
-\texttt{stats\_CEB} (146 join queries over StackExchange; DB \texttt{stats}),
-and \texttt{stats\_CEB\_single} (632 single-table sub-plans of the same schema).
-The two single-table workloads are where extended statistics act; the join
-workloads are the negative control. Candidates are the 2- and 3-column subsets
+\textbf{Setup.} We evaluate on PostgreSQL 16.14 with four workloads organized
+into three roles (Table \ref{tab:bench}). \emph{Primary:} \texttt{CENSUS} (a
+single 69-column table, 468 queries; DB \texttt{census}) and
+\texttt{stats\_CEB\_single} (632 single-table sub-plans over StackExchange; DB
+\texttt{stats}) --- the workloads where extended statistics act. \emph{Negative
+control:} \texttt{JOB} (113 join queries over IMDB; DB \texttt{imdb}) and
+\texttt{stats\_CEB} (146 join queries) --- where errors are dominated by joins
+that extended statistics cannot directly repair. \emph{Synthetic:} constructed
+tables used only to stress specific mechanisms (\S\ref{sec:rq2},
+\S\ref{sec:e2e}). Candidates are the 2- and 3-column subsets
 of each query's selection predicates. We restrict to 2/3-column subsets because
 these are the combinations whose correlation the single-relation restriction
 clauses actually exercise, MCV-list accuracy degrades with dimensionality, and
@@ -899,7 +902,7 @@ target & ANALYZE(0 ext) & ANALYZE(1000 ext) & repair \\
 \subsection{RQ2: Is One Statistic per Query Sufficient?}
 \label{sec:rq2}
 
-\textbf{Surprisingly, yes.} For each query we greedily rank non-overlapping
+\textbf{Yes.} For each query we greedily rank non-overlapping
 candidates by single q-error and measure the \emph{joint} q-error of keeping the
 top-1/2/3. On stats\_CEB\_single, adding a 2nd/3rd non-overlapping candidate
 changes nothing for $93\%$ of the 180 queries with candidates (the joint
@@ -1718,8 +1721,8 @@ system has a limit on the number of statistics per relation.
 
 Extended-statistics selection should be treated as a joint \emph{which} and
 \emph{how much} decision. Across the single-table workloads we evaluated
-(stats\_CEB\_single and the wide CENSUS benchmark) the benefit is strikingly
-sparse---one dominant statistic per query---which makes the budget-constrained
+(stats\_CEB\_single and the wide CENSUS benchmark) the benefit is sparse---one
+dominant statistic per query---which makes the budget-constrained
 problem an exactly-linear MILP solvable in seconds at full-workload scale,
 through a catalog-mask protocol that makes per-candidate, per-capacity
 measurement feasible on wide tables. End-to-end validation shows per-candidate
