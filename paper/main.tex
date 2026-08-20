@@ -652,6 +652,70 @@ the server via \texttt{UPDATE ... FROM}), it is specific to PostgreSQL 16; we
 have not verified it against other major versions. These are honest limits of
 the implementation, not of the model.
 
+\subsection{Sampling Determinism vs.\ Statistics Target}
+\label{sec:measure-determinism}
+
+A cardinality estimate is only as trustworthy as the statistics it comes from,
+and \texttt{ANALYZE} is sampling-based, so a natural worry is that repeated
+\emph{runs} of the same measurement drift. Empirically the picture is stark and
+systematic: determinism is a step function of \texttt{statistics\_target}, not
+a smooth improvement. Table \ref{tab:targetdeter} repeats each measurement six
+times (a fresh \texttt{ANALYZE} each time) at three targets, both with no
+extended statistics and with one installed MCV, reporting the coefficient of
+variation of the estimated row count.
+
+\begin{table}[t]
+\caption{Measurement determinism vs.\ \texttt{statistics\_target} on
+\texttt{posts}: coefficient of variation of the estimated row count across 6
+fresh \texttt{ANALYZE}s (upper: no extended stats; lower: one MCV on
+AnswerCount/FavoriteCount/ViewCount). ``n'' is the mean estimate; ``CV'' the
+run-to-run coefficient of variation. At target\,100 measurement is noisy, while
+at 1000 and 10000 it is \emph{exactly} deterministic (CV\,$0$). Target also
+sets accuracy, not just determinism: the MCV estimate of st.144 rises from
+4{,}405 (target\,1000) to 11{,}894 (target\,10000).}
+\label{tab:targetdeter}
+\footnotesize
+\begin{tabular}{lcrrr}
+\toprule
+ & & \multicolumn{3}{c}{query $|$ CV (est.)}\\
+\cmidrule(lr){3-5}
+target & stats & st.144 & st.326 & st.308\\
+\midrule
+100  & none & 1.35\% (2683) & 1.31\% (2829) & 0.97\% (8851)\\
+1000 & none & 0.00\% (2695) & 0.00\% (2834) & 0.00\% (8926)\\
+10000& none & 0.00\% (2695) & 0.00\% (2834) & 0.00\% (8926)\\
+\midrule
+100  & 1 MCV & 2.16\% (2692) & 1.97\% (2836) & 1.84\% (12507)\\
+1000 & 1 MCV & 0.00\% (4405) & 0.00\% (4607) & 0.00\% (16005)\\
+10000& 1 MCV & 0.00\% (11894)& 0.00\% (12521)& 0.00\% (19241)\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two observations. First, \emph{determinism is exact above a threshold}: at
+target\,1000 and 10000 the estimated row count is identical across all six
+\emph{runs} (CV\,$0.00\%$) for every query we tested --- PostgreSQL's
+hash-bucketed \texttt{ANALYZE} converges to a fixed histogram/MCV once the
+sample is large enough, so repeated measurement is not merely ``close'' but
+byte-for-byte reproducible. By contrast target\,100 is under-sampled: the same
+queries show CV\,$1$--$2\%$ run-to-run scatter. Second, target
+simultaneously drives \emph{accuracy}, not just determinism --- this is the
+capacity axis, not a stability artifact: the single-MCV estimate of st.144
+jumps from 4{,}405 (target\,1000) to 11{,}894 (target\,10000), i.e.\ to the
+correct $\approx$12{,}391, because a larger MCV captures the low-cardinality
+selectivity region the query needs (see RQ1).
+
+A related failure mode motivates measuring at high capacity at all: at low
+\texttt{statistics\_target}, MCV statistics over high-cardinality column
+combinations can be built \emph{empty} (a \texttt{NULL} payload), so they make
+no contribution. Combined with the run-to-run noise, this makes
+target\,100 an unreliable default for comparing candidates --- which is why our
+measurements and the phase-1 deterministic protocol (\S\ref{sec:measure}) use
+target\,10000 (and sometimes 1000 for cross-checks), where measurement is exactly
+reproducible and only accuracy varies with capacity. This is the empirical
+justification, independent of the cost model, for treating capacity levels as
+the deterministic inputs the ILP consumes.
+
 \subsection{Runtime: Measurement Is the Bottleneck, Not the Solve}
 \label{sec:measure-runtime}
 
