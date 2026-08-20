@@ -541,29 +541,12 @@ Masking must reproduce what a \emph{single} deployed statistic would deliver.
 We validate this directly by measuring each candidate's q-error twice: (i)
 \emph{singleton}, building only that statistic, and (ii) \emph{masked}, building
 the candidate plus three overlapping siblings in one ANALYZE and NULLing the
-siblings' payloads. Table \ref{tab:maskcorrect} shows the two agree exactly
-(e.g.\ st.144 masked 1.04 vs.\ singleton 1.042, \S\ref{sec:e2e}). Together with
-the fact that a NULL payload is ignored by the planner, this confirms
-Protocol-M is an \emph{exact} isolation of each candidate's effect -- not an
-approximation.
-
-\begin{table}[t]
-\caption{Direct correctness check: masked vs.\ singleton q-error when 3-4
-overlapping statistics are co-built (masked = only this candidate's payload
-kept, others NULLed). Exact agreement confirms Protocol-M is an exact
-isolation, not an approximation.}
-\label{tab:maskcorrect}
-\small
-\begin{tabular}{lcrr}
-\toprule
-candidate & level & singleton & masked\\
-\midrule
-FavCnt+ViewCnt  & 10000 & 1.0012 & 1.0012\\
-AnsCnt+ViewCnt  & 10000 & 1.0129 & 1.0129\\
-FavCnt+PostTyp+Score & 1000 & 1.0000 & 1.0000\\
-\bottomrule
-\end{tabular}
-\end{table}
+siblings' payloads. The two agree to the last digit every time --- e.g.\
+\texttt{FavCnt+ViewCnt} and \texttt{AnsCnt+ViewCnt} at L10000 both read
+1.0012 and 1.0129 singleton vs.\ masked; st.144 masked 1.04 vs.\ singleton
+1.042 (\S\ref{sec:e2e}). Together with the fact that a NULL payload is ignored
+by the planner, this confirms Protocol-M is an \emph{exact} isolation of each
+candidate's effect -- not an approximation.
 
 \textbf{Pragmatics and safety.} Protocol-M writes
 \texttt{pg\_}\allowbreak\texttt{statistic\_}\allowbreak\texttt{ext\_data}
@@ -750,29 +733,13 @@ stats\_CEB\_single & 632 & 616 & 180 & 79    & 1/35\\
 
 \textbf{Yes.} On the CENSUS \texttt{climate} table, the best single statistic
 brings a high-error query to a q-error of roughly 2.1--2.3 at target 100,
-1.2--2.1 at 1000, and $\approx$1.0 at 10000 (Table \ref{tab:capacity}). Target
-100 cannot even represent the relevant 3-column correlation; target 1000
-captures it but leaves residual error, and 10000 is near-exact. Capacity is
-therefore not a storage knob that can be swept under the rug --- it sets the
+1.2--2.1 at 1000, and $\approx$1.0 at 10000. Target 100 cannot even represent
+the relevant 3-column correlation; target 1000 captures it but leaves residual
+error, and 10000 is near-exact. (ANALYZE cost likewise grows with target and
+with the number of installed statistics, \S\ref{sec:measure-runtime}.) Capacity
+is therefore not a storage knob that can be swept under the rug --- it sets the
 estimation precision directly. This motivates treating
 $(\text{columns},\text{capacity})$ as a joint decision (Prop.~\ref{prop:linear}).
-
-\begin{table}[t]
-\caption{Capacity-level trade-off on CENSUS \texttt{climate} (69 cols). ANALYZE
-cost is shown with zero and with 1000 extended statistics present; ``repair'' is
-the best achievable single-statistic q-error.}
-\label{tab:capacity}
-\small
-\begin{tabular}{lccr}
-\toprule
-target & ANALYZE(0 ext) & ANALYZE(1000 ext) & repair \\
-\midrule
-100   & 0.28 s & 2.03 s   & $\sim$2.1--2.3\\
-1000  & 3.97 s & $\sim$31 s& $\sim$1.2--2.1\\
-10000 & 21.85 s& 264 s    & $\sim$1.0\\
-\bottomrule
-\end{tabular}
-\end{table}
 
 \subsection{RQ2: Is One Statistic per Query Sufficient?}
 \label{sec:rq2}
@@ -862,26 +829,8 @@ A reviewer-driven check is whether the 2/3-column candidate restriction itself
 manufactures sparsity. We relax the width on the hardest CENSUS queries (where
 2/3-column candidates leave the largest residual) and re-measure the best
 single-candidate q-error with 4- and 5-column MCVs admitted (mask protocol,
-identical to \S\ref{sec:measure}). Table \ref{tab:width} reports the result.
-
-\begin{table}[t]
-\caption{Candidate-width sensitivity on hard CENSUS queries (mask-measured best
-\emph{single} candidate q-error). Allowing 4-/5-column MCVs lowers q-error
-materially, so the 2/3-column scope understates achievable repair --- but the
-optimum is still a \emph{single} statistic per query. Candidate width is a
-stated limitation, not a threat to one-stat-per-query sparsity.}
-\label{tab:width}
-\small
-\begin{tabular}{lcccc}
-\toprule
-query & baseline & 2/3-col & +4-col & +5-col\\
-\midrule
-query.62  & 2\,069 & 1.406 & 1.154 & 1.023\\
-query.295 & 287    & 1.099 & 1.044 & 1.014\\
-query.382 & 378    & 1.119 & 1.038 & 1.020\\
-\bottomrule
-\end{tabular}
-\end{table}
+identical to \S\ref{sec:measure}): query.62 drops $1.406\to1.023$, query.295
+$1.099\to1.014$, query.382 $1.119\to1.020$.
 
 Two observations. First, \emph{sparsity is robust to width}: in every case the
 best solution is still a \emph{single} statistic (query.62's best at 5 columns
@@ -1072,11 +1021,10 @@ not a modelling luxury but the component that buys the last, hardest repairs.
 \label{sec:rq4}
 
 \emph{The optimization is not the bottleneck.} On the full 468-query CENSUS
-workload the worst-case (no-prune) MILP has 57{,}735 physical-statistic
-variables and 92{,}568 assignment variables (150{,}303 binary variables in
-total) and is solved optimally by HiGHS in $\approx$4.7s; with pruning it
-shrinks to 34{,}280 / 46{,}392 / 80{,}672 and solves in $\approx$4.3s.
-Measurement (\S\ref{sec:measure}) dominates the pipeline, not the solve.
+workload the worst-case MILP (57{,}735 statistics, 150{,}303 binary variables)
+solves optimally in $\approx$4.7s and with pruning in $\approx$4.3s
+(\S\ref{sec:scale}). Measurement (\S\ref{sec:measure}) dominates the pipeline,
+not the solve.
 
 \subsection{RQ5: Does Prediction Survive Real PostgreSQL Execution?}
 \label{sec:rq5}
