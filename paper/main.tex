@@ -1433,6 +1433,53 @@ restore exact predictability: with no overlapping pairs there is only one stat
 per clause set, so the ``first-built'' choice is forced and its per-candidate
 measurement is exact.
 
+\subsubsection{An order-driven interference gradient.}
+\label{sec:order-grad}
+The order mechanism yields a systematic, controlled experiment that the naive
+``overlap-density'' view misses. For each served query we hold its dominant
+statistic $W$ (created last) and prepend $k$ \emph{bad} siblings --- overlapping
+statistics that, when built first, hijack the query --- then measure the
+prediction ratio (E2E / per-candidate predicted q-error) as a function of $k$.
+Each query's bad siblings are enumerated by an exhaustive probe (18 for st.144,
+3 each for st.588/st.308/st.562; st.326 has none). Table \ref{tab:ordergrad}
+reports the mean ratio.
+
+\begin{table}[t]
+\caption{Order-driven interference (axis $k$ = bad siblings created \emph{before}
+the winner). A single bad sibling preceding the winner lifts the prediction
+ratio from 1.0 to $\approx$1.8--4.1 at every query that has one; st.326 (no bad
+sibling) stays flat. ``$d$'' is the naive overlap density, which stays $\approx$1
+here and cannot separate the rows.}
+\label{tab:ordergrad}
+\small
+\begin{tabular}{lcccc}
+\toprule
+query & $k{=}0$ & $k{=}1$ & $k{\ge}1$ range & naive $d$\\
+\midrule
+st.144 & 1.000 & 1.844 & 1.84--3.61 & 0.93--1.00\\
+st.588 & 1.000 & 2.082 & 2.082       & 1.00\\
+st.308 & 1.000 & 2.143 & 2.143       & 1.00\\
+st.562 & 1.000 & 4.093 & 4.093       & 1.00\\
+st.326 & 1.000 & --    & 1.000       & 0.00\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two conclusions. First, the prediction ratio is a \emph{step function of the
+order axis}, not of overlap amount: the moment a bad sibling is built before the
+winner ($k\ge 1$) the query's ratio jumps (st.144: 1.000 $\to$ 1.84--3.61;
+st.562: 1.000 $\to$ 4.09); additional bad siblings do not accumulate because the
+planner uses the \emph{first} matching one. The st.144 variation in the $k\ge1$
+range reflects \emph{which} sibling is first (first-built wins), the exact
+mechanism of \S\ref{sec:switch}. Second, the naive density $d(S)$ is
+uninformative: across all of these deployments it sits at $0.93$--$1.00$ (and
+would also sit at low values for harmless overlap), yet the ratio spans $1.0$ to
+$4.1$. Overlap density alone therefore cannot predict interference --- only the
+deployment \emph{order} of a bad sibling can. This refines the Stage-2 story:
+interference is not ``more overlap $\Rightarrow$ worse''; it is a discrete,
+order-determined event, removed exactly when no bad overlapping sibling can be
+built before a query's winner (global disjointness, Stage 3).
+
 \subsection{Stage 3: Global Disjointness Restores Near-Exact Predictability}
 \label{sec:p1}
 
