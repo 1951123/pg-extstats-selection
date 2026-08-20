@@ -676,51 +676,12 @@ the data the optimization needs, not the optimization itself.}
 \label{fig:pipeline}
 \end{figure*}
 
-\textbf{Scalability and overhead of Protocol-M.} Table \ref{tab:maskscale} and
-Fig.~\ref{fig:maskscale} quantify the full scaling picture on a controlled 40-column
-synthetic table (200K rows, target 1000), sweeping $N$ from 1 to 5000
-candidates. We measure the baseline ANALYZE $A_0=1.04$s, one EXPLAIN at
-$0.4$ms, and the catalog-mask UPDATE overhead at $1.8$ms per candidate ---
-negligible next to any ANALYZE. Protocol-A's cost is $N\cdot(2A_0 + \textsc{explain})$
-and grows linearly in $N$ with a large constant; Protocol-M's cost is one
-ANALYZE at $N$ plus $N$ cheap EXPLAINs. The speedup is already $17\times$ at
-$N{=}10$, peaks near $117\times$ at $N{=}100$, and stays above $74\times$ up to
-$N{=}5000$; the catalog-mask overhead is never more than $\sim$10\% of
-Protocol-M's total cost. The scaling story is therefore robust far beyond the
-$N{=}1000$ point measured on Census: Protocol-M turns an $O(N)$-ANALYZE protocol
-into one ANALYZE plus $N$ sub-millisecond payloads, and crucially, the
-per-candidate cost no longer depends on the table size at all.
-
-\begin{table}[t]
-\caption{Protocol-M scalability and overhead on a 40-column table (target 1000):
-measured ANALYZE-with-$N$ cost $A(N)$, derived total phase-1 cost for Protocol-A
-($2A_0$ per candidate) vs.\ Protocol-M (one $A(N)$ + $N$ EXPLAINs + $N$ mask
-updates), and speedup. Mask overhead $\le 10\%$ of Protocol-M's total.}
-\label{tab:maskscale}
-\small
-\begin{tabular}{lrrrrr}
-\toprule
-$N$ & $A(N)$ & Protocol-A & Protocol-M & speedup & mask \%\\
-\midrule
-1    & 1.02s & 2s   & 1.0s & 2.0$\times$  & $<1$\\
-10   & 1.22s & 21s  & 1.2s & 16.7$\times$ & 2\\
-100  & 1.56s & 208s & 1.8s & 116.7$\times$& 10\\
-500  & 10.5s & 1039s& 11.6s& 89.3$\times$ & 8\\
-1000 & 21.0s & 2077s& 23.3s& 89.3$\times$ & 8\\
-3000 & 74.8s & 6231s& 81.5s& 76.5$\times$ & 7\\
-5000 & 129.8s& 10385s&140.9s& 73.7$\times$ & 7\\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/mask_scale}
-\caption{Protocol-M speedup vs.\ the number of candidate statistics $N$ (marker:
-naive Protocol-A total time). The advantage peaks near $N{=}100$ ($\sim$117$\times$)
-and stays above $74\times$ out to $N{=}5000$.}
-\label{fig:maskscale}
-\end{figure}
+\textbf{Scalability and overhead.} On a controlled 40-column synthetic table
+(target 1000) swept from $N{=}1$ to 5{,}000 candidates, Protocol-M's speedup is
+already $17\times$ at $N{=}10$, peaks near $117\times$ at $N{=}100$, and stays
+above $74\times$ out to $N{=}5000$, while the mask-update overhead is never more
+than $\sim$10\% of total cost. Per-candidate cost thus no longer depends on the
+table size at all.
 
 \section{Empirical Findings}
 \label{sec:findings}
