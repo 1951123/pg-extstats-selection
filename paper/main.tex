@@ -1020,21 +1020,17 @@ full (ours)         & \textbf{1.0327} & \textbf{1.0156}\\
 \end{tabular}
 \end{table}
 
-Disabling the \emph{capacity} axis (allowing only L10000) hurts clearly at
-tight budgets (1.033 $\to$ 1.057 at 5 KB), confirming that capacity allocation
---- the ``how much'' dimension --- is a real, load-bearing component; the full
-budget sweep in \S\ref{sec:rq3} (Table \ref{tab:whathowmuch}) shows the same
-advantage of capacity awareness over every fixed what-only level, concentrated
-in the tail. In
-contrast, both the sparse per-query cap and the worse-than-baseline pruning are
-\emph{free}: they reproduce the full quality while shrinking the problem
-(pruning cuts 2{,}085 to 1{,}178 variables at 100 KB with identical quality).
-The global-disjointness component does not change the predicted quality but
-restores deployment predictability (\S\ref{sec:p1}). Altogether the ablation
-separates \emph{modeling assumptions} (the capacity axis; global disjointness at
-deployment) from \emph{computational conveniences} (the sparse cap; pruning):
-the former drive the quality and predictability our formulation delivers, while
-the latter cost nothing but solve and measurement time.
+Disabling the \emph{capacity} axis (allowing only L10000) hurts at tight
+budgets (1.033 $\to$ 1.057 at 5 KB), confirming capacity allocation --- the
+``how much'' dimension --- is load-bearing (the same advantage of capacity
+awareness over every fixed what-only level, \S\ref{sec:rq3}). In contrast, the
+sparse per-query cap and the worse-than-baseline pruning are \emph{free}: they
+reproduce full quality while shrinking the problem (pruning cuts 2{,}085 to
+1{,}178 variables at 100 KB). Thus the ablation separates \emph{modeling
+assumptions} (the capacity axis; global disjointness at deployment) from
+\emph{computational conveniences} (the sparse cap; pruning): the former drive
+the quality and predictability our formulation delivers, while the latter cost
+nothing but solve and measurement time.
 
 \section{End-to-End Validation}
 \label{sec:e2e}
@@ -1173,16 +1169,11 @@ Across the deployments we ran, the global-disjoint solution is
 \emph{exactly} predictable (ratio 1.000 at both budgets), because the deployed
 set is pairwise column-disjoint so the planner cannot cross-talk --- the
 independence assumption holds structurally rather than per-query. We present
-this as an \emph{empirical observation} on the deployments we ran rather than a
-guaranteed property: column-disjointness removes the specific cross-talk we
-identified, and PostgreSQL's matching logic then admits at most one matching
-statistic per restriction clause, but we have not exhaustively enumerated the
-deployment space. The systematic sweep below (\S\ref{sec:e2esys}) substantially
-widens the evidence for this observation --- but does not turn it into a theorem.
-The
-cost of disjointness is a well-defined nominal-quality loss (predicted 2.00 vs
-1.02): disjointness forces the solver to forgo overlapping-but-high-value
-dominant candidates.
+this as an \emph{empirical observation}, not a theorem: we have not
+exhaustively enumerated the deployment space, though the systematic sweep below
+(\S\ref{sec:e2esys}) widens the evidence considerably. The cost of disjointness
+is a well-defined nominal-quality loss (predicted 2.00 vs.\ 1.02): it forces
+the solver to forgo overlapping-but-high-value dominant candidates.
 
 \subsubsection{Systematic validation: predictions across many deployments.}
 \label{sec:e2esys}
