@@ -678,25 +678,17 @@ the results around six research questions.
 
 \emph{Why this problem matters: q-error is mean-invisible but tail-catastrophic.}
 A reader may notice that the \emph{average} q-error on stats\_CEB\_single is
-only $\approx$1.1 and ask whether we are solving a marginal problem. The answer
-is no, and the reason is distributional. q-error is a \emph{multiplicative}
-factor, so its cost is concentrated in the worst estimates: a query estimated
-wrong by a factor of 10 or 1000 (not by 10\%) is what makes the optimizer pick
-a categorically wrong plan. Table \ref{tab:bench} and the distribution to
-follow show how different the two primary workloads are. On \texttt{CENSUS},
-22\% of the 468 queries have baseline q-error $>2$, 5.8\% have $>10$, and the
-worst is $4{,}172$ (a 30,000+ row-count misestimate that would send any planner
-down a wrong physical plan); on \texttt{stats\_CEB\_single} the errors are
-milder but still present --- 5.1\% of queries exceed q-error 2 and the tail
-reaches 4.7. These two ends span the problem spectrum: \texttt{stats\_CEB\_single}
-shows that even \emph{mild, systematic} misestimates can be removed cheaply and
-predictably, while \texttt{CENSUS} shows that the \emph{catastrophic} tail can
-also be collapsed (max $4{,}172\to1.4$, \S\ref{sec:rq3}). Reporting mean alone
-hides this --- which is why we always report median/P90/max alongside it. The
-mean improvement ($1.095\to1.016$) looks small precisely \emph{because} most
-queries are already near q-error 1; the method's real value is that it targets
-exactly the queries for which cardinality estimation is badly wrong, and clears
-that tail under a budget.
+only $\approx$1.1 and ask whether we are solving a marginal problem. We are not,
+for a distributional reason: q-error is a \emph{multiplicative} factor, so its
+cost concentrates in the worst estimates --- a query wrong by a factor of 10 or
+1000 (not 10\%) is what makes the optimizer pick a categorically wrong plan.
+The two primary workloads span the spectrum: on \texttt{CENSUS}, 22\% of the
+468 queries have baseline q-error $>2$, 5.8\% have $>10$, and the worst is
+$4{,}172$; on \texttt{stats\_CEB\_single}, 5.1\% exceed q-error 2 and the tail
+reaches 4.7. The mean improvement ($1.095\to1.016$) looks small precisely
+\emph{because} most queries are already near q-error 1; the method's real value
+is that it targets and clears exactly that tail under a budget. Reporting mean
+alone hides this, which is why we always report median/P90/max alongside it.
 
 \begin{table*}[t]
 \caption{Workload characteristics and candidate distribution.
