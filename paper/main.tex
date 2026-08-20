@@ -898,6 +898,43 @@ stats\_CEB\_single (median, n=180) & 1.06 & -- & 1.00 & 1.00 / 1.00\\
 \end{tabular}
 \end{table}
 
+\subsubsection{Exhaustive check: one statistic equals the best \emph{subset}.}
+A skeptic may ask whether restricting to one statistic per query loses anything
+against the \emph{true} multi-select optimum --- i.e.\ an arbitrary subset, not
+just top-$k$. For every query with few candidates we settle this exactly: we
+enumerate \emph{all} non-empty subsets of its candidates (173 queries, up to 10
+candidates each, 18{,}177 subsets in total) and measure each subset's real joint
+q-error (mask protocol, keep-only-that-subset). Table \ref{tab:exh} reports the
+best single vs.\ the best \emph{arbitrary} subset.
+
+\begin{table}[t]
+\caption{Exhaustive subset enumeration (mask protocol, $\le$\,10 candidates):
+the best \emph{single} statistic essentially matches the best \emph{arbitrary}
+subset for every query. ``Gap'' is the absolute joint-q-error difference
+(best exhaustive $\;-\;$ best single).}
+\label{tab:exh}
+\small
+\begin{tabular}{lcccc}
+\toprule
+candidate & \#queries & best single & best subset & gap\\
+\midrule
+$\;1$ & 111 & 1.000--1.150 & 1.000--1.150 & $0$\\
+$\;4$ & 45  & 1.000--1.158 & 1.000--1.158 & $0$\\
+$10$ & 17  & 1.000--1.138 & 1.000--1.138 & $-0.0011$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Across all 18{,}177 enumerated subsets of the 173 queries, the best arbitrary
+subset never beats the best single statistic by more than $0.0011$ of absolute
+joint q-error ($170/173$ exactly equal; the remaining three, e.g.\ \texttt{st.26}
+with baseline 2.19, differ in the third decimal). This includes the hard
+ten-candidate queries \texttt{st.562} (baseline 4.70), \texttt{st.567} (4.56)
+and \texttt{st.588} (4.49), where the exhaustive optimum equals the singleton.
+So even against the true, unconstrained multi-select optimum, the sparse
+restriction to one statistic per query loses essentially nothing on these
+workloads.
+
 \subsubsection{Stress test: where sparsity fails.}
 The sparse regime is not a universal property --- so it deserves a controlled
 \emph{failure test}. We build a synthetic table (100K rows) with \emph{two
