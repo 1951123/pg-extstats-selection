@@ -1422,70 +1422,52 @@ drop any interfering statistic, and re-solve.
 \subsection{Why Does Sparsity Occur? A Mechanistic Hypothesis}
 \label{sec:disc-sparsity}
 
-The sparse finding (\S\ref{sec:rq2}) is what makes the whole approach work, so
-it deserves a mechanistic account -- though we stress it is a \emph{hypothesis},
-not a theorem. Our view is that a single-table selection query's error is
-typically dominated by \emph{one} correlated column cluster. Concretely: a
-restriction clause is a conjunction of predicates, and its selectivity error is
-largest where the columns are most strongly correlated (the independence
-assumption fails hardest). The planner's default estimate for such a clause is
-about as wrong as its worst correlated sub-clause; a single MCV over exactly
-that dominant cluster removes the largest source of error, and residual errors
-in the remaining (weakly-correlated) predicates contribute little to the total
-q-error. Hence \emph{one} well-chosen statistic captures nearly all improvement
-attainable from the 2-/3-column MCV candidates, and a second non-overlapping statistic finds no independent
-``second cluster'' worth capturing.
+We stress that the sparse finding (\S\ref{sec:rq2}) has a mechanistic account as a
+\emph{hypothesis}, not a theorem. A single-table selection query's error is
+typically dominated by \emph{one} correlated column cluster: its restriction
+clause is a conjunction of predicates whose selectivity error is largest where
+columns are most strongly correlated (where independence fails hardest), and the
+planner's default estimate is about as wrong as the worst such sub-clause. A
+single MCV over exactly that dominant cluster removes the largest error source;
+residual errors in weakly-correlated predicates contribute little. Hence
+\emph{one} well-chosen statistic captures nearly all improvement attainable from
+the 2-/3-column MCV candidates, and a second non-overlapping statistic finds no
+independent ``second cluster'' worth capturing.
 
-This hypothesis is consistent with every observation we report: it explains why
-$k{=}2,3$ add nothing (RQ2), why the top-1 coverage CDF is sharply peaked near
-1.0 (P4), why capacity \emph{upgrading} the dominant statistic matters more
-than adding others (RQ3), and why the sparse cap costs no quality in the
-ablation (\S\ref{sec:ablation}). It also predicts the boundary of our claim:
-workloads where a query is genuinely driven by \emph{several} independent
-correlated clusters would violate sparsity and warrant the multi-select model
-($\S\ref{sec:formulation}$) instead. Our controlled stress test
-(\S\ref{sec:rq2}, Table \ref{tab:sweep}) confirms this predicted boundary
-directly: a query over two independent clusters goes from top-1 $=$ 100 to
-top-2 $=$ 1.00, and sparsity collapses once $K\ge 3$ --- exactly the many-cluster
-regime the hypothesis says breaks sparsity. Characterising how often that regime
-occurs on real workloads is an open question (below) and a natural direction for
-future work.
+This is consistent with every observation we report: $k{=}2,3$ add nothing
+(RQ2); the top-1 coverage CDF is sharply peaked near 1.0; capacity
+\emph{upgrading} the dominant statistic matters more than adding others (RQ3);
+and the sparse cap costs no quality in the ablation (\S\ref{sec:ablation}). It
+also predicts the boundary of our claim. Workloads where a query is genuinely
+driven by \emph{several} independent correlated clusters violate sparsity and
+warrant the multi-select model ($\S\ref{sec:formulation}$); our controlled
+stress test (\S\ref{sec:rq2}, Table \ref{tab:sweep}) confirms this directly --
+a query over two independent clusters goes from top-1 $=$ 100 to top-2 $=$ 1.00,
+and sparsity collapses once $K\ge 3$. Characterising how often that regime
+occurs on real workloads is an open question below.
 
 \subsection{What Is Being Optimized}
 \label{sec:disc-objective}
 
-We optimize a \emph{storage} budget (persistent bytes and estimation quality);
-ANALYZE maintenance cost is handled separately because PostgreSQL couples its
-sampling effort to the \emph{maximum} target on a relation. This keeps the
-objective clean and lets us treat capacity as an allocation of persistent
-storage rather than a proxy for maintenance cost. The budget-quality curves
-(\S\ref{sec:rq3}) and the capacity-level mix (Fig.~\ref{fig:budgetquality}) are
-the concrete evidence that a storage budget is, in practice, spent on the
-``how much'' axis.
+We optimize a \emph{storage} budget (persistent bytes and estimation quality,
+\S\ref{sec:rq3}); ANALYZE maintenance cost is handled separately because
+PostgreSQL couples its sampling effort to the \emph{maximum} target on a
+relation, so we treat capacity as an allocation of persistent storage. The
+budget-quality curves in \S\ref{sec:rq3} and Fig.~\ref{fig:budgetquality} show
+that a storage budget is, in practice, spent on the ``how much'' axis.
 
-\emph{Why arithmetic mean q-error.} We optimize the arithmetic mean of q-error,
-which is sensitive to extreme outliers --- and our workloads \emph{are} outlier
-dominated (median stays 1.000 even as the mean drops, \S\ref{sec:rq3}). We
-chose it deliberately: q-error is bounded below by 1 with a heavy upper tail,
-so the mean rewards repairing the worst queries, which is precisely the cost of
-a bad cardinality estimate. We report median/P90/max alongside the mean
-everywhere so that outlier-domination is visible rather than hidden (e.g.\ the
-CENSUS tail collapse, \S\ref{sec:rq3}). Because the objective is linear in the
-$\Delta_{is}$ terms, the arithmetic mean keeps the MILP linear; a geometric
-mean (equivalently $\min\sum_i\log e_i$, i.e.\ maximizing
-$\sum_s(\log e_i^0-\log e_{is})x_{is}$) would also stay linear while weighting
-\emph{relative} rather than \emph{absolute} improvement. We use the arithmetic
-mean as the headline and treat the mean choice as an empirical robustness
-question. To check it, we solve the sparse MILP at several budgets under the
-geometric (log) objective and the arithmetic (linear) objective and compare:
-the two objectives select deployments that differ in detail (Jaccard $0.67$
---$0.83$ of the chosen statistics) but yield \emph{identical} resulting
-arithmetic and geometric mean q-errors at every budget (Table
-\ref{tab:meanrob}); the mean of the geo-objective solution equals that of the
-arith-objective solution, and likewise for the geometric mean. The deployment
---- and hence the headline conclusion --- is therefore robust to the mean
-choice, and we keep the arithmetic mean because it directly targets the worst
-queries that our evaluation emphasizes.
+\emph{Why arithmetic mean q-error.} q-error is bounded below by 1 with a heavy
+upper tail, so the arithmetic mean rewards repairing the worst queries --
+exactly the cost of a bad estimate -- while the median stays 1.000. It also
+keeps the MILP linear in the $\Delta_{is}$ terms (a geometric mean,
+$\min\sum_i\log e_i$, would stay linear too while weighting \emph{relative}
+improvement). We check the mean choice empirically: solving the sparse MILP
+under the log objective and the linear objective picks overlapping-but-identical
+statistic sets (Jaccard $0.67$--$0.83$) yet yields \emph{identical} resulting
+arithmetic and geometric mean q-errors at every budget
+(Table \ref{tab:meanrob}). The deployment is robust to the mean choice, and we
+keep the arithmetic mean because it directly targets the worst queries that our
+evaluation emphasizes.
 
 \begin{table}[t]
 \caption{Mean-choice robustness (full 632-query workload). Solving the sparse
@@ -1525,25 +1507,20 @@ then structurally independent, not just measured independently.
 \subsection{Open Questions}
 
 (1) \emph{Level monotonicity}: enforcing that a higher capacity never yields a
-worse q-error could prune options and speed the solve, but is not required for
-correctness. (2) \emph{Maintenance-aware selection}: jointly modeling ANALYZE
-cost (as a function of the \emph{max} target) rather than storage alone is a
-natural extension, replacing the storage-only budget with an end-to-end
-maintenance budget. (3) \emph{When to upgrade vs.\ add}: our data show a smooth
-capacity-only curve for stats\_CEB\_single and a large tail on CENSUS, but a
-principled characterisation of the ``upgrade vs.\ add'' decision boundary is
-open; a marginal-value heuristic (quality gained per storage unit for an upgrade
-vs.\ a new statistic) would make the resource-allocation view of
-\S\ref{sec:intro} more precise. (4) \emph{When does sparsity fail?}:
-identifying workloads with multiple independent correlated clusters (the regime
-where the multi-select model is needed) is the most important open question.
-(5) \emph{Limits}: we consider MCV statistics on
-single-table workloads; join workloads need other techniques, and the real
-system has a limit on the number of statistics per relation. Our candidate
-family is restricted to 2-/3-column subsets, and \S\ref{sec:rq2} shows this
-scope -- while preserving one-stat-per-query sparsity -- understates the
-achievable quality on harder CENSUS queries, where 4-/5-column candidates
-help; extending candidate generation to higher arity is future work.
+worse q-error could prune options and speed the solve. (2) \emph{Maintenance-aware
+selection}: jointly modeling ANALYZE cost (a function of the \emph{max} target)
+replaces the storage-only budget with an end-to-end maintenance budget.
+(3) \emph{Upgrade vs.\ add}: our data show a smooth capacity-only curve on
+stats\_CEB\_single and a large tail on CENSUS, but a principled
+``upgrade-vs-add'' decision boundary --- e.g.\ a marginal-value heuristic
+(quality gained per storage unit) --- is open. (4) \emph{When does sparsity
+fail?}: identifying workloads with genuinely multiple independent correlated
+clusters (the regime needing the multi-select model) is the most important open
+question. (5) \emph{Limits}: we consider MCV statistics on single-table
+workloads; joins need other techniques, there is a real limit on statistics per
+relation, and our 2-/3-column candidate family understates achievable quality on
+harder CENSUS queries, where 4-/5-column candidates help --- extending candidate
+generation to higher arity is future work.
 
 \section{Conclusion}
 \label{sec:concl}
