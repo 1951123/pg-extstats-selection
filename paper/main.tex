@@ -553,25 +553,17 @@ candidate's effect -- not an approximation.
 directly, so it requires superuser and must
 run in a dedicated, disposable database cluster (or with autovacuum and
 concurrent writes suspended) to avoid contaminating a production system. Two
-system facts make the manipulation safe and correct in practice.
-(i) \emph{No stale catalog state.} Every UPDATE to the catalog triggers the
-usual cache invalidation, so the relcache/syscache entries consulted by the
-planner's \texttt{statext\_}\allowbreak\texttt{is\_kind\_built()} test are
-rebuilt on the next command; we re-issue a fresh \texttt{EXPLAIN} per
-candidate, so we never reuse an estimate computed from a pre-update cache.
-(ii) \emph{Update-in-place, not rewrite.} NULLing a payload does not re-run
-ANALYZE, so masking cost is independent of the table size and of the number of
-candidates. Because the protocol relies on the layout of the system catalog (a
-\texttt{pg\_mcv\_list} without a bytea cast, so the round-trip happens inside
-the server via \texttt{UPDATE ... FROM}), it is specific to PostgreSQL 16; we
-have not verified it against other major versions. These are honest limits of
-the implementation, not of the model.
-
-Protocol-M's scope is explicit: it is an efficient \emph{PostgreSQL-16}
-implementation of isolated candidate measurement for \emph{MCV} statistics
---- \texttt{ndistinct} and \texttt{dependencies} masking is untested, and both
-the catalog layout and the planner's OID-order selection
-(\S\ref{sec:switch}) are version-dependent --- not a portable protocol.
+system facts make the manipulation safe and correct in practice:
+(i) \emph{No stale catalog state} --- every UPDATE triggers standard cache
+invalidation, and we re-issue a fresh \texttt{EXPLAIN} per candidate, so we
+never reuse an estimate computed from a pre-update cache; and
+(ii) \emph{update-in-place, not rewrite} --- NULLing a payload does not re-run
+ANALYZE, so masking cost is independent of table size. Because the protocol
+relies on the layout of the system catalog, it is specific to PostgreSQL 16 and
+to \emph{MCV} statistics (\texttt{ndistinct}/\texttt{dependencies} masking is
+untested); both the catalog layout and the planner's OID-order selection
+(\S\ref{sec:switch}) are version-dependent. These are honest limits of the
+implementation, not of the model.
 
 \subsection{Sampling Determinism vs.\ Statistics Target}
 \label{sec:measure-determinism}
@@ -927,17 +919,14 @@ much'' axis; \S\ref{sec:rq3}, Table \ref{tab:whathowmuch}).
 
 On the full 632-query workload (Fig.~\ref{fig:budgetquality}), the budget is
 visibly spent on capacity: the number of high-capacity selections grows with
-budget (L10000: $1\to\cdots\to15$, L1000: $1\to\cdots\to15$), and the clearest
-case, \texttt{posts(AnswerCount,ViewCount)}, upgrades from L100 to L1000 to
-L10000 as the budget grows --- the same \emph{what}, more \emph{how much}. The
-multi-metric view confirms that mean is outlier-dominated (median stays 1.000);
-the real effect is \emph{tail repair}, with the maximum q-error falling from
-4.7 to 1.1. On the hardest CENSUS queries --- the top-10, i.e.\ the ten
-single-table queries with the largest baseline q-error --- the improvement is
-across the whole distribution: baseline (mean / median / P90 / max) $=$
-(1071.5 / 332.5 / 2542.9 / 4162.1) collapses to $(1.10 / 1.09 / 1.18 / 1.41)$.
-We optimize mean but evaluate the full distribution; the headline is the tail
-collapse, e.g.\ a 4162 $\to$ 1.4 maximum.
+budget, and the clearest case, \texttt{posts(AnswerCount,ViewCount)}, upgrades
+from L100 to L1000 to L10000 as the budget grows --- the same \emph{what}, more
+\emph{how much}. The multi-metric view confirms the real effect is \emph{tail
+repair}: the maximum q-error falls from 4.7 to 1.1 across the workload, and on
+the ten hardest CENSUS queries baseline (mean / median / P90 / max) $=$
+$(1071.5 / 332.5 / 2542.9 / 4162.1)$ collapses to $(1.10 / 1.09 / 1.18 / 1.41)$
+--- e.g.\ a 4162 $\to$ 1.4 maximum. We optimize mean but evaluate the full
+distribution.
 
 \begin{figure}[t]
 \centering
@@ -984,19 +973,14 @@ budget & mean & max & mean & max\\
 \end{table}
 
 Three observations. First, the capacity-aware model is \emph{never worse} than
-the best fixed-capacity variant at any budget --- free level choice dominates
-choosing any single level. Second, the advantage is concentrated in the tail:
-at 250--500\,KB the what-only variants saturate (all-L100 / all-L1000 keep a
-maximum q-error of 2.19 at every budget), whereas the full model keeps driving
-the maximum down (1.45 at 250\,KB, 1.17 at 500\,KB), because it spends the
-allocated budget \emph{upgrading} the dominant combinations' capacity rather
-than merely adding more coverage. Third, the mechanism is visible in the chosen
-level mix: at 250\,KB the full model deploys 14 statistics spread across
-L100/L1000/L10000 (4/6/4) --- it mixes capacities --- while what-only-L10000
-spends the same budget on 12 all-heavy statistics and still leaves a larger
-tail. This is the same capacity-reallocation behaviour that separates the MILP
-from greedy (above) and from a column-only optimizer: the ``how much'' axis is
-not a modelling luxury but the component that buys the last, hardest repairs.
+the best fixed-capacity variant at any budget. Second, the advantage is
+concentrated in the tail: at 250--500\,KB the what-only variants saturate (kept
+maximum q-error 2.19 at every budget), whereas the full model keeps driving it
+down (1.45 at 250\,KB, 1.17 at 500\,KB), because it spends the budget
+\emph{upgrading} the dominant combinations' capacity rather than adding more
+coverage --- the same capacity-reallocation behaviour that separates the MILP
+from greedy above. The ``how much'' axis is not a modelling luxury but the
+component that buys the last, hardest repairs.
 
 \subsection{RQ4: Does the Approach Scale?}
 \label{sec:rq4}
