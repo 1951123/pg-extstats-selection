@@ -54,18 +54,21 @@ We observe that PostgreSQL \texttt{CREATE STATISTICS} selection is not just
 (table, columns) and \emph{how much} capacity (each statistic's
 \texttt{statistics\_target}). We re-frame it as \emph{capacity-aware
 selection}: under a storage budget, should we spend on adding a statistic or
-on upgrading an existing one to a higher-capacity target? Across the single-table
-workloads we evaluate (stats\_CEB and the wide 69-column CENSUS benchmark) we find a
-sparse structure: one well-chosen multivariate statistic captures
-nearly all improvement attainable from the evaluated 2-/3-column MCV candidates
-per query. We exploit this by restricting each
-query to a single statistic, under which the surrogate objective is
-\emph{exactly linear} and the resulting budgeted MILP solves in seconds at
+on upgrading an existing one to a higher-capacity target? Our central finding is
+an \emph{empirically observed sparse regime}: across the two single-table
+workloads we evaluate (stats\_CEB\_single and the wide 69-column CENSUS
+benchmark), one well-chosen 2-/3-column MCV candidate captures
+nearly all improvement attainable from the evaluated candidate family
+per query. Exploiting this regime --- by restricting each
+query to a single statistic --- makes the surrogate objective
+\emph{exactly linear} and the budgeted MILP solvable in seconds at
 full-workload scale. A catalog-mask protocol makes the enormous candidate $\times$ capacity
 space measurable on wide tables. End-to-end validation on PostgreSQL 16 shows
 individual candidate measurements are predictive, but reveals that co-installed
-overlapping statistics cause planner interference --- motivating global
-disjointness or post-selection validation. Join-heavy workloads act as a
+overlapping statistics cause planner interference; we give \emph{two deployment
+modes} for this: a conservative \emph{global-disjoint} mode with near-exact
+predictability, and an unconstrained mode followed by lightweight
+planner-validation. Join-heavy workloads act as a
 negative control.
 \end{abstract}
 
@@ -177,21 +180,32 @@ variables in total --- is solved optimally in under five seconds
 
 \textbf{(D) The validation surprise: overlapping statistics interfere.}
 End-to-end deployment on real PostgreSQL shows per-candidate predictions are
-accurate, but co-installed \emph{overlapping} statistics let the planner switch
-queries to a suboptimal statistic (predicted mean 1.02 vs.\ measured 1.32). A
-\emph{global-disjointness} constraint restores (empirically) near-exact
-predictability
-(ratio 1.000) at a quantified quality cost (\S\ref{sec:p1}). This is not a
+accurate, but co-installed \emph{overlapping} statistics let the planner
+switch queries --- an effect we trace to \emph{creation order}
+(\S\ref{sec:switch}) --- tripling prediction error for affected queries
+(predicted mean 1.02 vs.\ measured 1.32). We therefore provide \emph{two
+deployment modes}: a conservative \emph{global-disjointness} mode that forbids
+column-overlapping co-installation and restores (empirically) near-exact
+predictability (ratio 1.000) at a quantified quality cost; and an
+\emph{unconstrained} mode that keeps nominal quality but must be followed by
+lightweight planner validation. Global disjointness is a
+\emph{correctness-preserving} deployment mode, not claimed to be the
+universally optimal one. This is not a
 failure of our measurement --- it is a second-order planner interaction that the
 per-candidate model cannot see, and a concrete, validated fix.
 
-In summary, we contribute (i) a reformulation of extended-statistics selection
-as budgeted \emph{what-and-how-much allocation} (\S\ref{sec:formulation},
-\S\ref{sec:milp}); (ii) an empirical sparse-structure finding with a formal
-linearity proposition that makes the problem tractable (\S\ref{sec:rq2}); (iii)
-the catalog-mask measurement protocol that makes the candidate space measurable
-(\S\ref{sec:measure}); and (iv) an end-to-end validation that isolates --- and
-fixes --- the planner-interference effect (\S\ref{sec:e2e}).
+In summary, we contribute (i) an \emph{empirically observed sparse regime} on
+the two evaluated single-table workloads --- one dominant 2-/3-column MCV
+candidate per query --- whose linearity is a formal consequence
+(Prop.~\ref{prop:linear}), and which is what makes the problem tractable
+(\S\ref{sec:rq2}); (ii) a reformulation of extended-statistics selection as
+budgeted \emph{what-and-how-much allocation}, solvable by the resulting MILP
+(\S\ref{sec:formulation}, \S\ref{sec:milp}); (iii) the catalog-mask measurement
+protocol that makes the candidate $\times$ capacity space measurable
+(\S\ref{sec:measure}); and (iv) an end-to-end validation that isolates, explains
+(creation-order planner interference, \S\ref{sec:switch}), and --- via a
+global-disjointness mode or post-selection validation --- \emph{fixes} the
+predictability gap (\S\ref{sec:e2e}).
 
 \section{Background and Related Work}
 \label{sec:back}
@@ -408,7 +422,7 @@ statistics coexist (we return to this in \S\ref{sec:e2e}).
 
 Our measurements (\S\ref{sec:rq2}) reveal that per query a
 \emph{single dominant statistic} already captures nearly all improvement
-attainable from the evaluated candidate family. This observation motivates a \emph{restricted} optimization model:
+attainable from the evaluated 2-/3-column MCV candidates. This observation motivates a \emph{restricted} optimization model:
 the \emph{sparse} special case, in which each query selects at most one
 statistic, $\sum_s x_{is}\le 1$. We stress that this is an \emph{empirically
 justified restriction}, not a modeling assumption that holds by definition: it
@@ -1720,16 +1734,20 @@ system has a limit on the number of statistics per relation.
 \label{sec:concl}
 
 Extended-statistics selection should be treated as a joint \emph{which} and
-\emph{how much} decision. Across the single-table workloads we evaluated
-(stats\_CEB\_single and the wide CENSUS benchmark) the benefit is sparse---one
-dominant statistic per query---which makes the budget-constrained
-problem an exactly-linear MILP solvable in seconds at full-workload scale,
-through a catalog-mask protocol that makes per-candidate, per-capacity
-measurement feasible on wide tables. End-to-end validation shows per-candidate
+\emph{how much} decision. On the two single-table workloads we evaluate
+(stats\_CEB\_single and the wide CENSUS benchmark) we observe a sparse regime
+among the evaluated 2-/3-column MCV candidates --- one
+dominant statistic per query---which, together with capacity levels, makes the
+budget-constrained problem an exactly-linear MILP solvable in seconds at
+full-workload scale, via a catalog-mask protocol that makes per-candidate,
+per-capacity measurement feasible on wide tables. We present sparsity as an
+empirically characterized regime of these workloads, not as a universal
+property. End-to-end validation shows per-candidate
 prediction is sound and isolates the residual risk to planner cross-talk among
-co-installed overlapping statistics; a global-disjointness
-constraint restores empirically near-exact predictability. Join-heavy workloads
-are the negative
+co-installed overlapping statistics; we explain it as a creation-order effect
+(\S\ref{sec:switch}) and restore empirically near-exact predictability either
+with a conservative global-disjointness mode or with post-selection
+planner-validation. Join-heavy workloads are the negative
 control. The result is a principled, scalable, and honestly-validated recipe
 for automating PostgreSQL extended-statistics deployment under a storage
 budget.
