@@ -120,31 +120,21 @@ merely which column combinations:
   \;\times\;
   \underbrace{\text{which }\texttt{statistics\_target}}_{\text{how much}},
 \]
-compounded by a combinatorial explosion in candidates --- a single CENSUS query
-can have up to 455 candidate column combinations (30{,}856 is the sum of
-per-query candidate counts before any deduplication; after globally
-deduplicating identical column combinations across the workload only 19{,}245
-distinct combinations remain). To our knowledge, prior work on automatic
+compounded by a combinatorial explosion in candidates (a single CENSUS query
+can have hundreds of candidate column combinations; \S\ref{sec:rq4} gives
+full-scale sizes). To our knowledge, prior work on automatic
 statistics configuration has focused on discovering or selecting useful column
 groups; we are not aware of prior work that explicitly treats PostgreSQL's
 per-statistic \texttt{statistics\_target} as a competing resource-allocation
 dimension under a shared storage budget (\S\ref{sec:back}).
 
-\emph{Running example.} Consider a query filtering
-\texttt{posts(AnswerCount,}\allowbreak\texttt{ViewCount)}. A statistic over
-this combination can be stored at L100, L1000, or L10000 (we treat
-$\{100,1000,10000\}$ as the \emph{evaluated capacity menu}, not the complete
-target space; finer-grained targets are future work, \S\ref{sec:disc}). Measured on our
-workload, L100 is too
-coarse to capture the correlation (q-error stays $\sim$4.7), while L10000
-drives it to $\approx$1.0. How much capacity is enough is therefore itself a
-decision: ``should we build this statistic?'' admits no useful answer without
-``\emph{at what capacity}?''. And because L10000 costs $\sim$100\,KB while L100
-costs $\sim$2\,KB, that choice is \emph{quantitative} under a budget. This is
-the ``what and how much'' allocation we optimize: the same combination can be
-deployed at different capacities depending on the budget, and spending on
-\emph{upgrading} it competes directly with spending on \emph{adding} another
-combination.
+\emph{Running example.} \texttt{posts(AnswerCount,ViewCount)} can be stored at
+L100, L1000, or L10000 (an \emph{evaluated capacity menu}, \S\ref{sec:disc}):
+L100 loses the 3-column correlation (q-error stays $\sim$4.7), while L10000
+drives it to $\approx$1.0 at $\sim$100\,KB vs.\ $\sim$2\,KB. So
+``should we build this statistic?'' admits no answer without ``\emph{at what
+capacity}?'' --- spending on \emph{upgrading} it competes directly with
+spending on \emph{adding} another combination.
 
 \textbf{(B) A measurable sparse regime, discovered, not assumed.} At first
 glance the problem looks like a combinatorial multi-select: a query could
@@ -153,20 +143,16 @@ We do not claim that extended-statistics selection is inherently sparse;
 rather, we show that the two evaluated single-table workloads lie in a
 \emph{measurable sparse regime}: across them, one well-chosen multivariate
 statistic captures nearly all
-improvement attainable from the evaluated 2-/3-column MCV candidates for a
-query --- adding a second or third non-overlapping
-candidate gives almost no benefit, and on the hardest CENSUS queries the top-1,
-top-2 and top-3 joint q-errors are identical. This was not assumed --- it was
-\textbf{discovered} --- and it has a direct consequence: \emph{restricted to at
-most one statistic per query}, the objective has no interaction term and is
-\emph{exactly linear} (Prop.~\ref{prop:linear}). We do not claim this makes the
-general multi-select problem tractable in the abstract, nor that it describes
-the raw deployment objective; rather, sparsity is an
-\emph{empirically characterized regime} of the workloads we evaluate, and the
-linear model is exact \emph{conditional on} the one-statistic-per-query
-restriction that this regime justifies --- for the \emph{surrogate}, with the
-E2E experiments (\S\ref{sec:e2e}) determining when that surrogate remains
-faithful to PostgreSQL's real statistic selection.
+improvement attainable from the evaluated 2-/3-column MCV candidates per query
+(adding a second or third candidate helps ~nothing; \S\ref{sec:rq2} falsifies
+this in several ways). This was \textbf{discovered}, not assumed, and it has a
+direct consequence: restricted to at most one statistic per query, the
+objective has no interaction term and is \emph{exactly linear}
+(Prop.~\ref{prop:linear}) --- a formal property of the \emph{surrogate} within
+an empirically characterized regime, whose faithfulness to PostgreSQL's real
+statistic selection is determined by the E2E experiments (\S\ref{sec:e2e}).
+We do not claim this makes the general multi-select problem tractable in the
+abstract.
 
 \textbf{(C) The enabler: measuring the massive candidate space.} Instantiating
 this optimization requires a per-candidate, per-capacity q-error for every
@@ -175,12 +161,10 @@ per candidate) is infeasible --- a single CENSUS ANALYZE at target 10000 takes
 $\sim$20s. Our \emph{catalog-mask protocol} (\S\ref{sec:measure}) builds all
 candidates in one ANALYZE and isolates each by masking the others'
 \texttt{pg\_statistic\_ext\_data} payloads, cutting measurement cost by
-$9$--$132\times$ (growing with the number of candidates) and making the
-enormous candidate $\times$ capacity space actually measurable. The resulting MILP is then the tractable part: the full
-CENSUS workload --- 57{,}735 physical-statistic variables ($y_s$) and 92{,}568
-query--statistic assignment variables ($x_{is}$), i.e.\ 150{,}303 binary
-variables in total --- is solved optimally in under five seconds
-(\S\ref{sec:rq4}) --- optimization is not the dominant runtime bottleneck.
+$9$--$132\times$ and making the enormous candidate $\times$ capacity space
+measurable. The resulting MILP then solves at full-workload scale in seconds
+(\S\ref{sec:rq4}) --- optimization is not the dominant runtime bottleneck;
+measurement is.
 
 \textbf{(D) The validation surprise: overlapping statistics interfere.}
 End-to-end deployment on real PostgreSQL shows per-candidate predictions are
@@ -265,94 +249,28 @@ the ANALYZE cost of 10000.
 
 \subsection{Related Work}
 
-We position our work against five bodies of literature; for each we say what it
-\emph{optimizes}, \emph{measures}, and why it does not solve the
-\emph{what} $\times$ \emph{how much} question.
-
-\textbf{(a) Cardinality estimation.} Selectivity estimation is one of the
-oldest problems in query optimization \cite{selinger1979access}: histograms
-\cite{piatetsky1984accurate,poosala1996improved,ioannidis2003cardinality},
-selectivity from query feedback \cite{chendependencies}, and -- more recently --
-\emph{learned} cardinality models \cite{kipf2019learned} all aim to improve the
-estimate itself. Our problem is orthogonal: we do not estimate, we decide
-\emph{which statistics to deploy} so that PostgreSQL's own estimator is
-accurate \cite{chaudhuri1998overview}. In particular, we drive the \emph{real}
-planner and measure its actual q-error, so no synthetic model accuracy is
-involved.
-
-\textbf{(b) Automatic statistics configuration.} Chaudhuri and Narasayya
-\cite{chaudhuri2000automating,chaudhuri2001automating} showed that a workload's
-needed statistics can be identified and pruned to a small effective set. This
-establishes the \emph{which} dimension as well-studied --- and is exactly why we
-do \emph{not} claim novelty for ``automatically selecting statistics.'' Two
-subsequent lines are the most direct prior art and frame the boundary of our
-claim. \emph{CORDS} \cite{ilyas2004cords} automatically discovers correlations
-and soft functional dependencies among columns and recommends column-group
-statistics to avoid the independence assumption; \emph{Haas et al.}
-\cite{haas2007dependencies} detect dependent attribute pairs from query
-feedback and \emph{rank} them so that only the most valuable multivariate
-statistics are kept under a catalog-space budget. Both pre-frame our concern
-(candidate explosion, catalog budget), but both operate at the level of
-\emph{which column groups} and \emph{pairwise} independence --- they do not
-jointly choose each statistic's \emph{capacity} and do not optimize a shared
-storage budget across the \texttt{statistics\_target} axis. Concretely, prior
-work decides \emph{whether to add} a statistic; we additionally decide
-\emph{whether to upgrade} an already-chosen one from L100 to L1000 to L10000.
-That is the shift from ``selection'' to ``budget allocation.'' We are careful to
-note that capacity (\texttt{statistics\_target}) \emph{tuning} appears
-incidentally in database-tuning practice and knob-optimization literature; what
-is missing there is a \emph{joint} treatment in which capacity and column choice
-compete for a \emph{single} storage budget, so that upgrading one statistic
-trades off against adding another. That joint resource-allocation view, with a
-provably linear objective on an empirically validated sparse regime, is our
-point of departure.
-
-\textbf{(c) Physical database design and index selection.} Budget-constrained
-structure selection is a classic problem: which indexes and materialized views
-to build, typically solved by cost-driven candidate generation plus MILP or
-greedy \cite{chaudhuri1997index,indexselection,agrawal2000automated}. Our MILP
-follows the same methodology. The novelty is twofold: our candidates carry a
-\emph{capacity} axis (an index or materialized view has no analogue of
-$\texttt{statistics\_target}$), and our objective is \emph{provably linear}
-because we exploit a \emph{discovered sparse structure} ($\S\ref{sec:rq2}$) --- a
-property index-selection workloads do not exhibit. The result is that the hard
-part of the problem is not the optimization (seconds at full scale) but the
-\emph{measurement} of the candidate space (\S\ref{sec:measure}).
-
-\textbf{(d) PostgreSQL extended statistics.} The mechanics of
-\texttt{CREATE STATISTICS} --- MCV / ndistinct / dependencies, per-object
-\texttt{statistics\_target}, the restriction to single relations, and the
-ANALYZE sampling coupling \cite{pgstats,pgmv} --- are the substrate of our
-model (\S\ref{sec:mechanisms}). To our knowledge no prior work formulates
-extended-statistics \emph{deployment} as a budgeted joint selection-and-capacity
-problem, nor provides a catalog-mask protocol to measure the candidate space at
-scale.
-
-\textbf{(e) Workload-driven database tuning.} Automated physical tuning
-\cite{indexselection}, knob/configuration optimization, and workload-aware
-index advisors share our high-level framing (workload $\to$ candidates $\to$
-optimizer evaluation $\to$ global selection). What distinguishes our accuracy
-criterion is that we optimize \emph{prediction quality under a storage budget}
-(mean q-error), not wall-clock latency or a cost-benchmark proxy. Learned
-cardinality estimators \cite{kipf2019learned} are orthogonal in the same sense:
-they \emph{change the estimator}, whereas we leave PostgreSQL's estimator
-unchanged and optimize the physical statistics supplied to it.
-
-\textbf{(f) PostgreSQL-ecosystem statistics advisors.} Production tools already
-recommend extended statistics on PostgreSQL workloads: EDB's Query Advisor
-\emph{Statistics Advisor} \cite{edbstatsadvisor} monitors multi-column filters
-and selectivity-error, explores column combinations, and weights candidates by
-benefited-query count, but limits to at most two columns and does not tune
-capacity; \texttt{pg\_qualstats} \cite{pgqualstats} collects predicate
-statistics that can surface correlated columns for manual extended-statistics
-creation. Both answer essentially \emph{which} statistics to recommend; neither
-optimizes the joint \emph{which $\times$ how much} (capacity) decision against a
-single shared storage budget, nor provides an E2E planner-interference fix.
-
-Table \ref{tab:taxonomy} situates our contribution against this lineage. The
-column that distinguishes us from every prior system is \emph{capacity tuning
-under a shared storage budget} --- treating \texttt{statistics\_target} as a
-first-class competing resource --- together with \emph{E2E planner validation}.
+Prior work on statistics configuration answers essentially \emph{which} column
+groups to build. Chaudhuri and Narasayya \cite{chaudhuri2000automating,
+chaudhuri2001automating} identify and prune a workload's needed statistics to a
+small effective set; \emph{CORDS} \cite{ilyas2004cords} and \emph{Haas et al.}
+\cite{haas2007dependencies} discover correlated column groups and rank them
+under a catalog-space budget. Production PostgreSQL advisors --- EDB's
+Statistics Advisor \cite{edbstatsadvisor} (at most two columns, no capacity
+tuning) and \texttt{pg\_qualstats} \cite{pgqualstats} --- likewise recommend
+\emph{which} statistics, not \emph{how much} capacity. The shared gap across
+this lineage is the capacity axis: none treats PostgreSQL's per-statistic
+\texttt{statistics\_target} as a competing resource dimension against a single
+shared storage budget, so none decides \emph{whether to upgrade} an
+already-chosen statistic from L100 to L1000 to L10000 (``budget allocation''
+rather than ``selection''). Budget-constrained \emph{index and view selection}
+\cite{chaudhuri1997index,indexselection,agrawal2000automated} is the closest
+methodology (cost-driven candidates, MILP/greedy), but its candidates carry no
+capacity axis and the objective is not linear. Learned cardinality estimators
+\cite{kipf2019learned} are orthogonal: they \emph{change the estimator}, whereas
+we leave PostgreSQL's estimator unchanged and optimize the physical statistics
+supplied to it, validating the outcome against the \emph{real} planner (no
+synthetic model accuracy involved) \cite{chaudhuri1998overview}. Table
+\ref{tab:taxonomy} situates our contribution against this lineage.
 
 \begin{table*}[t]
 \caption{Positioning against automatic statistics configuration. Prior work
