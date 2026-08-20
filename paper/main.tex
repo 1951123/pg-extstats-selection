@@ -1355,21 +1355,16 @@ generation to higher arity is future work.
 Extended-statistics selection should be treated as a joint \emph{which} and
 \emph{how much} decision. On the two single-table workloads we evaluate
 (stats\_CEB\_single and the wide CENSUS benchmark) we observe a sparse regime
-among the evaluated 2-/3-column MCV candidates --- one
-dominant statistic per query---which, together with capacity levels, makes the
-budget-constrained problem an exactly-linear MILP solvable in seconds at
-full-workload scale, via a catalog-mask protocol that makes per-candidate,
-per-capacity measurement feasible on wide tables. We present sparsity as an
-empirically characterized regime of these workloads, not as a universal
-property. End-to-end validation shows per-candidate
-prediction is sound and isolates the residual risk to planner cross-talk among
-co-installed overlapping statistics; we explain it as a creation-order effect
+among the evaluated 2-/3-column MCV candidates --- one dominant statistic per
+query --- which, together with capacity levels, makes the budget-constrained
+problem an exactly-linear MILP solvable in seconds at full-workload scale, via
+a catalog-mask protocol that makes per-candidate, per-capacity measurement
+feasible on wide tables. End-to-end validation shows per-candidate prediction is
+sound and isolates the residual risk to planner cross-talk among co-installed
+overlapping statistics; we explain it as a creation-order effect
 (\S\ref{sec:switch}) and restore empirically near-exact predictability either
 with a conservative global-disjointness mode or with post-selection
-planner-validation. Join-heavy workloads are the negative
-control. The result is a principled, scalable, and honestly-validated recipe
-for automating PostgreSQL extended-statistics deployment under a storage
-budget.
+planner-validation. Join-heavy workloads are the negative control.
 
 \emph{Scope.} We state precisely what we do and do not claim. Our contribution
 is not an MILP \emph{per se}, nor a claim that extended-statistics selection is
@@ -1382,10 +1377,9 @@ demonstration of where it fails); and (iii) a \emph{scalable measurement}
 protocol that turns the candidate $\times$ capacity space into data the
 optimizer can consume. Taken together --- not any single one --- these make
 capacity-aware extended-statistics selection \emph{optimizable and
-deployable} on the workloads we evaluate. We do not claim to solve the general
-(Boolean-multi-select, arbitrary-statistic-kind, join-dominated) version of the
-problem; those regimes are explicitly out of scope and are the stated boundary
-of this work.
+deployable} on the workloads we evaluate; the general (Boolean-multi-select,
+arbitrary-statistic-kind, join-dominated) version of the problem is explicitly
+out of scope.
 
 \begin{acks}
 \emph{Acknowledgements.} (to be completed)
