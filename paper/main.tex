@@ -1024,7 +1024,8 @@ greedy picks the wrong columns, but because the problem has a capacity-allocatio
 trade-off under tight budgets.
 
 \subsubsection{Against \emph{stronger} greedy baselines.}
-A reviewer may object that the greedy in Table \ref{tab:greedy} is too naive. We
+The greedy in Table \ref{tab:greedy} is a single-pass, per-query rule; a natural
+question is whether stronger, budget-aware heuristics change the picture. We
 therefore compare the MILP against three progressively stronger greedy
 baselines, all capacity-aware (they may choose L100/L1000/L10000):
 \textbf{G1} per-query best improvement-per-byte (Table \ref{tab:greedy}'s
