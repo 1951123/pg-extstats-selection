@@ -663,20 +663,16 @@ than a hidden win ($\S\ref{sec:disc}$). We measure at the highest-capacity setti
 near-exact, and report 1000 as the default operating point. We organize
 the results around six research questions.
 
-Before reporting them, one point about \emph{why these workloads, and the
-error metric, matter}. A reader might note that the \emph{mean} q-error on
-stats\_CEB\_single is only $\approx$1.1 and wonder whether we are solving a
-marginal problem. We are not, for a distributional reason: q-error is
-\emph{multiplicative}, so its cost concentrates in the worst estimates --- a
-query wrong by a factor of 10 or 1000 (not 10\%) is what makes the optimizer
-pick a categorically wrong plan. The two primary workloads span this spectrum
-(Table \ref{tab:bench}): on \texttt{CENSUS}, 22\% of the 468 queries have
-baseline q-error $>2$, 5.8\% have $>10$, and the worst is $4{,}172$; on
-\texttt{stats\_CEB\_single}, 5.1\% exceed q-error 2 and the tail reaches 4.7.
-The mean improvement ($1.095\to1.016$) looks small precisely \emph{because}
-most queries are already near q-error 1; the method's real value is that it
-targets and clears exactly that tail under a budget. Reporting the mean alone
-hides this, which is why we always report median/P90/max alongside it.
+The \emph{mean} q-error on stats\_CEB\_single is only $\approx$1.1 --- but this
+is not a marginal problem. q-error is \emph{multiplicative}, so its cost
+concentrates in the worst estimates: a query wrong by a factor of 10 or 1000
+(not 10\%) is what makes the optimizer pick a categorically wrong plan. The two
+primary workloads span this spectrum (Table \ref{tab:bench}): on
+\texttt{CENSUS}, 22\% of queries have baseline q-error $>2$ (worst $4{,}172$);
+on \texttt{stats\_CEB\_single}, 5.1\% exceed q-error 2 (tail 4.7). The mean
+improvement ($1.095\to1.016$) looks small only \emph{because} most queries are
+already near q-error 1; the method's value is that it targets and clears that
+tail. Hence we report median/P90/max alongside the mean.
 
 \begin{table*}[t]
 \caption{Workload characteristics and candidate distribution.
