@@ -1901,6 +1901,22 @@ control. The result is a principled, scalable, and honestly-validated recipe
 for automating PostgreSQL extended-statistics deployment under a storage
 budget.
 
+\emph{Scope.} We state precisely what we do and do not claim. Our contribution
+is not an MILP \emph{per se}, nor a claim that extended-statistics selection is
+inherently sparse. It is the combination of three scoped findings: (i) a
+\emph{capacity-aware} reformulation --- the ``what $\times$ how much'' budget
+allocation across \texttt{statistics\_target} --- which is new and independent
+of sparsity; (ii) a \emph{measurable sparse regime}, characterized empirically
+on the two evaluated single-table workloads (with an explicit, synthetic
+demonstration of where it fails); and (iii) a \emph{scalable measurement}
+protocol that turns the candidate $\times$ capacity space into data the
+optimizer can consume. Taken together --- not any single one --- these make
+capacity-aware extended-statistics selection \emph{optimizable and
+deployable} on the workloads we evaluate. We do not claim to solve the general
+(Boolean-multi-select, arbitrary-statistic-kind, join-dominated) version of the
+problem; those regimes are explicitly out of scope and are the stated boundary
+of this work.
+
 \begin{acks}
 \emph{Acknowledgements.} (to be completed)
 \end{acks}
