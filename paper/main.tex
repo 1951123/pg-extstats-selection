@@ -793,28 +793,9 @@ against the \emph{true} multi-select optimum --- i.e.\ an arbitrary subset, not
 just top-$k$. For every query with few candidates we settle this exactly: we
 enumerate \emph{all} non-empty subsets of its candidates (173 queries, up to 10
 candidates each, 18{,}177 subsets in total) and measure each subset's real joint
-q-error (mask protocol, keep-only-that-subset). Table \ref{tab:exh} reports the
-best single vs.\ the best \emph{arbitrary} subset.
+q-error (mask protocol, keep-only-that-subset).
 
-\begin{table}[t]
-\caption{Exhaustive subset enumeration (mask protocol, $\le$\,10 candidates):
-the best \emph{single} statistic essentially matches the best \emph{arbitrary}
-subset for every query. ``Gap'' is the absolute joint-q-error difference
-(best exhaustive $\;-\;$ best single).}
-\label{tab:exh}
-\small
-\begin{tabular}{lcccc}
-\toprule
-candidate & \#queries & best single & best subset & gap\\
-\midrule
-$\;1$ & 111 & 1.000--1.150 & 1.000--1.150 & $0$\\
-$\;4$ & 45  & 1.000--1.158 & 1.000--1.158 & $0$\\
-$10$ & 17  & 1.000--1.138 & 1.000--1.138 & $-0.0011$\\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Across all 18{,}177 enumerated subsets of the 173 queries, the best arbitrary
+Across all 18{,}177 enumerated subsets, the best arbitrary
 subset never beats the best single statistic by more than $0.0011$ of absolute
 joint q-error ($170/173$ exactly equal; the remaining three, e.g.\ \texttt{st.26}
 with baseline 2.19, differ in the third decimal). This includes the hard
@@ -1263,34 +1244,8 @@ The two deployments above are suggestive but few. We therefore run a
 \emph{systematic} sweep: on the real \texttt{posts} table we deploy 5 singletons
 plus the whole-workload budgeted MILP at four budgets (10/40/100/250\,KB),
 each solved both \emph{with} global disjointness and \emph{without}, and measure
-E2E for every query a deployment touches. Table \ref{tab:e2ecount} and
-Fig.~\ref{fig:e2epredict} summarize 149 disjoint and 197 overlapping
-query-deployment points.
-
-\begin{table}[t]
-\caption{Systematic E2E: mean measured/predicted q-error ratio per deployment.
-Disjoint deployments (singletons and global-disjoint MILP) reproduce their
-predictions to within $1.001$ at every budget; overlapping deployments
-uniformly exceed theirs (up to $1.099$), and the excess shrinks as the budget
-buys more breadth.}
-\label{tab:e2ecount}
-\small
-\begin{tabular}{lclr}
-\toprule
-deployment & kind & stats & mean ratio\\
-\midrule
-singleton $\times 5$        & single & 1 & 1.000\\
-disjoint @10\,KB            & disjoint & 4 & 1.000\\
-disjoint @40\,KB            & disjoint & 3 & 1.000\\
-disjoint @100\,KB           & disjoint & 5 & 1.000\\
-disjoint @250\,KB           & disjoint & 6 & 1.001\\
-overlap @10\,KB             & overlap & 5  & \textbf{1.099}\\
-overlap @40\,KB             & overlap & 11 & 1.069\\
-overlap @100\,KB            & overlap & 17 & 1.042\\
-overlap @250\,KB            & overlap & 14 & 1.022\\
-\bottomrule
-\end{tabular}
-\end{table}
+E2E for every query a deployment touches. Fig.~\ref{fig:e2epredict} summarizes
+149 disjoint and 197 overlapping query-deployment points.
 
 \begin{figure}[t]
 \centering
@@ -1304,12 +1259,11 @@ Overlapping points scatter above it --- 197 points, mean ratio 1.053, worst
 \end{figure}
 
 The sweep confirms the Stage-2/3 finding is \emph{not} an artefact of a
-hand-picked deployment. Every disjoint point is essentially on the diagonal:
-across 149 disjoint query-deployment points the mean ratio is $1.0001$ and the
-single worst is $1.009$. In contrast the overlapping points are uniformly
-above the diagonal (mean $1.053$, worst $2.05$), and the excess is largest
+hand-picked deployment: disjoint deployments reproduce their predictions to
+within $1.001$ at every budget (mean $1.0001$, worst $1.009$ across 149
+points), while overlapping deployments uniformly exceed theirs --- largest
 under the tightest budget ($1.099$ at 10\,KB, where overlap is densest) and
-shrinks as the budget buys more breadth ($1.022$ at 250\,KB). This is exactly
+shrinking as the budget buys more breadth ($1.022$ at 250\,KB). This is exactly
 what a per-candidate measurement model predicts: individual statistics are
 faithful, and the residual error is a joint effect of co-installed overlapping
 statistics that disjointness removes --- and removes \emph{generally}, not just
