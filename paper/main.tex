@@ -132,7 +132,9 @@ dimension under a shared storage budget (\S\ref{sec:back}).
 
 \emph{Running example.} Consider a query filtering
 \texttt{posts(AnswerCount,}\allowbreak\texttt{ViewCount)}. A statistic over
-this combination can be stored at L100, L1000, or L10000. Measured on our
+this combination can be stored at L100, L1000, or L10000 (we treat
+$\{100,1000,10000\}$ as the \emph{evaluated capacity menu}, not the complete
+target space; finer-grained targets are future work, \S\ref{sec:disc}). Measured on our
 workload, L100 is too
 coarse to capture the correlation (q-error stays $\sim$4.7), while L10000
 drives it to $\approx$1.0. How much capacity is enough is therefore itself a
@@ -666,6 +668,31 @@ the server via \texttt{UPDATE ... FROM}), it is specific to PostgreSQL 16; we
 have not verified it against other major versions. These are honest limits of
 the implementation, not of the model.
 
+We state Protocol-M's scope explicitly (Table \ref{tab:po_scope}): it is an
+efficient \emph{PostgreSQL-16} implementation of isolated candidate measurement
+for \emph{MCV} statistics, not a portable protocol. The planner-order
+observation (\S\ref{sec:switch}) is likewise version-dependent and should be
+rechecked on other major versions.
+
+\begin{table}[t]
+\caption{Protocol-M scope. We validate the masking mechanism for MCV on
+PostgreSQL 16; \texttt{ndistinct} and \texttt{dependencies} masking is
+untested, and both the catalog layout and the planner's OID-order statistic
+selection are version-dependent.}
+\label{tab:po_scope}
+\small
+\begin{tabular}{lcc}
+\toprule
+component & PostgreSQL 16 & other versions\\
+\midrule
+MCV masking        & validated & untested\\
+ndistinct masking  & not evaluated & future\\
+dependencies masking & not evaluated & future\\
+planner OID-order selection & observed & version-dependent\\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{Sampling Determinism vs.\ Statistics Target}
 \label{sec:measure-determinism}
 
@@ -1015,6 +1042,47 @@ and \texttt{st.588} (4.49), where the exhaustive optimum equals the singleton.
 So even against the true, unconstrained multi-select optimum, the sparse
 restriction to one statistic per query loses essentially nothing on these
 workloads.
+
+\subsubsection{Candidate-width sensitivity.}
+A reviewer-driven check is whether the 2/3-column candidate restriction itself
+manufactures sparsity. We relax the width on the hardest CENSUS queries (where
+2/3-column candidates leave the largest residual) and re-measure the best
+single-candidate q-error with 4- and 5-column MCVs admitted (mask protocol,
+identical to \S\ref{sec:measure}). Table \ref{tab:width} reports the result.
+
+\begin{table}[t]
+\caption{Candidate-width sensitivity on hard CENSUS queries (mask-measured best
+\emph{single} candidate q-error). Allowing 4-/5-column MCVs lowers q-error
+materially, so the 2/3-column scope understates achievable repair --- but the
+optimum is still a \emph{single} statistic per query. Candidate width is a
+stated limitation, not a threat to one-stat-per-query sparsity.}
+\label{tab:width}
+\small
+\begin{tabular}{lcccc}
+\toprule
+query & baseline & 2/3-col & +4-col & +5-col\\
+\midrule
+query.62  & 2\,069 & 1.406 & 1.154 & 1.023\\
+query.295 & 287    & 1.099 & 1.044 & 1.014\\
+query.382 & 378    & 1.119 & 1.038 & 1.020\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two observations. First, \emph{sparsity is robust to width}: in every case the
+best solution is still a \emph{single} statistic (query.62's best at 5 columns
+is one 5-column MCV), never a combination ---
+so the one-statistic-per-query structure that makes the objective linear
+survives width relaxation. Second, \emph{the 2/3-column scope is a real
+limitation}: on hard queries where 3 columns leave residual error, a single
+4- or 5-column MCV captures more correlation (query.62: $1.406\to1.023$). This
+does not invalidate the allocation model --- the sparse MILP is agnostic to how
+columns are grouped into candidates --- but it means our \emph{candidate
+family} (and hence the reported achievable quality) is an underestimate on
+such queries; extending candidate generation to higher arity is the natural
+next step. On the evaluated single-table workloads over \texttt{posts}, the
+2/3-column candidates already reach $\approx$1.0 everywhere (Table
+\ref{tab:multi}), so the width effect is confined to the harder CENSUS tail.
 
 \subsubsection{Stress test: where sparsity fails.}
 The sparse regime is not a universal property --- so it deserves a controlled
@@ -1760,7 +1828,11 @@ identifying workloads with multiple independent correlated clusters (the regime
 where the multi-select model is needed) is the most important open question.
 (5) \emph{Limits}: we consider MCV statistics on
 single-table workloads; join workloads need other techniques, and the real
-system has a limit on the number of statistics per relation.
+system has a limit on the number of statistics per relation. Our candidate
+family is restricted to 2-/3-column subsets, and \S\ref{sec:rq2} shows this
+scope -- while preserving one-stat-per-query sparsity -- understates the
+achievable quality on harder CENSUS queries, where 4-/5-column candidates
+help; extending candidate generation to higher arity is future work.
 
 \section{Conclusion}
 \label{sec:concl}
