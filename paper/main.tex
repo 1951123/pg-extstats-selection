@@ -406,27 +406,18 @@ subject to a global budget.
 
 \subsection{Variables and Objective}
 
-Before defining the program, we make explicit the \emph{role} of the model's
-variables, because a natural question is whether the system can
-really dictate which statistic a query uses. It cannot: PostgreSQL's planner,
-not the optimizer, decides at plan time which installed extended statistic
-applies to a query. We therefore treat the MILP as an \emph{upper-level
-deployment optimization} over a \emph{singleton-effect surrogate model}. The
-assignment $x_{is}$ is a \emph{model} variable, not a plan directive: it states
-that \emph{if} the surrogate is faithful, query $i$'s error under the deployed
-set is $e_{is}$ for the level at which $s$ is created ($\S\ref{sec:sparse}$).
-The surrogate is exact when each query's best statistic can be isolated ---
-which is what the one-statistic-per-query regime guarantees. The end-to-end
-validation (\S\ref{sec:e2e}) is precisely the experiment that checks whether the
-surrogate assignment remains faithful after the real planner performs its own
-selection; \S\ref{sec:p1} shows it does under pairwise disjointness and does
-not under overlapping co-installation.
+The MILP does not dictate planner behavior: PostgreSQL's planner, not the
+optimizer, chooses which installed statistic applies at plan time. The
+assignment $x_{is}$ is therefore a \emph{surrogate} model variable --- it
+states \emph{if} the surrogate is faithful, query $i$'s error under the
+deployed set is $e_{is}$ for the level at which $s$ is created
+(\S\ref{sec:sparse}); the E2E validation (\S\ref{sec:e2e}) is precisely the
+experiment that checks whether this surrogate assignment predicts the deployed
+planner.
 
-We solve the sparse model as a mixed-integer linear program. Binary variables
-are $y_s$ (create physical statistic $s$) and $x_{is}$ (query $i$ uses $s$
-in the surrogate model).
-By Prop.~\ref{prop:linear}, minimizing mean q-error is equivalent to
-maximizing total improvement,
+Binary variables are $y_s$ (create physical statistic $s$) and $x_{is}$ (query
+$i$ uses $s$ in the surrogate). By Prop.~\ref{prop:linear}, minimizing mean
+q-error is equivalent to maximizing total improvement,
 \[
   \max \sum_{i,s}\underbrace{\big(e_i^0-e_{is}\big)}_{\Delta_{is}\ge 0}x_{is},
 \]
@@ -438,17 +429,14 @@ advance.
 The MILP enforces: (1) the storage budget $\sum_s c_s y_s\le C$; (2) a statistic
 must exist to be used, $x_{is}\le y_s$ (shared across queries); (3) sparse
 per-query cap $\sum_s x_{is}\le 1$; and (4) capacity-level exclusivity
-$\sum_{\ell} y_{(cols,\ell)}\le 1$ --- a real object has a single
-\texttt{statistics\_target}, so at most one level of a given combination is
-created. A fifth constraint enforces \emph{global disjointness}: $y_a+y_b\le 1$
-whenever the column sets of $a$ and $b$ overlap. This is stronger than (4)
-(which only forbids two levels of the \emph{same} combination). We call the
-model with constraint (5) the \emph{deployment-valid} model: it guarantees the
-deployed set is pairwise column-disjoint, so the planner cannot cross-talk among
-co-installed overlapping MCVs and the surrogate's per-candidate predictions
-remain composable after deployment (\S\ref{sec:p1}). The model without (5)
-(overlap allowed) optimizes the surrogate more aggressively but may require
-post-selection validation (Option B, \S\ref{sec:disc-fix}).
+$\sum_{\ell} y_{(cols,\ell)}\le 1$ (one level per column-combination). A fifth,
+optional constraint enforces \emph{global disjointness}: $y_a+y_b\le 1$ when
+the column sets of $a,b$ overlap. We evaluate two deployment variants: the model
+\emph{with} (5) --- the \emph{deployment-valid} model, whose pairwise
+column-disjoint set lets the planner's per-candidate predictions compose after
+deployment (\S\ref{sec:p1}) --- and the model \emph{without} it (overlap
+allowed, which optimizes the surrogate more aggressively but may require
+post-selection validation; Option B, \S\ref{sec:disc-fix}).
 
 \subsection{Pruning and Solve Scalability}
 \label{sec:scale}
@@ -602,94 +590,29 @@ the server via \texttt{UPDATE ... FROM}), it is specific to PostgreSQL 16; we
 have not verified it against other major versions. These are honest limits of
 the implementation, not of the model.
 
-We state Protocol-M's scope explicitly (Table \ref{tab:po_scope}): it is an
-efficient \emph{PostgreSQL-16} implementation of isolated candidate measurement
-for \emph{MCV} statistics, not a portable protocol. The planner-order
-observation (\S\ref{sec:switch}) is likewise version-dependent and should be
-rechecked on other major versions.
-
-\begin{table}[t]
-\caption{Protocol-M scope. We validate the masking mechanism for MCV on
-PostgreSQL 16; \texttt{ndistinct} and \texttt{dependencies} masking is
-untested, and both the catalog layout and the planner's OID-order statistic
-selection are version-dependent.}
-\label{tab:po_scope}
-\small
-\begin{tabular}{lcc}
-\toprule
-component & PostgreSQL 16 & other versions\\
-\midrule
-MCV masking        & validated & untested\\
-ndistinct masking  & not evaluated & future\\
-dependencies masking & not evaluated & future\\
-planner OID-order selection & observed & version-dependent\\
-\bottomrule
-\end{tabular}
-\end{table}
+Protocol-M's scope is explicit: it is an efficient \emph{PostgreSQL-16}
+implementation of isolated candidate measurement for \emph{MCV} statistics
+--- \texttt{ndistinct} and \texttt{dependencies} masking is untested, and both
+the catalog layout and the planner's OID-order selection
+(\S\ref{sec:switch}) are version-dependent --- not a portable protocol.
 
 \subsection{Sampling Determinism vs.\ Statistics Target}
 \label{sec:measure-determinism}
 
-A cardinality estimate is only as trustworthy as the statistics it comes from,
-and \texttt{ANALYZE} is sampling-based, so a natural worry is that repeated
-\emph{runs} of the same measurement drift. Empirically the picture is stark and
-systematic: determinism is a step function of \texttt{statistics\_target}, not
-a smooth improvement. Table \ref{tab:targetdeter} repeats each measurement six
-times (a fresh \texttt{ANALYZE} each time) at three targets, both with no
-extended statistics and with one installed MCV, reporting the coefficient of
-variation of the estimated row count.
-
-\begin{table}[t]
-\caption{Measurement determinism vs.\ \texttt{statistics\_target} on
-\texttt{posts}: coefficient of variation of the estimated row count across 6
-fresh \texttt{ANALYZE}s (upper: no extended stats; lower: one MCV on
-AnswerCount/FavoriteCount/ViewCount). ``n'' is the mean estimate; ``CV'' the
-run-to-run coefficient of variation. At target\,100 measurement is noisy, while
-at 1000 and 10000 it is \emph{exactly} deterministic (CV\,$0$). Target also
-sets accuracy, not just determinism: the MCV estimate of st.144 rises from
-4{,}405 (target\,1000) to 11{,}894 (target\,10000).}
-\label{tab:targetdeter}
-\footnotesize
-\begin{tabular}{lcrrr}
-\toprule
- & & \multicolumn{3}{c}{query $|$ CV (est.)}\\
-\cmidrule(lr){3-5}
-target & stats & st.144 & st.326 & st.308\\
-\midrule
-100  & none & 1.35\% (2683) & 1.31\% (2829) & 0.97\% (8851)\\
-1000 & none & 0.00\% (2695) & 0.00\% (2834) & 0.00\% (8926)\\
-10000& none & 0.00\% (2695) & 0.00\% (2834) & 0.00\% (8926)\\
-\midrule
-100  & 1 MCV & 2.16\% (2692) & 1.97\% (2836) & 1.84\% (12507)\\
-1000 & 1 MCV & 0.00\% (4405) & 0.00\% (4607) & 0.00\% (16005)\\
-10000& 1 MCV & 0.00\% (11894)& 0.00\% (12521)& 0.00\% (19241)\\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Two observations. First, \emph{determinism is exact above a threshold}: at
-target\,1000 and 10000 the estimated row count is identical across all six
-\emph{runs} (CV\,$0.00\%$) for every query we tested --- PostgreSQL's
-hash-bucketed \texttt{ANALYZE} converges to a fixed histogram/MCV once the
-sample is large enough, so repeated measurement is not merely ``close'' but
-byte-for-byte reproducible. By contrast target\,100 is under-sampled: the same
-queries show CV\,$1$--$2\%$ run-to-run scatter. Second, target
-simultaneously drives \emph{accuracy}, not just determinism --- this is the
-capacity axis, not a stability artifact: the single-MCV estimate of st.144
-jumps from 4{,}405 (target\,1000) to 11{,}894 (target\,10000), i.e.\ to the
-correct $\approx$12{,}391, because a larger MCV captures the low-cardinality
-selectivity region the query needs (see RQ1).
-
-A related failure mode motivates measuring at high capacity at all: at low
-\texttt{statistics\_target}, MCV statistics over high-cardinality column
-combinations can be built \emph{empty} (a \texttt{NULL} payload), so they make
-no contribution. Combined with the run-to-run noise, this makes
-target\,100 an unreliable default for comparing candidates --- which is why our
-measurements and the phase-1 deterministic protocol (\S\ref{sec:measure}) use
-target\,10000 (and sometimes 1000 for cross-checks), where measurement is exactly
-reproducible and only accuracy varies with capacity. This is the empirical
-justification, independent of the cost model, for treating capacity levels as
-the deterministic inputs the MILP consumes.
+Because \texttt{ANALYZE} is sampling-based, we verify that repeated
+\emph{runs} do not drift. Across six fresh \texttt{ANALYZE}s at three targets,
+determinism is a \emph{step function} of \texttt{statistics\_target}: at
+target\,100 the estimated row count shows $1$--$2\%$ run-to-run coefficient of
+variation, while at target\,1000 and 10000 it is \emph{exactly} deterministic
+(CV $0$; PostgreSQL's hash-bucketed \texttt{ANALYZE} converges to a fixed
+histogram/MCV once the sample is large enough). Target also sets \emph{accuracy},
+not just determinism --- the single-MCV estimate of st.144 rises from 4{,}405
+(target\,1000) to 11{,}894 (target\,10000), i.e.\ to the correct $\approx$12{,}391.
+A related failure mode at low target is that MCVs over high-cardinality column
+combinations can be built \emph{empty} (a \texttt{NULL} payload), contributing
+nothing. This is why our measurements use target\,10000 (and sometimes 1000 for
+cross-checks), where measurement is exactly reproducible and only accuracy
+varies with capacity.
 
 \subsection{Runtime: Measurement Is the Bottleneck, Not the Solve}
 \label{sec:measure-runtime}
@@ -1048,61 +971,24 @@ next step. On the evaluated single-table workloads over \texttt{posts}, the
 \ref{tab:multi}), so the width effect is confined to the harder CENSUS tail.
 
 \subsubsection{Step 4: a controlled many-cluster stress test --- where sparsity fails.}
-The sparse regime is not a universal property --- so it deserves a controlled
-\emph{failure test}. We build a synthetic table (100K rows) with \emph{two
-independent, perfectly-correlated column clusters}, $A{=}\{a_1,a_2,a_3\}$ and
-$B{=}\{b_1,b_2,b_3\}$ (each cluster's columns are equal-valued; the two
-clusters are mutually independent), plus an independent filler column $x$.
-Candidates are again the 2/3-column subsets. Table \ref{tab:stress} reports the
-joint q-error of the best $k{=}1,2,3$ non-overlapping candidates per query.
-
-\begin{table}[t]
-\caption{Multi-select stress test. A single \emph{dominant} cluster is
-fully repaired by top-1 (sparsity holds); a query driven by \emph{two
-independent} clusters needs top-2 --- top-1 leaves the second cluster's error
-at q-error 100, and only the second statistic repairs it (sparsity fails).}
-\label{tab:stress}
-\small
-\begin{tabular}{lcccc}
-\toprule
-query type & base & top-1 & top-2 & top-3\\
-\midrule
-single cluster A       & 100  & 1.00 & 1.00 & 1.00\\
-single cluster A+filler& 100  & 1.00 & 1.00 & 1.00\\
-single cluster B       & 100  & 1.00 & 1.00 & 1.00\\
-two independent clusters & 1000 & 100 & \textbf{1.00} & \textbf{1.00}\\
-two clusters + filler  & 100  & 100 & \textbf{1.00} & \textbf{1.00}\\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The contrast is sharp and matches the mechanistic hypothesis
-(\S\ref{sec:disc-sparsity}). For single-cluster queries, one dominant 3-column
-MCV captures the whole error and adding a second statistic changes nothing
-(top-1 $=$ top-2 $=$ top-3 $=1.00$). For the two-cluster query, the best
-\emph{single} statistic repairs only one cluster and the other is left to the
-independence assumption, so top-1 is still q-error 100; deploying \emph{both}
-cluster statistics (top-2) collapses it to 1.00. This is exactly the regime we
-flagged as the boundary of our claim in \S\ref{sec:formulation}: sparsity holds
-when a query's error is dominated by \emph{one} correlated cluster and fails
-when it is driven by \emph{several independent} ones --- in which case the
-multi-select model (\S\ref{sec:multi}) is required.
-
-\subsubsection{How sparsity decays with the number of clusters.}
-The two-cluster result is not a knife-edge: sparsity degrades smoothly as a
-query is driven by more independent clusters. We sweep the number of
-\emph{mutually independent} perfectly-correlated clusters $K=1,2,3,4$ (a query
-filters on all $K$ clusters), and report the top-1 vs.\ top-$K$ coverage ratio
+The sparse regime is not universal, so we build a controlled \emph{failure
+test} matching the mechanistic hypothesis (\S\ref{sec:disc-sparsity}): on a
+synthetic table we vary the number $K$ of \emph{mutually independent},
+perfectly-correlated column clusters a query filters on, and measure the
+top-1 vs.\ top-$K$ coverage ratio
 \[
   \operatorname{cov}_K = \frac{e^0 - e(\{s_1\})}{e^0 - e(\{s_1,\dots,s_K\})},
 \]
-i.e.\ the fraction of the best $K$-statistic improvement the \emph{single}
-best statistic captures (equal to 1 = sparsity holds perfectly).
-Table \ref{tab:sweep} shows it is $1.000$ at $K{=}1$, drops to $0.90$ at
-$K{=}2$, and collapses to $\approx 0$ once three or more independent clusters
-coexist --- exactly the monotone failure regime the mechanistic hypothesis
-(\S\ref{sec:disc-sparsity}) predicts, and the regime where the multi-select
-model is needed.
+the fraction of the best $K$-statistic improvement a \emph{single} best
+statistic captures. For $K{=}1$ one 3-column MCV captures the whole error and
+adding a second statistic changes nothing (top-1 $=$ top-$K$ $=1.00$). For
+$K{=}2$ the best single statistic repairs only \emph{one} cluster (top-1 is
+still q-error 100) and only deploying \emph{both} collapses it to 1.00.
+Consequently sparsity holds exactly only for $K{=}1$ and
+\emph{decays} with $K$ (Table \ref{tab:sweep}): $\operatorname{cov}_K$ is
+$1.000$ at $K{=}1$, drops to $0.90$ at $K{=}2$, and collapses to $\approx 0$
+once three or more independent clusters coexist --- exactly the monotone
+failure regime where the multi-select model (\S\ref{sec:multi}) is required.
 
 \begin{table}[t]
 \caption{Controlled sparsity decay. As a query is driven by $K$ mutually
@@ -1123,74 +1009,36 @@ $K$ clusters & base & top-1 & top-$K$ & $\operatorname{cov}_K$\\
 \end{tabular}
 \end{table}
 
-This characterization turns ``why sparsity?'' from a hypothesis into a
-measured, parameterized statement: single-table queries are sparse because
-their error is typically concentrated in \emph{one} correlated cluster, and the
-regime inverts cleanly (and predictably) once several independent clusters
-drive the same query.
+This parameterized decay turns ``why sparsity?'' into a measured statement:
+single-table queries lie in the $K{=}1$ regime because their error is
+concentrated in one correlated cluster, and the regime inverts predictably once
+several independent clusters drive the same query.
 
 \subsection{RQ3: Does the MILP Beat a Budgeted Greedy?}
 \label{sec:rq3}
 
-We are careful here, and distinguish two greedy baselines. With a
-\emph{generous} budget, the per-query-best greedy \emph{union} (ignoring the
-budget) already equals the MILP solution (same 5 statistics, mean 1.021) --- on
-a workload of independent single-table queries, greedy is already near-optimal
-when nothing constrains it. The interesting question is under \emph{tight}
-budgets, where a greedy that must stay within budget spends it on many cheap
-statistics and cannot reallocate \emph{capacity}. Table \ref{tab:greedy} compares
-the MILP against a budget-respecting greedy (each query's highest
-improvement-per-byte statistic, within budget): the MILP wins at every budget,
-and the gap is largest exactly when the budget is tightest (an absolute q-error
-difference of 0.047, i.e.\ $\sim$4.7\% relative, at 5 KB, shrinking to 0.008,
-i.e.\ $\sim$0.8\%, at 100 KB).
-
-\begin{table}[t]
-\caption{Budgeted greedy vs.\ MILP on the 632-query stats\_CEB\_single workload.
-The MILP's advantage is largest under tight budgets --- where it reallocates
-capacity rather than merely dropping coverage.}
-\label{tab:greedy}
-\small
-\begin{tabular}{lccr}
-\toprule
-budget & MILP & greedy (budgeted) & MILP advantage ($\Delta$q)\\
-\midrule
-5 KB    & 1.0327 & 1.0798 & 0.047\\
-10 KB   & 1.0264 & 1.0704 & 0.044\\
-20 KB   & 1.0237 & 1.0553 & 0.032\\
-40 KB   & 1.0188 & 1.0376 & 0.019\\
-100 KB  & 1.0156 & 1.0238 & 0.008\\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Qualitatively, the MILP's edge comes from capacity allocation: it spends the
-budget upgrading already-chosen combinations to a higher target rather than
-adding many under-powered ones (e.g.\ at 100 KB the MILP builds 17 statistics,
-greedy builds 40, yet MILP is better). This is precisely the ``what and how
-much'' resource-allocation view of \S\ref{sec:intro}: MILP is needed not because
-greedy picks the wrong columns, but because the problem has a capacity-allocation
-trade-off under tight budgets.
-
-\subsubsection{Against \emph{stronger} greedy baselines.}
-The greedy in Table \ref{tab:greedy} is a single-pass, per-query rule; a natural
-question is whether stronger, budget-aware heuristics change the picture. We
-therefore compare the MILP against three progressively stronger greedy
-baselines, all capacity-aware (they may choose L100/L1000/L10000):
-\textbf{G1} per-query best improvement-per-byte (Table \ref{tab:greedy}'s
-greedy); \textbf{G2} a \emph{marginal} shared-resource greedy that re-picks the
-statistic with the highest total improvement-per-byte across still-unserved
-queries after every selection; and \textbf{G3} an \emph{add-or-upgrade} greedy
-that, in addition to G2, may \emph{raise} an already-deployed combination's
-capacity level (paying only the price delta) --- the strongest of the three.
-Table \ref{tab:greedy2} reports the MILP against the \emph{best} of the three at
-each budget.
+With a \emph{generous} budget the per-query-best greedy \emph{union} (ignoring
+the budget) already equals the MILP solution (same 5 statistics, mean 1.021) ---
+on independent single-table queries greedy is near-optimal when unconstrained.
+The interesting question is under \emph{tight} budgets, where a greedy that
+stays within budget spends it on many cheap statistics and cannot reallocate
+\emph{capacity}. We compare the MILP against three progressively stronger
+budget-aware greedy baselines, all capacity-aware (they may choose
+L100/L1000/L10000): \textbf{G1} per-query best improvement-per-byte; \textbf{G2}
+a \emph{marginal} shared-resource greedy that re-picks the statistic with the
+highest total improvement-per-byte across still-unserved queries after every
+selection; and \textbf{G3} an \emph{add-or-upgrade} greedy that additionally
+\emph{raises} an already-deployed combination's capacity level (paying only the
+price delta). Table \ref{tab:greedy2} reports the MILP against the \emph{best}
+of the three at each budget (G1 is the best in all but the most generous case,
+so the simpler greedy is not a strawman).
 
 \begin{table}[t]
 \caption{MILP vs.\ the strongest greedy baseline (best of per-query benefit/byte
 G1, marginal G2, and add-or-upgrade G3) on the 632-query workload. Even this
 strong adversary loses at every budget; the advantage is largest under tight
-budgets. ``best-is'' names the winning greedy.}
+budgets and re-appears at 250\,KB where only the MILP can reallocate capacity.
+``best-is'' names the winning greedy.}
 \label{tab:greedy2}
 \small
 \begin{tabular}{lcccl}
@@ -1208,18 +1056,16 @@ budget & MILP & best greedy & MILP adv ($\Delta$q) & best-is\\
 \end{tabular}
 \end{table}
 
-Two observations. First, the MILP beats even the \emph{strongest} greedy at
-every budget --- sophistication in the greedy (marginal re-evaluation, explicit
-upgrades) does not make it competitive, because greedy still cannot globally
-reallocate the shared capacity budget. Second, the advantage never disappears:
-under tight budgets (5 KB) it is 0.047, and --- notably --- it \emph{grows again}
-at 250 KB (0.020) because the best greedy saturates: once G1/G2 have spent their
-budget on cheap L100 coverage they cannot spend remaining budget on \emph{capacity}
-upgrades, whereas the MILP drives the mean from 1.0156 to 1.0040. Only at the
-generous 500 KB budget does the add-or-upgrade greedy (G2/G3) close some of the
-gap (1.0096, and G3 alone performs 4 upgrades), confirming that capacity
-allocation is the specific capability greedy lacks --- the same conclusion as
-\S\ref{sec:rq3} and Table \ref{tab:whathowmuch}.
+The MILP wins at every budget, and its edge never disappears: it is largest
+under tight budgets (0.047 at 5\,KB) and --- notably --- \emph{grows again} at
+250\,KB (0.020) because the best greedy saturates: once G1/G2 have spent their
+budget on cheap L100 coverage they cannot spend the remainder on
+\emph{capacity} upgrades, whereas the MILP drives the mean from 1.0156 to
+1.0040. Only at the generous 500\,KB budget does the add-or-upgrade greedy
+close some of the gap (1.0096, G3 doing 4 upgrades), confirming that capacity
+allocation is the specific capability greedy lacks --- not a failure of greedy
+column choice but of global \emph{budget reallocation} (capacity is the ``how
+much'' axis; \S\ref{sec:rq3}, Table \ref{tab:whathowmuch}).
 
 On the full 632-query workload (Fig.~\ref{fig:budgetquality}), the budget is
 visibly spent on capacity: the number of high-capacity selections grows with
@@ -1242,28 +1088,6 @@ collapse, e.g.\ a 4162 $\to$ 1.4 maximum.
 632-query stats\_CEB\_single workload. Mean, median and P90 all decrease; the
 level mix shows budget spent on capacity (L100/L1000/L10000), not just coverage.}
 \label{fig:budgetquality}
-\end{figure}
-
-Fig.~\ref{fig:upgradevsadd} makes the underlying economic decision explicit on
-three served queries: for each, ``A'' is the query's dominant statistic at
-L100/L1000/L10000 (the \emph{upgrade} path of the same columns) and ``B'' a
-competing overlapping candidate at the same three levels (the \emph{add a new
-one} alternative). Upgrading A dominates adding B: A reaches a lower q-error,
-often at a \emph{smaller} size than B ever reaches (e.g.\ st.308 reaches q$=$1.21
-at 11.7\,KB by upgrading A, versus q$=$2.14 at 87.6\,KB by adding B). The
-per-candidate surrogate therefore rationally spends a marginal budget slice
-upgrading the dominant statistic rather than paying for a new one --- the
-``how much'' dimension beating ``what'' on the frontier.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/upgrade_vs_add}
-\caption{Upgrade vs.\ add on three representative served queries (log size axis).
-A (solid) is the dominant statistic at L100/L1000/L10000; B (dashed) a competing
-overlapping candidate. A's frontier is south-west of B's --- upgrading the
-dominant statistic yields a lower q-error, typically at a smaller size than
-adding B. The solver's marginal budget goes to ``upgrade A'' before ``add B''.}
-\label{fig:upgradevsadd}
 \end{figure}
 
 \subsubsection{What-only vs.\ what+how-much.}
@@ -1697,11 +1521,12 @@ ablation (\S\ref{sec:ablation}). It also predicts the boundary of our claim:
 workloads where a query is genuinely driven by \emph{several} independent
 correlated clusters would violate sparsity and warrant the multi-select model
 ($\S\ref{sec:formulation}$) instead. Our controlled stress test
-(\S\ref{sec:rq2}, Table \ref{tab:stress}) confirms this predicted boundary
+(\S\ref{sec:rq2}, Table \ref{tab:sweep}) confirms this predicted boundary
 directly: a query over two independent clusters goes from top-1 $=$ 100 to
-top-2 $=$ 1.00, exactly the many-cluster regime the hypothesis says breaks
-sparsity. Characterising how often that regime occurs on real workloads is an
-open question (below) and a natural direction for future work.
+top-2 $=$ 1.00, and sparsity collapses once $K\ge 3$ --- exactly the many-cluster
+regime the hypothesis says breaks sparsity. Characterising how often that regime
+occurs on real workloads is an open question (below) and a natural direction for
+future work.
 
 \subsection{What Is Being Optimized}
 \label{sec:disc-objective}
