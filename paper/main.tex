@@ -1196,6 +1196,28 @@ level mix shows budget spent on capacity (L100/L1000/L10000), not just coverage.
 \label{fig:budgetquality}
 \end{figure}
 
+Fig.~\ref{fig:upgradevsadd} makes the underlying economic decision explicit on
+three served queries: for each, ``A'' is the query's dominant statistic at
+L100/L1000/L10000 (the \emph{upgrade} path of the same columns) and ``B'' a
+competing overlapping candidate at the same three levels (the \emph{add a new
+one} alternative). Upgrading A dominates adding B: A reaches a lower q-error,
+often at a \emph{smaller} size than B ever reaches (e.g.\ st.308 reaches q$=$1.21
+at 11.7\,KB by upgrading A, versus q$=$2.14 at 87.6\,KB by adding B). The
+per-candidate surrogate therefore rationally spends a marginal budget slice
+upgrading the dominant statistic rather than paying for a new one --- the
+``how much'' dimension beating ``what'' on the frontier.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/upgrade_vs_add}
+\caption{Upgrade vs.\ add on three representative served queries (log size axis).
+A (solid) is the dominant statistic at L100/L1000/L10000; B (dashed) a competing
+overlapping candidate. A's frontier is south-west of B's --- upgrading the
+dominant statistic yields a lower q-error, typically at a smaller size than
+adding B. The solver's marginal budget goes to ``upgrade A'' before ``add B''.}
+\label{fig:upgradevsadd}
+\end{figure}
+
 \subsubsection{What-only vs.\ what+how-much.}
 The claim that capacity is a real decision axis requires isolating it: does
 free choice of \texttt{statistics\_target} beat \emph{fixed-capacity
