@@ -146,13 +146,15 @@ deployed at different capacities depending on the budget, and spending on
 \emph{upgrading} it competes directly with spending on \emph{adding} another
 combination.
 
-\textbf{(B) The surprise: the benefit is almost entirely sparse.} At first
+\textbf{(B) A measurable sparse regime, discovered, not assumed.} At first
 glance the problem looks like a combinatorial multi-select: a query could
 benefit from several statistics at once. Our measurements show otherwise.
-Across both single-table workloads (the wide 69-column CENSUS and
-stats\_CEB\_single), one well-chosen multivariate statistic captures nearly all
+We do not claim that extended-statistics selection is inherently sparse;
+rather, we show that the two evaluated single-table workloads lie in a
+\emph{measurable sparse regime}: across them, one well-chosen multivariate
+statistic captures nearly all
 improvement attainable from the evaluated 2-/3-column MCV candidates for a
-query: adding a second or third non-overlapping
+query --- adding a second or third non-overlapping
 candidate gives almost no benefit, and on the hardest CENSUS queries the top-1,
 top-2 and top-3 joint q-errors are identical. This was not assumed --- it was
 \textbf{discovered} --- and it has a direct consequence: \emph{restricted to at
@@ -191,7 +193,8 @@ column-overlapping co-installation and restores (empirically) near-exact
 predictability (ratio 1.000) at a quantified quality cost; and an
 \emph{unconstrained} mode that keeps nominal quality but must be followed by
 lightweight planner validation. Global disjointness is a
-\emph{correctness-preserving} deployment mode, not claimed to be the
+\emph{prediction-preserving} deployment mode --- it restores the surrogate's
+fidelity on the measured workloads --- not claimed to be the
 universally optimal one. This is not a
 failure of our measurement --- it is a second-order planner interaction that the
 per-candidate model cannot see, and a concrete, validated fix.
@@ -204,10 +207,13 @@ candidate per query --- whose linearity is a formal consequence
 budgeted \emph{what-and-how-much allocation}, solvable by the resulting MILP
 (\S\ref{sec:formulation}, \S\ref{sec:milp}); (iii) the catalog-mask measurement
 protocol that makes the candidate $\times$ capacity space measurable
-(\S\ref{sec:measure}); and (iv) an end-to-end validation that isolates, explains
-(creation-order planner interference, \S\ref{sec:switch}), and --- via a
-global-disjointness mode or post-selection validation --- \emph{fixes} the
-predictability gap (\S\ref{sec:e2e}).
+(\S\ref{sec:measure}); and (iv) a \emph{deployment-time interaction} finding:
+we identify a previously-hidden \emph{creation-order} planner choice among
+co-installed overlapping statistics that breaks per-candidate surrogate
+fidelity, characterize it exactly (\S\ref{sec:switch}), and --- via a
+\emph{prediction-preserving} global-disjointness mode or a lightweight
+post-selection validation --- restore surrogate fidelity
+(\S\ref{sec:e2e}).
 
 \section{Background and Related Work}
 \label{sec:back}
@@ -388,7 +394,17 @@ planner's estimate for $q_i$ is the \textbf{q-error}
 Let $e_i^0$ be the baseline q-error of $q_i$ with no extended statistics. A
 \emph{physical statistic} is $s=(\text{table},\text{columns},\text{level})$,
 with storage cost $c_s$ (bytes) and a per-query effective q-error $e_{is}$
-when $q_i$ uses only $s$. The selection objective is
+when $q_i$ uses only $s$.
+
+\emph{Why a storage budget.} We deliberately optimize \emph{persistent
+storage} $c_s$ rather than \texttt{ANALYZE}/maintenance time. PostgreSQL couples
+sampling effort to the \emph{maximum} statistics target on a relation, so
+maintenance cost is not a per-statistic additive quantity that any selection
+model can budget over; storage, by contrast, is a clean additive resource that
+every selected statistic consumes and that competes for a shared budget
+(\S\ref{sec:mechanisms}). We therefore frame the problem as \emph{storage-budgeted
+selection} and treat maintenance-aware optimization as a separate extension
+(\S\ref{sec:disc-objective}). The selection objective is
 \[
   \min_{\{y_s\},\{x_{is}\}}\; \frac{1}{n}\sum_i \operatorname{qerr}_i\big(T_i\big)
   \quad\text{s.t.}\quad \sum_s c_s\,y_s \le C,
@@ -537,7 +553,7 @@ optimization is not the bottleneck at full-workload scale --- the phase-1
 \section{Measurement Infrastructure}
 \label{sec:measure}
 
-Our ILP needs a per-candidate, per-capacity q-error $e_{is}$ and size $c_s$
+Our MILP needs a per-candidate, per-capacity q-error $e_{is}$ and size $c_s$
 for every option that survives pruning. This section turns the measurement
 from an afterthought into a first-class systems component: it is, in fact, the
 pipeline's true bottleneck (\S\ref{sec:rq4}).
@@ -755,7 +771,7 @@ measurements and the phase-1 deterministic protocol (\S\ref{sec:measure}) use
 target\,10000 (and sometimes 1000 for cross-checks), where measurement is exactly
 reproducible and only accuracy varies with capacity. This is the empirical
 justification, independent of the cost model, for treating capacity levels as
-the deterministic inputs the ILP consumes.
+the deterministic inputs the MILP consumes.
 
 \subsection{Runtime: Measurement Is the Bottleneck, Not the Solve}
 \label{sec:measure-runtime}
@@ -943,7 +959,14 @@ target & ANALYZE(0 ext) & ANALYZE(1000 ext) & repair \\
 \subsection{RQ2: Is One Statistic per Query Sufficient?}
 \label{sec:rq2}
 
-\textbf{Yes.} For each query we greedily rank non-overlapping
+We do not test whether one-statistic-per-query sparsity holds \emph{by
+construction}; we test whether it survives progressively stronger attempts to
+falsify it: (1) real-workload top-$k$ joint measurement, (2) exhaustive
+enumeration of arbitrary subsets, (3) wider 4-/5-column candidates, (4) a
+synthetic many-cluster regime engineered to break it, and (5) a workload-scope
+negative control.
+
+\textbf{Step 1: real-workload top-$k$.} For each query we greedily rank non-overlapping
 candidates by single q-error and measure the \emph{joint} q-error of keeping the
 top-1/2/3. On stats\_CEB\_single, adding a 2nd/3rd non-overlapping candidate
 changes nothing for $93\%$ of the 180 queries with candidates (the joint
@@ -1006,7 +1029,7 @@ stats\_CEB\_single (median, n=180) & 1.06 & -- & 1.00 & 1.00 / 1.00\\
 \end{tabular}
 \end{table}
 
-\subsubsection{Exhaustive check: one statistic equals the best \emph{subset}.}
+\subsubsection{Step 2: exhaustive check --- one statistic equals the best \emph{subset}.}
 A skeptic may ask whether restricting to one statistic per query loses anything
 against the \emph{true} multi-select optimum --- i.e.\ an arbitrary subset, not
 just top-$k$. For every query with few candidates we settle this exactly: we
@@ -1043,7 +1066,7 @@ So even against the true, unconstrained multi-select optimum, the sparse
 restriction to one statistic per query loses essentially nothing on these
 workloads.
 
-\subsubsection{Candidate-width sensitivity.}
+\subsubsection{Step 3: candidate-width sensitivity.}
 A reviewer-driven check is whether the 2/3-column candidate restriction itself
 manufactures sparsity. We relax the width on the hardest CENSUS queries (where
 2/3-column candidates leave the largest residual) and re-measure the best
@@ -1084,7 +1107,7 @@ next step. On the evaluated single-table workloads over \texttt{posts}, the
 2/3-column candidates already reach $\approx$1.0 everywhere (Table
 \ref{tab:multi}), so the width effect is confined to the harder CENSUS tail.
 
-\subsubsection{Stress test: where sparsity fails.}
+\subsubsection{Step 4: a controlled many-cluster stress test --- where sparsity fails.}
 The sparse regime is not a universal property --- so it deserves a controlled
 \emph{failure test}. We build a synthetic table (100K rows) with \emph{two
 independent, perfectly-correlated column clusters}, $A{=}\{a_1,a_2,a_3\}$ and
@@ -1171,7 +1194,7 @@ drive the same query.
 
 We are careful here, and distinguish two greedy baselines. With a
 \emph{generous} budget, the per-query-best greedy \emph{union} (ignoring the
-budget) already equals the ILP solution (same 5 statistics, mean 1.021) --- on
+budget) already equals the MILP solution (same 5 statistics, mean 1.021) --- on
 a workload of independent single-table queries, greedy is already near-optimal
 when nothing constrains it. The interesting question is under \emph{tight}
 budgets, where a greedy that must stay within budget spends it on many cheap
@@ -1432,7 +1455,7 @@ the latter cost nothing but solve and measurement time.
 \label{sec:e2e}
 
 We close the loop of the measurement $\to$ optimization $\to$ deployment
-pipeline (Fig.~\ref{fig:pipeline}) by building the ILP-selected sets on the real
+pipeline (Fig.~\ref{fig:pipeline}) by building the MILP-selected sets on the real
 database and asking a causal question with three stages: \emph{Is a single
 deployed statistic predictable? Is a co-installed overlapping set predictable?
 And can we restore predictability?} Each stage controls the previous one, so
@@ -1455,7 +1478,7 @@ candidate in isolation, then compose).
 (RQ5b)}
 \label{sec:e2e-coinstalled}
 
-Next we deploy the 2 MB ILP solution for stats\_CEB\_single: five statistics,
+Next we deploy the 2 MB MILP solution for stats\_CEB\_single: five statistics,
 all pairwise-overlapping MCVs over \{AnswerCount, FavoriteCount, ViewCount,
 PostTypeId\}, predicted mean q-error 1.021. Measured on the real table the mean
 is \textbf{1.32} --- a 1.29$\times$ gap. Five of the eight queries match their
