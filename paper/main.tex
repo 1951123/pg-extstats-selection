@@ -1696,8 +1696,40 @@ $\Delta_{is}$ terms, the arithmetic mean keeps the MILP linear; a geometric
 mean (equivalently $\min\sum_i\log e_i$, i.e.\ maximizing
 $\sum_s(\log e_i^0-\log e_{is})x_{is}$) would also stay linear while weighting
 \emph{relative} rather than \emph{absolute} improvement. We use the arithmetic
-mean as the headline and leave the geometric-mean variant as a robustness
-question rather than a modeling obstacle.
+mean as the headline and treat the mean choice as an empirical robustness
+question. To check it, we solve the sparse MILP at several budgets under the
+geometric (log) objective and the arithmetic (linear) objective and compare:
+the two objectives select deployments that differ in detail (Jaccard $0.67$
+--$0.83$ of the chosen statistics) but yield \emph{identical} resulting
+arithmetic and geometric mean q-errors at every budget (Table
+\ref{tab:meanrob}); the mean of the geo-objective solution equals that of the
+arith-objective solution, and likewise for the geometric mean. The deployment
+--- and hence the headline conclusion --- is therefore robust to the mean
+choice, and we keep the arithmetic mean because it directly targets the worst
+queries that our evaluation emphasizes.
+
+\begin{table}[t]
+\caption{Mean-choice robustness (full 632-query workload). Solving the sparse
+MILP under the geometric (log) and arithmetic (linear) objectives selects
+overlapping-but-not-identical statistic sets (Jaccard), yet produces identical
+resulting arithmetic and geometric mean q-errors at every budget. The
+deployment is robust to the mean choice.}
+\label{tab:meanrob}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+budget & Jaccard & \multicolumn{2}{c}{arith mean} & \multicolumn{2}{c}{geo mean}\\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+      & & geo-obj & arith-obj & geo-obj & arith-obj\\
+\midrule
+10\,\,KB   & 0.667 & 1.0264 & 1.0264 & 1.0191 & 1.0191\\
+40\,KB   & 0.833 & 1.0188 & 1.0188 & 1.0137 & 1.0137\\
+100\,KB  & 0.667 & 1.0156 & 1.0156 & 1.0115 & 1.0115\\
+250\,KB  & 0.750 & 1.0040 & 1.0040 & 1.0037 & 1.0037\\
+500\,KB  & 0.806 & 1.0014 & 1.0014 & 1.0013 & 1.0013\\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{The Interference Fix}
 \label{sec:disc-fix}
