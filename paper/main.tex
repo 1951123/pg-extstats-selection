@@ -886,16 +886,15 @@ budget & MILP & best greedy & MILP adv ($\Delta$q) & best-is\\
 \end{tabular}
 \end{table}
 
-The MILP wins at every budget, and its edge never disappears: it is largest
-under tight budgets (0.047 at 5\,KB) and --- notably --- \emph{grows again} at
+The MILP wins at every budget, and its edge never disappears: largest under
+tight budgets (0.047 at 5\,KB) and --- notably --- \emph{growing again} at
 250\,KB (0.020) because the best greedy saturates: once G1/G2 have spent their
 budget on cheap L100 coverage they cannot spend the remainder on
 \emph{capacity} upgrades, whereas the MILP drives the mean from 1.0156 to
 1.0040. Only at the generous 500\,KB budget does the add-or-upgrade greedy
-close some of the gap (1.0096, G3 doing 4 upgrades), confirming that capacity
-allocation is the specific capability greedy lacks --- not a failure of greedy
-column choice but of global \emph{budget reallocation} (capacity is the ``how
-much'' axis; \S\ref{sec:rq3}, Table \ref{tab:whathowmuch}).
+close part of the gap (G3, 4 upgrades). Capacity allocation is exactly the
+capability greedy lacks --- not a failure of greedy column choice but of global
+\emph{budget reallocation} (the ``how much'' axis; \S\ref{sec:rq3}).
 
 On the full 632-query workload (Fig.~\ref{fig:budgetquality}), the budget is
 visibly spent on capacity: the number of high-capacity selections grows with
