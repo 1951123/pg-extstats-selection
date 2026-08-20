@@ -795,8 +795,8 @@ three; q.382: $1.12$). This is not an
 artefact of a small candidate space: it holds on the widest, highest-error,
 most-candidate-dense workload in our study.
 
-This is not just anecdotal. Fig.~\ref{fig:sparsity} characterises the 
-\emph{distribution} over the whole 632-query workload. The natural sparsity
+This is not just anecdotal. The \emph{distribution} over the whole 632-query
+workload makes it precise. The natural sparsity
 question is \emph{non-circular}: how much of the improvement of the measured
 \emph{best $k$-subset} does a single statistic already capture? We define the
 top-1 coverage ratio against the measured joint q-error of the best $k$
@@ -819,16 +819,6 @@ reaches the estimation floor ($\le1.05$) for $94\%$ of near-baseline queries
 (base 1--1.1) and $97\%$ of the genuinely repairable queries (base 2--10, $n{=}32$).
 One dominant column cluster drives a single-table query's error, and one
 well-chosen 3-column MCV captures it --- measured, not assumed.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/sparsity_cdf}
-\caption{Top-1 coverage vs.\ the \emph{measured} best-2-subset over the full
-632-query stats\_CEB\_single workload (queries with baseline $>1.2$, $n{=}35$):
-the best single candidate captures a median $1.000$ of the improvement of the
-best two-statistic set. Sparsity is a measured, distribution-level property.}
-\label{fig:sparsity}
-\end{figure}
 
 \subsubsection{Step 2: exhaustive check --- one statistic equals the best \emph{subset}.}
 A skeptic may ask whether restricting to one statistic per query loses anything
