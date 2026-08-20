@@ -538,20 +538,14 @@ ANALYZE.}
 \label{sec:measure-correct}
 
 Masking must reproduce what a \emph{single} deployed statistic would deliver.
-We validate this directly: for a statistic that the mask measurement predicts
-at q-error $e$, we build \emph{only} that statistic on the real table and
-re-measure. The singleton deployment reproduces the masked prediction (e.g.\
-st.144: masked 1.04 vs.\ singleton 1.042; st.588 1.03 vs.\ 1.029; st.284 1.02
-vs.\ 1.025, \S\ref{sec:e2e}). Together with the fact that a NULL payload is
-ignored by the planner, this confirms Protocol-M is not an approximation but an
-\emph{exact} isolation of each candidate's effect on the queries we test.
-
-\textbf{Direct mask-vs-singleton check.} To verify that masking exactly
-reproduces a singleton deployment --- even with overlapping siblings co-built
-in the same ANALYZE --- we measure each candidate's q-error twice: (i)
+We validate this directly by measuring each candidate's q-error twice: (i)
 \emph{singleton}, building only that statistic, and (ii) \emph{masked}, building
 the candidate plus three overlapping siblings in one ANALYZE and NULLing the
-siblings' payloads. Table \ref{tab:maskcorrect} shows the two agree exactly.
+siblings' payloads. Table \ref{tab:maskcorrect} shows the two agree exactly
+(e.g.\ st.144 masked 1.04 vs.\ singleton 1.042, \S\ref{sec:e2e}). Together with
+the fact that a NULL payload is ignored by the planner, this confirms
+Protocol-M is an \emph{exact} isolation of each candidate's effect -- not an
+approximation.
 
 \begin{table}[t]
 \caption{Direct correctness check: masked vs.\ singleton q-error when 3-4
@@ -795,8 +789,9 @@ candidates by single q-error and measure the \emph{joint} q-error of keeping the
 top-1/2/3. On stats\_CEB\_single, adding a 2nd/3rd non-overlapping candidate
 changes nothing for $93\%$ of the 180 queries with candidates (the joint
 $k{=}2,3$ q-error equals $k{=}1$ exactly), and the largest $k{=}2$-$k{=}1$ gap
-over the whole workload is $0.027$ (Table \ref{tab:multi}); on the wide CENSUS
-table the two hardest queries are identical at $k{=}1,2,3$. This is not an
+over the whole workload is $0.027$; on the wide CENSUS
+table the two hardest queries are identical at $k{=}1,2,3$ (q.184: $1.08$ at all
+three; q.382: $1.12$). This is not an
 artefact of a small candidate space: it holds on the widest, highest-error,
 most-candidate-dense workload in our study.
 
@@ -834,24 +829,6 @@ the best single candidate captures a median $1.000$ of the improvement of the
 best two-statistic set. Sparsity is a measured, distribution-level property.}
 \label{fig:sparsity}
 \end{figure}
-
-\begin{table}[t]
-\caption{Adding a 2nd/3rd non-overlapping candidate does not help (k=1,2,3 joint
-q-error). The last row aggregates the full 180-query stats\_CEB\_single workload
-at L10000: median joint q-error across queries. ``Single dominant statistic
-suffices per query.''}
-\label{tab:multi}
-\small
-\begin{tabular}{lcccc}
-\toprule
-query & baseline & cands & k=1 & k=2 / k=3 \\
-\midrule
-CENSUS q.184 & 4162 & 165 & 1.08 & 1.08 / 1.08\\
-CENSUS q.382 & 378  & 56  & 1.12 & 1.12 / 1.12\\
-stats\_CEB\_single (median, n=180) & 1.06 & -- & 1.00 & 1.00 / 1.00\\
-\bottomrule
-\end{tabular}
-\end{table}
 
 \subsubsection{Step 2: exhaustive check --- one statistic equals the best \emph{subset}.}
 A skeptic may ask whether restricting to one statistic per query loses anything
@@ -928,8 +905,8 @@ columns are grouped into candidates --- but it means our \emph{candidate
 family} (and hence the reported achievable quality) is an underestimate on
 such queries; extending candidate generation to higher arity is the natural
 next step. On the evaluated single-table workloads over \texttt{posts}, the
-2/3-column candidates already reach $\approx$1.0 everywhere (Table
-\ref{tab:multi}), so the width effect is confined to the harder CENSUS tail.
+2/3-column candidates already reach $\approx$1.0 everywhere, so the width effect
+is confined to the harder CENSUS tail.
 
 \subsubsection{Step 4: a controlled many-cluster stress test --- where sparsity fails.}
 The sparse regime is not universal, so we build a controlled \emph{failure
