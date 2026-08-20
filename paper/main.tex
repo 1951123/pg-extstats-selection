@@ -561,34 +561,29 @@ implementation, not of the model.
 \subsection{Sampling Determinism vs.\ Statistics Target}
 \label{sec:measure-determinism}
 
-Because \texttt{ANALYZE} is sampling-based, we verify that repeated
-\emph{runs} do not drift. Across six fresh \texttt{ANALYZE}s at three targets,
-determinism is a \emph{step function} of \texttt{statistics\_target}: at
-target\,100 the estimated row count shows $1$--$2\%$ run-to-run coefficient of
-variation, while at target\,1000 and 10000 it is \emph{exactly} deterministic
-(CV $0$; PostgreSQL's hash-bucketed \texttt{ANALYZE} converges to a fixed
-histogram/MCV once the sample is large enough). Target also sets \emph{accuracy},
-not just determinism --- the single-MCV estimate of st.144 rises from 4{,}405
-(target\,1000) to 11{,}894 (target\,10000), i.e.\ to the correct $\approx$12{,}391.
-A related failure mode at low target is that MCVs over high-cardinality column
-combinations can be built \emph{empty} (a \texttt{NULL} payload), contributing
-nothing. This is why our measurements use target\,10000 (and sometimes 1000 for
-cross-checks), where measurement is exactly reproducible and only accuracy
-varies with capacity.
+Because \texttt{ANALYZE} is sampling-based, we verify that repeated runs do not
+drift: across six fresh \texttt{ANALYZE}s at three targets, determinism is a
+step function of \texttt{statistics\_target} --- at target\,100 the estimate
+shows $1$--$2\%$ run-to-run variation, while at target\,1000/10000 it is exactly
+deterministic (CV $0$). Target also sets \emph{accuracy}: the single-MCV
+estimate of st.144 rises from 4{,}405 (target\,1000) to 11{,}894 (target\,10000),
+the correct $\approx$12{,}391; at low target, MCVs over high-cardinality
+combinations can even be built \emph{empty} (a \texttt{NULL} payload),
+contributing nothing. This is why measurements use target\,10000 (sometimes 1000
+for cross-checks): exactly reproducible, with only accuracy varying with
+capacity.
 
 \subsection{Runtime: Measurement Is the Bottleneck, Not the Solve}
 \label{sec:measure-runtime}
 
-Table \ref{tab:measurement} shows the consequence. Using the measured linear
-growth of ANALYZE time with the number of statistics on the table, Protocol-A
-costs $2N$ ANALYZEs and stays proportional to $N$, while Protocol-M costs one
-ANALYZE plus $N$ cheap EXPLAIN payloads. The gap widens with $N$: a $9\times$
-saving at 10 candidates grows to $\sim$60$\times$ at 100 and $\sim$130$\times$
-at 1000. For a single Census query the masked measurement completes in minutes
-where the naive protocol would take hours. This is why the catalog-mask
-protocol --- not the MILP --- is the enabling component that makes the massive
-candidate $\times$ capacity space measurable, and why we emphasize that the
-optimization (\S\ref{sec:rq4}) is the cheap part of the pipeline.
+Table \ref{tab:measurement} shows the consequence of the measured linear growth
+of ANALYZE time with the number of statistics on a table: Protocol-A costs
+$2N$ ANALYZEs (proportional to $N$), Protocol-M one ANALYZE plus $N$ cheap
+EXPLAIN payloads, a $9\times$ saving at 10 candidates growing to $\sim$60$\times$
+at 100 and $\sim$130$\times$ at 1000. This is why the catalog-mask protocol ---
+not the MILP --- is the enabling component that makes the candidate $\times$
+capacity space measurable, and why the optimization (\S\ref{sec:rq4}) is the
+cheap part of the pipeline.
 
 \begin{table*}[t]
 \caption{ANALYZE cost with $N$ extended statistics on CENSUS \texttt{climate}
