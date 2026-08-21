@@ -234,10 +234,11 @@ selected statistics and the estimation quality they deliver --- and treat ANALYZ
 maintenance cost separately (it is a property of the maximum, not the sum, of
 targets).
 
-\textbf{Capacity-quality trade-off.} Capacity directly buys precision: the best
-single statistic on CENSUS \texttt{climate} repairs a high-error query to
-$\approx$2.1--2.3 at target 100, $\approx$1.2--2.1 at 1000, and $\approx$1.0 at
-10000 (\S\ref{sec:rq1}). This motivates treating capacity as a decision axis.
+\textbf{Capacity-quality trade-off.} Capacity directly buys precision: raising
+a statistic from target 100 to 10000 takes the running example from q-error
+$\approx$4.7 to $\approx$1.0 (\S\ref{sec:intro}), and on the wide CENSUS table a
+single 3-column MCV collapses the worst query's baseline q-error of 4{,}162 to
+1.08 (\S\ref{sec:rq1}). This motivates treating capacity as a decision axis.
 
 \subsection{Related Work}
 
@@ -703,15 +704,20 @@ stats\_CEB\_single & 632 & 616 & 180 & 78   & 0/0/0/1/35\\
 \subsection{RQ1: Does Capacity Materially Affect Repair Quality?}
 \label{sec:rq1}
 
-\textbf{Yes.} On the CENSUS \texttt{climate} table, the best single statistic
-brings a high-error query to a q-error of roughly 2.1--2.3 at target 100,
-1.2--2.1 at 1000, and $\approx$1.0 at 10000. Target 100 cannot even represent
-the relevant 3-column correlation; target 1000 captures it but leaves residual
-error, and 10000 is near-exact. (ANALYZE cost likewise grows with target and
-with the number of installed statistics, \S\ref{sec:measure-runtime}.) Capacity
-is therefore not a storage knob that can be swept under the rug --- it sets the
-estimation precision directly. This motivates treating
-$(\text{columns},\text{capacity})$ as a joint decision (Prop.~\ref{prop:linear}).
+\textbf{Yes.} Capacity is not a storage knob that can be swept under the rug ---
+it sets estimation precision directly. On the CENSUS \texttt{climate} table, the
+single best statistic collapses the workload's worst query, \texttt{query.184}
+(baseline q-error 4{,}162: 13 true rows against ~54k estimated), to a q-error of
+1.08 --- a $>$\texttt{3{,}800}$\times$ repair of the extreme tail --- and the
+next-hardest queries behave the same way (\texttt{query.465}: 2{,}363
+$\to$1.10; \texttt{query.382}: 378 $\to$1.12). Capacity matters most where the
+dominant correlation is moderate-cardinality: the running example
+\texttt{posts(AnswerCount,ViewCount)} stays at $\approx$4.7 at target 100 (the
+3-column correlation is not representable), yet reaches $\approx$1.0 at 10000
+(\S\ref{sec:intro}). (ANALYZE cost likewise grows with target and with the
+number of installed statistics, \S\ref{sec:measure-runtime}.) This motivates
+treating $(\text{columns},\text{capacity})$ as a joint decision
+(Prop.~\ref{prop:linear}).
 
 \subsection{RQ2: Is One Statistic per Query Sufficient?}
 \label{sec:rq2}
