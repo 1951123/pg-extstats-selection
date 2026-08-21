@@ -234,14 +234,25 @@ selected statistics and the estimation quality they deliver --- and treat ANALYZ
 maintenance cost separately (it is a property of the maximum, not the sum, of
 targets).
 
-\textbf{Capacity-quality trade-off.} Capacity directly buys precision --- but
-only where it is the binding constraint: the single 3-column MCV
-\texttt{posts(AnswerCount,FavoriteCount,ViewCount)} moves a query from no
-improvement at target 100 (q-error 4.58) to near-exact at 10000 (1.04), while
-on the wide CENSUS table the workload's worst query collapses from a baseline
-q-error of 4{,}162 to 1.08 even at target 100 (capacity is \emph{not} the
-binding constraint there; \S\ref{sec:rq1}). This motivates treating capacity
-as a decision axis.
+\textbf{Capacity-quality trade-off.} \texttt{statistics\_target} is the knob
+that sets an extended statistic's precision: for an MCV statistic it caps how
+many most-common value-tuples the list stores, and it scales ANALYZE's
+sampling effort (\cite{pgstats}). It is a \emph{cap}, not a requirement: a
+column-combination with fewer frequent tuples than the cap is fully captured at
+any larger target, so raising the target helps only while the list is
+\emph{target-capped} (still filling) rather than \emph{data-capped} (bounded by
+the data's own cardinality). We therefore model capacity as a small menu of
+levels anchored on the PostgreSQL default: 100 (low precision; often
+data-capped for categorical correlations), and 1000 and 10000 as escalation
+levels for higher-cardinality combinations. On the evaluated workloads this
+menu is appropriate and generous --- many correlated groups are captured at 100
+(e.g. the CENSUS tail collapses from baseline q-error 4{,}162 to 1.08 already at
+target 100; \S\ref{sec:rq1}), while high-cardinality groups need the larger
+levels (\texttt{posts(AnswerCount,FavoriteCount,ViewCount)} moves from no
+improvement at 100, q-error 4.58, to near-exact at 10000, 1.04; \S\ref{sec:rq1}).
+Capacity thus sets a \emph{per-query} precision floor --- the ``how much''
+dimension --- and is a genuine decision axis, which motivates allocating it
+under a shared budget.
 
 \subsection{Related Work}
 
