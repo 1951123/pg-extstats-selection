@@ -151,12 +151,13 @@ to PostgreSQL is determined by the E2E experiments (\S\ref{sec:e2e}).
 \textbf{(C) The enabler: measuring the massive candidate space.} Instantiating
 this optimization requires a per-candidate, per-capacity q-error for every
 surviving option. On wide tables the naive protocol (CREATE--ANALYZE--EXPLAIN
-per candidate) is infeasible --- a single CENSUS ANALYZE at target 10000 takes
-$\sim$90s (its fixed base cost dominates; \S\ref{sec:measure-runtime}). Our
+per candidate) is infeasible --- a single CENSUS ANALYZE at target 10000 already
+takes $\sim$22s with a warm cache, and grows linearly with the number of
+statistics (\S\ref{sec:measure-runtime}). Our
 \emph{catalog-mask protocol} (\S\ref{sec:measure}) builds all
 candidates in one ANALYZE and isolates each by masking the others'
 \texttt{pg\_statistic\_ext\_data} payloads, cutting measurement cost by
-about $19$--$344\times$ and making the candidate $\times$ capacity space measurable;
+roughly $17$--$93\times$ and making the candidate $\times$ capacity space measurable;
 the resulting MILP then solves at full-workload scale in seconds
 (\S\ref{sec:rq4}). Measurement, not optimization, is the dominant bottleneck.
 
@@ -482,12 +483,12 @@ The obvious protocol (\emph{Protocol-A}) isolates a candidate by
 a clean, drop-analyzable cycle that costs two ANALYZEs per candidate. On a wide
 table this is prohibitive. On the CENSUS \texttt{climate} table (69 columns,
 $\sim$2.5M rows) a single ANALYZE at \texttt{statistics\_target}=10000 takes
-$\approx$90s with no statistics (a fixed base cost), growing roughly
-linearly with the number of statistics already
+$\approx$22s with no statistics (warm cache; a fixed base cost), growing
+roughly linearly with the number of statistics already
 on the table (Table \ref{tab:measurement}). Consequently the naive protocol
-costs $\approx$180s per candidate --- two ANALYZEs $\times$ $\approx$90s ---
+costs $\approx$44s per candidate --- two ANALYZEs $\times$ $\approx$22s ---
 times 19{,}245 deduplicated
-candidates is a not a tractable phase-1 ($\sim$40 days).
+candidates is not a tractable phase-1 ($\sim$10 days).
 
 \subsection{The Catalog-Mask Protocol (Protocol-M)}
 \label{sec:measure-mask}
@@ -598,15 +599,21 @@ capacity.
 
 Table \ref{tab:measurement} shows the cost structure that makes masking win.
 An ANALYZE has a sizable \emph{fixed} base cost --- sampling the table and
-recomputing its per-column statistics (about 90s here at target 10000, from a
-linear fit to measured times) --- plus a
+recomputing its per-column statistics (about 22s here at target 10000, measured
+with a warm cache) --- plus a
 \emph{variable} cost that grows (roughly linearly) with the number of extended
 statistics $N$. Protocol-A repeats that fixed base $2N$ times (two ANALYZEs
 per candidate), so it scales as $\sim 2N\times(\text{fixed}+c)$; Protocol-M pays
 the fixed base \emph{once} --- on a single table, one ANALYZE covers the whole
 workload's candidates --- and then only the variable cost, one ANALYZE plus $N$
-cheap EXPLAIN payloads: a $19\times$ saving at 10 candidates growing to
-$\sim$135$\times$ at 100 and $\sim$344$\times$ at 1000. This is why the
+cheap EXPLAIN payloads: a $17\times$ saving at 10 candidates growing to
+$\sim$89$\times$ at 500 and $\sim$93$\times$ at 1000. Because both protocols
+share the same variable slope, the advantage is \emph{monotone in $N$}: writing
+the fixed base as $B$, Protocol-A costs $2N(B+c)$ while Protocol-M costs
+$B+(c+\epsilon)N$, so the speedup $\frac{2N(B+c)}{B+(c+\epsilon)N}$ increases
+with $N$ and saturates at the fixed-cost amortization ceiling
+$2(B+c)/(c+\epsilon)\approx 98\times$ --- the larger the candidate space, the
+more Protocol-M's single-build amortization pays off. This is why the
 catalog-mask protocol --- not the MILP --- is the enabling component that makes
 the candidate $\times$ capacity space measurable, and why the optimization
 (\S\ref{sec:rq4}) is the cheap part of the pipeline.
@@ -630,12 +637,13 @@ workloads).
 
 \begin{table*}[t]
 \caption{ANALYZE cost with $N$ extended statistics on CENSUS \texttt{climate}
-(linear fit to measured target-10000 ANALYZE times), and the implied naive
-(Protocol-A) vs.\ catalog-mask (Protocol-M) total phase-1 cost for $N$
-candidates. ``base'' is the fixed ANALYZE cost per table; Protocol-A pays it
-twice per candidate ($2N$ ANALYZEs), Protocol-M once plus $N$ cheap
-EXPLAIN/mask payloads ($\approx$0.1s each). Measured anchors: 1{,}000 stats
-$\to$420s, 3{,}000 $\to$1{,}013s, 6{,}000 $\to$2{,}003s, 10{,}000 $\to$3{,}507s.}
+(measured at target 10000; base $\approx$22s with a warm cache, plus a roughly
+linear $\sim$0.35s-per-statistic growth), and the implied naive (Protocol-A) vs.\
+catalog-mask (Protocol-M) total phase-1 cost for $N$ candidates. ``base'' is
+the fixed ANALYZE cost per table; Protocol-A pays it twice per candidate ($2N$
+ANALYZEs), Protocol-M once plus $N$ cheap EXPLAIN/mask payloads ($\approx$0.1s
+each). Measured ANALYZE-at-$N$ anchors: 1{,}000 stats $\to$420s, 3{,}000
+$\to$1{,}013s, 6{,}000 $\to$2{,}003s, 10{,}000 $\to$3{,}507s.}
 \label{tab:measurement}
 \small
 \begin{tabular}{lcc|rrr}
@@ -643,10 +651,10 @@ $\to$420s, 3{,}000 $\to$1{,}013s, 6{,}000 $\to$2{,}003s, 10{,}000 $\to$3{,}507s.
 $N$ & base & ANALYZE & naive & Protocol-M & speedup\\
  & (0 st.) & (at $N$) & (Proto-A) & & \\
 \midrule
-10   & 90s & 93s   & 1{,}800s  & 94s   & 19$\times$\\
-100  & 90s & 123s  & 18{,}000s & 133s  & 135$\times$\\
-500  & 90s & 257s  & 90{,}000s & 307s  & 293$\times$\\
-1000 & 90s & 424s  & 180{,}000s & 524s & 344$\times$\\
+10   & 22s & 26s   & 440s   & 26s   & 17$\times$\\
+100  & 22s & 57s   & 4{,}400s & 67s  & 66$\times$\\
+500  & 22s & 197s  & 22{,}000s & 247s & 89$\times$\\
+1000 & 22s & 372s  & 44{,}000s & 472s & 93$\times$\\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -664,7 +672,7 @@ $N$ & base & ANALYZE & naive & Protocol-M & speedup\\
 \node[bs] (b) at (3.1,0) {candidate $\times$ capacity\\[-0.5mm]\textbf{measurement}};
 \node[bs] (c) at (6.2,0) {sparse\\[-0.5mm]MILP};
 \node[bs] (d) at (9.2,0) {\\[-0.5mm]\textbf{deploy}};
-\node[bs, exp] (b2) at (3.1,-1.9) {expensive\\[-0.5mm]($19$--$344\times$ speedup)};
+\node[bs, exp] (b2) at (3.1,-1.9) {expensive\\[-0.5mm]($17$--$93\times$ speedup)};
 \node[bs, cheap] (c2) at (6.2,-1.9) {cheap\\[-0.5mm]($<$5\,s)};
 \draw[arr] (a.east) -- (b.west);
 \draw[arr] (b.east) -- (c.west);
@@ -673,7 +681,7 @@ $N$ & base & ANALYZE & naive & Protocol-M & speedup\\
 \draw (c2.north) -- (c.south);
 \end{tikzpicture}
 \caption{Pipeline cost profile. The candidate $\times$ capacity
-\emph{measurement} (\S\ref{sec:measure}) is the expensive step -- $19$--$344\times$
+\emph{measurement} (\S\ref{sec:measure}) is the expensive step -- $17$--$93\times$
 cheaper with the catalog-mask protocol (Tab.~\ref{tab:measurement}), yet still dominant -- whereas the sparse
 MILP solves in under five seconds (\S\ref{sec:rq4}). The bottleneck is obtaining
 the data the optimization needs, not the optimization itself.}
