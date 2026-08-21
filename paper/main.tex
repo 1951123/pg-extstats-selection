@@ -642,20 +642,19 @@ table size at all.
 \section{Empirical Findings}
 \label{sec:findings}
 
-\textbf{Setup.} We evaluate on PostgreSQL 16.14 with four workloads organized
-into three roles (Table \ref{tab:bench}). \emph{Primary:} \texttt{CENSUS} (a
-single 69-column table, 468 queries; DB \texttt{census}) and
-\texttt{stats\_CEB\_single} (632 single-table sub-plans over StackExchange; DB
-\texttt{stats}) --- the workloads where extended statistics act. \emph{Negative
-control:} \texttt{job-light} (70 join queries over IMDB; DB \texttt{imdb}) and
+\textbf{Setup.} We evaluate on PostgreSQL 16.14 with three benchmarks in two
+roles (Table \ref{tab:bench}). \emph{Primary:} \texttt{CENSUS} (a single
+69-column table, 468 queries; DB \texttt{census}) and \texttt{stats\_CEB\_single}
+(632 single-table sub-plans over StackExchange; DB \texttt{stats}) --- the
+workloads where extended statistics act directly. \emph{Negative control:}
 \texttt{stats\_CEB} (146 join queries) --- where errors are dominated by joins
-that extended statistics cannot directly repair. (We do not use the original
-113-query JOB \cite{leis2015good}, because its queries are MIN/MAX aggregates
-that return a single row, so it carries no meaningful whole-query cardinality;
-job-light is the
-same IMDB schema rewritten in the `SELECT COUNT(*)` form standard for
-cardinality estimation \cite{kipf2019learned}.) \emph{Synthetic:} constructed
-tables used only to stress specific mechanisms (\S\ref{sec:rq2},
+that extended statistics cannot directly repair. (Table \ref{tab:bench} also
+lists the ``job-light'' join sub-plans of the same IMDB schema: we do not use
+the original 113-query JOB \cite{leis2015good}, because its queries are
+MIN/MAX aggregates that return a single row and carry no meaningful whole-query
+cardinality, whereas job-light's `SELECT COUNT(*)` join sub-plans are the
+standard cardinality-estimation form \cite{kipf2019learned}.) \emph{Synthetic:}
+constructed tables used only to stress specific mechanisms (\S\ref{sec:rq2},
 \S\ref{sec:e2e}). Candidates are the 2- and 3-column subsets
 of each query's selection predicates. We restrict to 2/3-column subsets because
 these are the combinations whose correlation the single-relation restriction
@@ -975,15 +974,15 @@ removed by the global-disjointness constraint (\S\ref{sec:p1}).
 \label{sec:rq6}
 
 \textbf{No meaningful benefit --- as a measured sanity check.} On the join-heavy
-\texttt{job-light} workload (70 queries over IMDB, \S\ref{sec:findings}),
-only 5 queries even have a single-table multi-column candidate (a
-\texttt{title(production\_year,kind\_id)} MCV); the remaining 65 have at most
-one selection predicate per relation, so there is no candidate to build at all.
-For the five where a candidate exists, we deploy it (mask protocol,
-\S\ref{sec:measure}) and re-measure the \emph{whole-join} q-error: the baseline
-is already poor (median q-error 9.8), and the best candidate does \emph{not}
-improve it --- in all five cases the whole-join q-error is unchanged or slightly
-worse (median best/baseline ratio 0.81), because its error is dominated by
+\texttt{stats\_CEB} workload (146 join queries, \S\ref{sec:findings}), we run
+the same phase-1 mask measurement (\S\ref{sec:measure}) over every query's
+single-table candidates and observe the effect of deploying the best candidate
+on the \emph{whole-query} q-error. The baseline is already dominated by joins:
+median whole-query q-error 12.3 (mean 33{,}853, max 4{,}177{,}428), with 111 of
+146 queries having a single-table candidate. Deploying the best candidate
+improves the whole-query q-error by a median of only $1.022\times$ (mean
+$1.28\times$, max $4.44\times$) --- essentially no improvement, even though the
+candidate fixes the single-relation part exactly. The residual error lives in
 cross-table join selectivity, which a single-relation MCV cannot repair
 (\S\ref{sec:mechanisms}). This is the expected null result for the negative
 control: the method does not optimize for coverage's sake.
