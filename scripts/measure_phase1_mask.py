@@ -36,6 +36,8 @@ from extstats.config import DEFAULT_DB, DBConfig, RECOMMENDED_STATS_TARGET  # no
 from extstats.parsers import (  # noqa: E402
     parse_census_dir,
     parse_job_dir,
+    parse_job_light_dir,
+    parse_job_light_full_dir,
     parse_stats_ceb_dir,
     parse_stats_ceb_single_dir,
 )
@@ -45,12 +47,26 @@ from extstats.measure_mask import measure_query_mask  # noqa: E402
 _PARSERS = {
     "census": parse_census_dir,
     "job": parse_job_dir,
+    "job_light": parse_job_light_dir,
+    "job_light_full": parse_job_light_full_dir,
     "stats_ceb": parse_stats_ceb_dir,
     "stats_ceb_single": parse_stats_ceb_single_dir,
 }
 _BENCH_DIRS = {"census": "Census", "job": "JOB", "stats_ceb": "stats_CEB",
                "stats_ceb_single": "stats_CEB"}
-# single-table benchmark -> force the shared table per query
+# job-light sub-plans live in the End-to-End-CardEst-Benchmark repo, not benchmarks/.
+_JOB_LIGHT_SUBPLAN_DIR = (
+    Path(__file__).resolve().parents[1]
+    / "End-to-End-CardEst-Benchmark" / "workloads" / "job-light" / "sub_plan_queries"
+)
+_JOB_LIGHT_DIR = (
+    Path(__file__).resolve().parents[1]
+    / "End-to-End-CardEst-Benchmark" / "workloads" / "job-light"
+)
+# persisted true cardinalities for the full 70-query job-light set
+_JOB_LIGHT_TRUTH = (
+    Path(__file__).resolve().parents[1] / "results" / "job_light_truth.json"
+)# single-table benchmark -> force the shared table per query
 _SINGLE_TABLE = {"census": "climate"}
 
 
@@ -92,7 +108,19 @@ def main(argv: list[str] | None = None) -> int:
         cfg = DBConfig(host=args.pghost, port=args.pgport, user=args.pguser, dbname=dbname)
         forced_table = _SINGLE_TABLE.get(bench)
 
-        queries = _PARSERS[bench](bench_root / _BENCH_DIRS[bench] / "queries")
+        if bench == "job_light":
+            queries = _PARSERS[bench](_JOB_LIGHT_SUBPLAN_DIR)
+        elif bench == "job_light_full":
+            truth = {}
+            if _JOB_LIGHT_TRUTH.exists():
+                truth = json.loads(_JOB_LIGHT_TRUTH.read_text())["truth"]
+            queries = parse_job_light_full_dir(_JOB_LIGHT_DIR, truth=truth)
+            # attach a locally-forced dbname (same imdb schema)
+            dbname = args.dbname or "imdb"
+            cfg = DBConfig(host=args.pghost, port=args.pgport,
+                           user=args.pguser, dbname=dbname)
+        else:
+            queries = _PARSERS[bench](bench_root / _BENCH_DIRS[bench] / "queries")
         if args.qids:
             want = {x.strip() for x in args.qids.split(",") if x.strip()}
             queries = [q for q in queries if q.qid in want]

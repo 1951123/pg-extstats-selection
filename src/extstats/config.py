@@ -20,7 +20,7 @@ BENCHMARKS_DIR = REPO_ROOT / "benchmarks"
 RESULTS_DIR = REPO_ROOT / "results"
 
 # Names of the benchmark subdirectories under benchmarks/.
-BENCH_NAMES = ("census", "job", "stats_ceb", "stats_ceb_single")
+BENCH_NAMES = ("census", "job", "stats_ceb", "stats_ceb_single", "job_light")
 
 
 # ---------------------------------------------------------------------------
@@ -52,6 +52,8 @@ class DBConfig:
 DEFAULT_DB = {
     "census": "census",
     "job": "imdb",
+    "job_light": "imdb",  # job-light join sub-plans run on the same IMDB schema
+    "job_light_full": "imdb",  # full 70-query job-light on the same schema
     "stats_ceb": "stats",
     "stats_ceb_single": "stats",  # single-table sub-plans of the same schema
 }
