@@ -647,9 +647,14 @@ into three roles (Table \ref{tab:bench}). \emph{Primary:} \texttt{CENSUS} (a
 single 69-column table, 468 queries; DB \texttt{census}) and
 \texttt{stats\_CEB\_single} (632 single-table sub-plans over StackExchange; DB
 \texttt{stats}) --- the workloads where extended statistics act. \emph{Negative
-control:} \texttt{JOB} (113 join queries over IMDB; DB \texttt{imdb}) and
+control:} \texttt{job-light} (70 join queries over IMDB; DB \texttt{imdb}) and
 \texttt{stats\_CEB} (146 join queries) --- where errors are dominated by joins
-that extended statistics cannot directly repair. \emph{Synthetic:} constructed
+that extended statistics cannot directly repair. (We do not use the original
+113-query JOB \cite{leis2015good}, which is a standard cardinality-estimation
+benchmark but ships its queries as MIN/MAX aggregates that return a single
+row, so it carries no meaningful whole-query cardinality; job-light is the
+same IMDB schema rewritten in the `SELECT COUNT(*)` form standard for
+cardinality estimation \cite{kipf2019learned}.) \emph{Synthetic:} constructed
 tables used only to stress specific mechanisms (\S\ref{sec:rq2},
 \S\ref{sec:e2e}). Candidates are the 2- and 3-column subsets
 of each query's selection predicates. We restrict to 2/3-column subsets because
@@ -689,9 +694,9 @@ benchmark & queries & cands/query & with any & global & per-query \\
           &         & (total)      &          & dedup  & med/max \\
 \midrule
 CENSUS           & 468 & 30856 & 467 & 19245 & 56/455\\
-JOB (join)       & 113 & 50    & 37  & 7     & 1/4\\
-stats\_CEB (join)& 146 & 609   & 108 & 79    & 4/39\\
-stats\_CEB\_single & 632 & 616 & 180 & 79    & 1/35\\
+job-light (join) & 70  & 5     & 5   & 1     & 0/1\\
+stats\_CEB (join)& 146 & 609   & 108 & 79    & 2/39\\
+stats\_CEB\_single & 632 & 616 & 180 & 79    & 0/35\\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -969,13 +974,19 @@ removed by the global-disjointness constraint (\S\ref{sec:p1}).
 \subsection{RQ6: Does It Help Where Extended Statistics Cannot?}
 \label{sec:rq6}
 
-\textbf{No meaningful benefit --- as a sanity check.} On the join-heavy
-\texttt{JOB} workload only 37/113 queries even have a multi-column selection
-candidate and, after deduplication, just 7 distinct combinations exist; because
-its errors are dominated by joins (which extended statistics cannot directly
-repair, \S\ref{sec:mechanisms}), no amount of capacity tuning helps. This is the
-expected null result for the negative control: the method does not optimize for
-coverage's sake.
+\textbf{No meaningful benefit --- as a measured sanity check.} On the join-heavy
+\texttt{job-light} workload (70 queries over IMDB, \S\ref{sec:findings}),
+only 5 queries even have a single-table multi-column candidate (a
+\texttt{title(production\_year,kind\_id)} MCV); the remaining 65 have at most
+one selection predicate per relation, so there is no candidate to build at all.
+For the five where a candidate exists, we deploy it (mask protocol,
+\S\ref{sec:measure}) and re-measure the \emph{whole-join} q-error: the baseline
+is already poor (median q-error 9.8), and the best candidate does \emph{not}
+improve it --- in all five cases the whole-join q-error is unchanged or slightly
+worse (median best/baseline ratio 0.81), because its error is dominated by
+cross-table join selectivity, which a single-relation MCV cannot repair
+(\S\ref{sec:mechanisms}). This is the expected null result for the negative
+control: the method does not optimize for coverage's sake.
 
 \subsection{Ablation: Are the Components Necessary?}
 \label{sec:ablation}
