@@ -54,14 +54,11 @@ _PARSERS = {
 }
 _BENCH_DIRS = {"census": "Census", "job": "JOB", "stats_ceb": "stats_CEB",
                "stats_ceb_single": "stats_CEB"}
-# job-light sub-plans live in the End-to-End-CardEst-Benchmark repo, not benchmarks/.
-_JOB_LIGHT_SUBPLAN_DIR = (
+# job-light (full 70-query set and 696 sub-plans) lives under benchmarks/JOB/
+# in its own subdirectory so the original 113 per-query .sql files are not mixed in.
+_JOB_LIGHT_QUERIES_DIR = (
     Path(__file__).resolve().parents[1]
-    / "End-to-End-CardEst-Benchmark" / "workloads" / "job-light" / "sub_plan_queries"
-)
-_JOB_LIGHT_DIR = (
-    Path(__file__).resolve().parents[1]
-    / "End-to-End-CardEst-Benchmark" / "workloads" / "job-light"
+    / "benchmarks" / "JOB" / "queries" / "job_light"
 )
 # persisted true cardinalities for the full 70-query job-light set
 _JOB_LIGHT_TRUTH = (
@@ -109,12 +106,12 @@ def main(argv: list[str] | None = None) -> int:
         forced_table = _SINGLE_TABLE.get(bench)
 
         if bench == "job_light":
-            queries = _PARSERS[bench](_JOB_LIGHT_SUBPLAN_DIR)
+            queries = _PARSERS[bench](_JOB_LIGHT_QUERIES_DIR)
         elif bench == "job_light_full":
             truth = {}
             if _JOB_LIGHT_TRUTH.exists():
                 truth = json.loads(_JOB_LIGHT_TRUTH.read_text())["truth"]
-            queries = parse_job_light_full_dir(_JOB_LIGHT_DIR, truth=truth)
+            queries = parse_job_light_full_dir(_JOB_LIGHT_QUERIES_DIR, truth=truth)
             # attach a locally-forced dbname (same imdb schema)
             dbname = args.dbname or "imdb"
             cfg = DBConfig(host=args.pghost, port=args.pgport,
