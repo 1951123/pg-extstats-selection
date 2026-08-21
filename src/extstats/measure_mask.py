@@ -20,6 +20,21 @@ for driver-parameter round-trip.
 Output is shaped like :mod:`extstats.measure`'s ``QueryMeasurement`` so the
 ILP / phase-1 pipeline consumes it unchanged (a single capacity level = build
 ``target``).
+
+Scopes (drive the same masking scheme at two granularities):
+- *per-query* (default): each query's candidates are built by their own ANALYZE
+  and measured independently. Preferred for multi-table / heterogeneous
+  workloads (queries on different tables cannot share a build) and for
+  per-query failure isolation; but it pays the fixed ANALYZE base cost (table
+  sampling + per-column statistics) once per query.
+- *workload-wide*: all of a single table's distinct (candidate x level) objects
+  are built and ANALYZEd once, then every query is measured by masking against
+  that one build. Preferred when one table carries most of the queries and the
+  fixed ANALYZE cost dominates (e.g. CENSUS ``climate``, stats_CEB_single
+  ``posts``): the fixed base is paid a single time, at the price of one large
+  ANALYZE (all candidates simultaneously) and no per-query isolation.
+The fixed ANALYZE cost is sampled/measured in ``probe_census_analyze_scale.py``;
+see also the paper's ``sec:measure-runtime``.
 """
 
 from __future__ import annotations

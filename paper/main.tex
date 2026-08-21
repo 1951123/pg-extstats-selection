@@ -596,6 +596,23 @@ catalog-mask protocol --- not the MILP --- is the enabling component that makes
 the candidate $\times$ capacity space measurable, and why the optimization
 (\S\ref{sec:rq4}) is the cheap part of the pipeline.
 
+\emph{Two measurement scopes, one protocol.} The same masking scheme can be
+driven at two granularities, and the fixed-cost structure dictates when each
+is preferred. \emph{(i) Per-query:} each query's candidate set is built by its
+own ANALYZE and measured in isolation. This is the natural default for
+multi-table or heterogeneous workloads (different queries touch different
+tables, so they cannot share a build anyway), and it confines any failure to a
+single query; but it repeats the fixed base cost once per query. \emph{(ii)
+Workload-wide:} when a workload is dominated by one table, all of that table's
+distinct candidates are built and ANALYZEd \emph{once}, and every query is then
+measured by masking against that single build. This pays the fixed base cost a
+single time --- the full payoff of Table \ref{tab:measurement} --- at the price
+of one (large) ANALYZE over all candidates and no per-query isolation. In
+practice: use per-query when the workload is heterogeneous or small; use the
+workload-wide build when a single table carries most of the queries and the
+fixed ANALYZE cost dominates (exactly our CENSUS and stats\_CEB\_single
+workloads).
+
 \begin{table*}[t]
 \caption{ANALYZE cost with $N$ extended statistics on CENSUS \texttt{climate}
 (measured at the given target), and the implied naive (Protocol-A) vs.\
