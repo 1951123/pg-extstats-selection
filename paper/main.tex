@@ -234,11 +234,12 @@ selected statistics and the estimation quality they deliver --- and treat ANALYZ
 maintenance cost separately (it is a property of the maximum, not the sum, of
 targets).
 
-\textbf{Capacity-quality trade-off.} Capacity directly buys precision: raising
-a statistic from target 100 to 10000 takes the running example from q-error
-$\approx$4.7 to $\approx$1.0 (\S\ref{sec:intro}), and on the wide CENSUS table a
-single 3-column MCV collapses the worst query's baseline q-error of 4{,}162 to
-1.08 (\S\ref{sec:rq1}). This motivates treating capacity as a decision axis.
+\textbf{Capacity-quality trade-off.} Capacity directly buys precision: the
+single 3-column MCV \texttt{posts(AnswerCount,FavoriteCount,ViewCount)} moves a
+query from no improvement at target 100 (q-error 4.58) to near-exact at 10000
+(1.04) --- and on the wide CENSUS table a single 3-column MCV collapses the
+worst query's baseline q-error of 4{,}162 to 1.08 (\S\ref{sec:rq1}). This
+motivates treating capacity as a decision axis.
 
 \subsection{Related Work}
 
@@ -705,18 +706,19 @@ stats\_CEB\_single & 632 & 616 & 180 & 78   & 0/0/0/1/35\\
 \label{sec:rq1}
 
 \textbf{Yes.} Capacity is not a storage knob that can be swept under the rug ---
-it sets estimation precision directly. On the CENSUS \texttt{climate} table, the
-single best statistic collapses the workload's worst query, \texttt{query.184}
-(baseline q-error 4{,}162: 13 true rows against ~54k estimated), to a q-error of
-1.08 --- a $>$\texttt{3{,}800}$\times$ repair of the extreme tail --- and the
-next-hardest queries behave the same way (\texttt{query.465}: 2{,}363
-$\to$1.10; \texttt{query.382}: 378 $\to$1.12). Capacity matters most where the
-dominant correlation is moderate-cardinality: the running example
-\texttt{posts(AnswerCount,ViewCount)} stays at $\approx$4.7 at target 100 (the
-3-column correlation is not representable), yet reaches $\approx$1.0 at 10000
-(\S\ref{sec:intro}). (ANALYZE cost likewise grows with target and with the
-number of installed statistics, \S\ref{sec:measure-runtime}.) This motivates
-treating $(\text{columns},\text{capacity})$ as a joint decision
+it sets estimation precision directly. On \texttt{stats\_CEB\_single} (the
+\texttt{posts} table), a single 3-column MCV,
+\texttt{posts(AnswerCount,FavoriteCount,ViewCount)}, repairs a query with
+baseline q-error 4.58 only as far as its capacity allows: at target 100 it
+does \emph{nothing} (q-error stays 4.58 --- the correlation is not representable
+in so few MCV entries), at target 1000 it more than halves the error (2.82), and
+at 10000 it becomes near-exact (1.04). The same trend appears on the wide CENSUS
+\texttt{climate} table, where one well-chosen 3-column MCV collapses the
+workload's worst query, \texttt{query.184}, from a baseline q-error of 4{,}162
+(13 true rows against ~54k estimated) to 1.08. (ANALYZE cost likewise grows
+with target and with the number of installed statistics,
+\S\ref{sec:measure-runtime}.) This motivates treating
+$(\text{columns},\text{capacity})$ as a joint decision
 (Prop.~\ref{prop:linear}).
 
 \subsection{RQ2: Is One Statistic per Query Sufficient?}
