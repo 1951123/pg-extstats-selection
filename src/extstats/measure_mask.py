@@ -323,3 +323,119 @@ def _measure_one_table(
                 cur.execute(f"DROP STATISTICS IF EXISTS {name}")
         _drop_backup(conn, backup_table)
         _analyze(conn, tbl)
+
+
+def measure_table_workload_mask(
+    conn: Connection,
+    queries_and_cands: list[tuple[BenchQuery, list[CandidateSet]]],
+    *,
+    kind: str = "mcv",
+    stat_prefix: str = "ext_",
+    levels: tuple[int, ...] = (100, 1000, 10000),
+    table: Optional[str] = None,
+    backup_table: str = "_ext_workload_backup",
+) -> list[QueryMaskMeasurement]:
+    """Workload-wide Protocol-M: build ALL distinct (candidate x level)
+    statistics on one shared table in a SINGLE ANALYZE, then measure every
+    (query, candidate, level) independently by masking.
+
+    Contrast with :func:`measure_query_mask`, which ANALYZEs once *per query*.
+    Here the fixed ANALYZE base cost (table sampling + per-column statistics,
+    see the module docstring "Scopes") is paid exactly once for the whole
+    workload, at the price of one large ANALYZE over every distinct candidate
+    simultaneously and no per-query failure isolation.
+
+    ``queries_and_cands`` must all share the same base table (pass ``table``
+    to force one, e.g. Census ``climate`` / stats_CEB_single ``posts``).
+    """
+    if kind not in _MASKABLE_KINDS:
+        raise ValueError(f"kind {kind!r} not maskable; use {sorted(_MASKABLE_KINDS)}")
+
+    max_level = max(levels)
+
+    # ---- 0) build the deduplicated (columns, level) universe across queries ----
+    # object name -> (candidate, level); columns key -> candidate for lookup
+    by_cols: dict[tuple, CandidateSet] = {}
+    for _, cands in queries_and_cands:
+        for c in cands:
+            by_cols.setdefault(tuple(c.columns), c)
+    dedup = sorted(by_cols.values(), key=lambda c: tuple(c.columns))
+
+    tbl = None
+    # determine the forced table from the (single) candidate table if not given
+    if table is None:
+        tabs = {_qualify_table(c.table) for _, cands in queries_and_cands for c in cands}
+        if len(tabs) != 1:
+            raise ValueError(
+                f"workload-wide masking requires a single shared table; found {tabs}")
+        tbl = tabs.pop()
+    else:
+        tbl = _qualify_table(table)
+
+    def name_of(c: CandidateSet, lvl: int) -> str:
+        return _stat_name_level(c, kind, stat_prefix, lvl)
+
+    # ---- 1) create every distinct (candidate, level) object ----
+    created: list[str] = []
+    try:
+        with conn.cursor() as cur:
+            for c in dedup:
+                for lvl in levels:
+                    nm = name_of(c, lvl)
+                    created.append(nm)
+                    cur.execute(f"DROP STATISTICS IF EXISTS {nm}")
+                    cur.execute(f"CREATE STATISTICS {nm} ({kind}) ON "
+                                f"{', '.join(c.columns)} FROM {tbl}")
+                    if len(levels) > 1:
+                        cur.execute(f"ALTER STATISTICS {nm} SET STATISTICS {int(lvl)}")
+
+        # ---- 2) ONE ANALYZE builds all objects (sampling at max level) ----
+        _set_target(conn, max_level)
+        _analyze(conn, tbl)
+
+        # snapshot all payload oids
+        oids: dict[tuple, int] = {}
+        for c in dedup:
+            for lvl in levels:
+                oids[(tuple(c.columns), lvl)] = _stat_oid(conn, name_of(c, lvl))
+        _backup_payload(conn, backup_table, list(oids.values()), kind)
+
+        # ---- 3) measure each query: baseline (all masked) + each (cand, level) ----
+        results: list[QueryMaskMeasurement] = []
+        for query, cands in queries_and_cands:
+            # baseline: no extended stat active (all payloads NULL)
+            _mask_payload_all_but(conn, backup_table, set(), kind)
+            base = estimate_count_query(conn, query.sql, actual=query.ground_truth)
+            mes = QueryMaskMeasurement(
+                qid=query.qid, bench=query.bench,
+                qerror_base=base.qerror if base.qerror is not None else float("nan"),
+                estimate_base=base.estimate, actual=query.ground_truth)
+            # per (candidate, level) isolation
+            for c in cands:
+                key_cols = tuple(c.columns)
+                for lvl in levels:
+                    keep = {oids[(key_cols, lvl)]}
+                    _mask_payload_all_but(conn, backup_table, keep, kind)
+                    res = estimate_count_query(conn, query.sql, actual=query.ground_truth)
+                    key = f"{tbl}({','.join(c.columns)})"
+                    qerr = res.qerror if res.qerror is not None else float("nan")
+                    size = stat_size_bytes(conn, name_of(c, lvl), kind)
+                    level_dict = mes.candidates.setdefault(key, {
+                        "table": tbl, "columns": list(c.columns),
+                        "kind": kind, "levels": {},
+                    })
+                    level_dict["levels"][int(lvl)] = {
+                        "estimate": res.estimate, "qerror": qerr, "size_bytes": size,
+                    }
+                    _restore_payload(conn, backup_table, kind)
+            results.append(mes)
+        _drop_backup(conn, backup_table)
+        return results
+    finally:
+        # always drop every created object + re-analyze to restore the table
+        for nm in created:
+            with conn.cursor() as cur:
+                cur.execute(f"DROP STATISTICS IF EXISTS {nm}")
+        _drop_backup(conn, backup_table)
+        _analyze(conn, tbl)
+
