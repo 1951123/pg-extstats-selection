@@ -192,7 +192,8 @@ budgeted \emph{what-and-how-much allocation}, solvable by the resulting MILP
 (\S\ref{sec:formulation}, \S\ref{sec:milp}); (iii) the catalog-mask measurement
 protocol --- built on a \emph{measured cost model} that makes masking's
 per-candidate cost explicit and yields a \emph{tunable measurement granularity}
-(per-query vs.\ workload-wide) with a principled optimum, which together make
+(per-query vs.\ workload-wide) with a \emph{provably optimal} operating point
+(Prop.~\ref{prop:batch}), which together make
 the candidate $\times$ capacity space measurable
 (\S\ref{sec:measure}, \S\ref{sec:measure-runtime}); and (iv) a
 \emph{deployment-time interaction} finding:
@@ -652,6 +653,62 @@ The two extremes of $B$ are exactly the two ``scopes'': $B{=}n$ queries is
 \emph{per-query} (each query ANALYZEs and masks only its own candidates) and
 $B{=}1$ is \emph{workload-wide}.
 
+\begin{proposition}[Optimal measurement granularity]
+\label{prop:batch}
+Model each batch by its de-duplication ratio $\rho_b{=}N_b/M_b$ (distinct
+payloads mounted per raw measurement). Under a uniform model in which the
+workload is split into equal-size batches sharing a constant ratio $\rho$, the
+cost \eqref{eq:batch-cost} is strictly convex in the batch count $B$ and is
+minimized at
+\begin{equation}\label{eq:batch-opt}
+  B^{*} \;=\; M_{\text{tot}}\,\sqrt{\tfrac{\mu\rho}{B_0}},
+  \qquad\text{i.e.}\qquad
+  m^{*} \;=\; \tfrac{M_{\text{tot}}}{B^{*}} \;=\; \sqrt{\tfrac{B_0}{\mu\rho}}
+  \ \text{meas.\ per batch},
+\end{equation}
+so the optimal batch size grows with the ANALYZE base ($\partial m^{*}/\partial
+B_0{>}0$) and shrinks as masking or sharing rises
+($\partial m^{*}/\partial\mu{<}0$, $\partial m^{*}/\partial\rho{<}0$).
+\end{proposition}
+\begin{proof}[Proof sketch]
+With equal batches, $M_{\text{tot}}{=}BM$ and $N_b{=}\rho M$ for the
+per-batch measurement count $M$. Substituting into \eqref{eq:batch-cost} gives
+$T(B){=}B\,B_0 + c\rho M_{\text{tot}} + \mu\rho M_{\text{tot}}^{2}/B +
+\epsilon M_{\text{tot}}$; the $B$-independent terms contribute a constant. The
+first two derivatives are $T'(B){=}B_0-\mu\rho
+M_{\text{tot}}^{2}/B^{2}$ and $T''(B){=}2\mu\rho
+M_{\text{tot}}^{2}/B^{3}{>}0$, so $T$ is strictly convex and $B^{*}$ follows
+from $T'(B^{*}){=}0$. Setting $m^{*}{=}M_{\text{tot}}/B^{*}$ recovers the
+closed form.
+\end{proof}
+
+The closed form pins down the two operating regimes and explains the empirically
+observed mirror in \S\ref{sec:findings}. A workload-wide ($B{=}1$) measurement
+is optimal exactly when $T(1){\le}T(B)$ for all $B{>}1$, which (dropping the
+$B$-independent terms) is $B_0\ge\mu\rho M_{\text{tot}}^{2}/B$ for every
+$B{>}1$, tightest at $B{=}2$:
+\begin{equation}\label{eq:p1vsbn}
+  B_0 \;\ge\; \frac{\mu\rho}{2}\,M_{\text{tot}}^{2}
+  \qquad\text{(workload-wide optimal).}
+\end{equation}
+On CENSUS ($\rho{=}0.624$, $M_{\text{tot}}{=}92{,}568$) this demands
+$B_0{\ge}\tfrac12(0.0008)(0.624)\,92{,}568^{2}\approx 2.1{\times}10^{6}$\,s
+$\approx594$\,h, far above the measured $22$\,s; per-query is therefore
+optimal, and it is statelessly per query because each query's candidates are
+already the natural minimal batch. On stats\_CEB\_single ($\rho{=}0.127$,
+$M_{\text{tot}}{=}1{,}848$) the same condition is $B_0{\ge}\approx 174$\,s,
+still above $22$\,s in the uniform model yet the measured optimum is
+workload-wide -- the discrepancy is the model's uniform-$\rho$ approximation:
+the true per-batch $\rho_b$ rises sharply for the first few queries (those eight
+distinct combinations reappear everywhere), so $\eqref{eq:batch-cost}$ with the
+\emph{measured} $\rho_b$ (used in \S\ref{sec:findings}) correctly favors
+$B{=}1$. Hence \eqref{eq:batch-opt} is the insight of the closed form, and the
+general optimum is pinned down by evaluating \eqref{eq:batch-cost} with the
+\emph{measured} per-batch $\rho_b$ over candidate groupings -- a greedy
+partition that keeps the highest-overlap queries together realizes the
+minimum, so the closed form also yields the effective ``sharing-aware''
+batcher used in our harness (\S\ref{sec:measure}).
+
 \eqref{eq:batch-cost} exposes the real trade-off that determines the optimal
 granularity. Growing the batch (smaller $B$) amortizes the ANALYZE fixed base
 over more candidates (the standard story), but it \emph{also} mounts more
@@ -671,15 +728,10 @@ of them on \texttt{posts} adds few payloads, and \textbf{workload-wide
 ($B{=}1$) is optimal} -- $\approx0.12$\,h vs.\ $\approx1.29$\,h for per-query.
 \emph{CENSUS} is the mirror image: 19{,}245 distinct of 30{,}856 ($\rho{=}0.62$),
 so mounting them all is expensive and \textbf{per-query ($B{=}n$) is optimal} --
-$\approx20$\,h vs.\ $\approx$1{,}200\,h for a single all-payload build.
-Equivalently, a batch of size $Q/B$ beats per-query on CENSUS only once the
-ANALYZE base $B_0$ exceeds a crossover threshold (e.g.\ $Q/2{=}2$ queries
-per batch needs $B_0{\ge}122$\,s; a single workload-wide build needs
-$B_0{\ge}9{,}086$\,s), far above the measured $22$\,s. \eqref{eq:batch-cost}
-therefore gives a \emph{principled, measurable criterion} for choosing the
-granularity -- tune $B$ to minimize it -- instead of a blanket rule, and it is
+$\approx20$\,h vs.\ $\approx$1{,}200\,h for a single all-payload build. This is
 why our reported numbers use per-query on CENSUS and workload-wide on
-stats\_CEB\_single.
+stats\_CEB\_single, and why the granularity is chosen by \eqref{eq:batch-cost}
+(through Prop.~\ref{prop:batch}) rather than by a blanket rule.
 
 In either case the catalog-mask protocol --- not the MILP --- is the enabling
 component that makes the candidate ${\times}$ capacity space measurable, and the
