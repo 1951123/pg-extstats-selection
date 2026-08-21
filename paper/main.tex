@@ -772,7 +772,7 @@ reaches the estimation floor ($\le1.05$) for $94\%$ of near-baseline queries
 One dominant column cluster drives a single-table query's error, and one
 well-chosen 3-column MCV captures it --- measured, not assumed.
 
-\subsubsection{Step 2: exhaustive check --- one statistic equals the best \emph{subset}.}
+\textbf{Step 2: exhaustive check --- one statistic equals the best \emph{subset}.}
 A skeptic may ask whether restricting to one statistic per query loses anything
 against the \emph{true} multi-select optimum --- i.e.\ an arbitrary subset, not
 just top-$k$. For every query with few candidates we settle this exactly: we
@@ -790,7 +790,7 @@ So even against the true, unconstrained multi-select optimum, the sparse
 restriction to one statistic per query loses essentially nothing on these
 workloads.
 
-\subsubsection{Step 3: candidate-width sensitivity.}
+\textbf{Step 3: candidate-width sensitivity.}
 A reviewer-driven check is whether the 2/3-column candidate restriction itself
 manufactures sparsity. We relax the width on the hardest CENSUS queries (where
 2/3-column candidates leave the largest residual) and re-measure the best
@@ -813,7 +813,7 @@ next step. On the evaluated single-table workloads over \texttt{posts}, the
 2/3-column candidates already reach $\approx$1.0 everywhere, so the width effect
 is confined to the harder CENSUS tail.
 
-\subsubsection{Step 4: a controlled many-cluster stress test --- where sparsity fails.}
+\textbf{Step 4: a controlled many-cluster stress test --- where sparsity fails.}
 The sparse regime is not universal, so we build a controlled \emph{failure
 test} matching the mechanistic hypothesis (\S\ref{sec:disc-sparsity}): on a
 synthetic table we vary the number $K$ of \emph{mutually independent},
