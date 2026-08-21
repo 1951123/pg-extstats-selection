@@ -486,9 +486,10 @@ $\sim$2.5M rows) a single ANALYZE at \texttt{statistics\_target}=10000 takes
 $\approx$22s with no statistics (warm cache; a fixed base cost), growing
 roughly linearly with the number of statistics already
 on the table (Table \ref{tab:measurement}). Consequently the naive protocol
-costs $\approx$44s per candidate --- two ANALYZEs $\times$ $\approx$22s ---
-times 19{,}245 deduplicated
-candidates is not a tractable phase-1 ($\sim$10 days).
+costs $\approx$44s per candidate --- two ANALYZEs $\times$ $\approx$22s. Even
+after deduplication the full workload leaves 19{,}245 distinct candidates, so
+Protocol-A would need $\approx$9.8 days of ANALYZE time at this capacity alone
+--- not a tractable phase-1.
 
 \subsection{The Catalog-Mask Protocol (Protocol-M)}
 \label{sec:measure-mask}
@@ -629,7 +630,15 @@ Workload-wide:} when a workload is dominated by one table, all of that table's
 distinct candidates are built and ANALYZEd \emph{once}, and every query is then
 measured by masking against that single build. This pays the fixed base cost a
 single time --- the full payoff of Table \ref{tab:measurement} --- at the price
-of one (large) ANALYZE over all candidates and no per-query isolation. In
+of one (large) ANALYZE over all candidates and no per-query isolation. It also
+cuts the \emph{variable} cost: because the build is over the \emph{deduplicated}
+candidate universe rather than the per-query sum, the same column combination
+appearing in many queries is ANALYZEd once and measured by masking for each, so
+neither the fixed base nor the per-statistic variable cost is paid for duplicate
+candidates across queries. On CENSUS this is exactly the gap between the
+per-query candidate total and the 19{,}245 distinct combinations
+(Tab.~\ref{tab:bench}); on stats\_CEB\_single it merges the 632 multi-table
+sub-plans into a single .posts/.users/.votes build. In
 practice: use per-query when the workload is heterogeneous or small; use the
 workload-wide build when a single table carries most of the queries and the
 fixed ANALYZE cost dominates (exactly our CENSUS and stats\_CEB\_single
