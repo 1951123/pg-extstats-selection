@@ -650,9 +650,9 @@ single 69-column table, 468 queries; DB \texttt{census}) and
 control:} \texttt{job-light} (70 join queries over IMDB; DB \texttt{imdb}) and
 \texttt{stats\_CEB} (146 join queries) --- where errors are dominated by joins
 that extended statistics cannot directly repair. (We do not use the original
-113-query JOB \cite{leis2015good}, which is a standard cardinality-estimation
-benchmark but ships its queries as MIN/MAX aggregates that return a single
-row, so it carries no meaningful whole-query cardinality; job-light is the
+113-query JOB \cite{leis2015good}, because its queries are MIN/MAX aggregates
+that return a single row, so it carries no meaningful whole-query cardinality;
+job-light is the
 same IMDB schema rewritten in the `SELECT COUNT(*)` form standard for
 cardinality estimation \cite{kipf2019learned}.) \emph{Synthetic:} constructed
 tables used only to stress specific mechanisms (\S\ref{sec:rq2},
@@ -1277,7 +1277,7 @@ resulting arithmetic and geometric mean q-errors at every budget. The
 deployment is robust to the mean choice.}
 \label{tab:meanrob}
 \small
-\begin{tabular}{lrrrr}
+\begin{tabular}{lrrrrr}
 \toprule
 budget & Jaccard & \multicolumn{2}{c}{arith mean} & \multicolumn{2}{c}{geo mean}\\
 \cmidrule(lr){3-4}\cmidrule(lr){5-6}
