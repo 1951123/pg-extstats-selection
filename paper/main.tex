@@ -234,12 +234,14 @@ selected statistics and the estimation quality they deliver --- and treat ANALYZ
 maintenance cost separately (it is a property of the maximum, not the sum, of
 targets).
 
-\textbf{Capacity-quality trade-off.} Capacity directly buys precision: the
-single 3-column MCV \texttt{posts(AnswerCount,FavoriteCount,ViewCount)} moves a
-query from no improvement at target 100 (q-error 4.58) to near-exact at 10000
-(1.04) --- and on the wide CENSUS table a single 3-column MCV collapses the
-worst query's baseline q-error of 4{,}162 to 1.08 (\S\ref{sec:rq1}). This
-motivates treating capacity as a decision axis.
+\textbf{Capacity-quality trade-off.} Capacity directly buys precision --- but
+only where it is the binding constraint: the single 3-column MCV
+\texttt{posts(AnswerCount,FavoriteCount,ViewCount)} moves a query from no
+improvement at target 100 (q-error 4.58) to near-exact at 10000 (1.04), while
+on the wide CENSUS table the workload's worst query collapses from a baseline
+q-error of 4{,}162 to 1.08 even at target 100 (capacity is \emph{not} the
+binding constraint there; \S\ref{sec:rq1}). This motivates treating capacity
+as a decision axis.
 
 \subsection{Related Work}
 
@@ -712,14 +714,17 @@ it sets estimation precision directly. On \texttt{stats\_CEB\_single} (the
 baseline q-error 4.58 only as far as its capacity allows: at target 100 it
 does \emph{nothing} (q-error stays 4.58 --- the correlation is not representable
 in so few MCV entries), at target 1000 it more than halves the error (2.82), and
-at 10000 it becomes near-exact (1.04). The same trend appears on the wide CENSUS
-\texttt{climate} table, where one well-chosen 3-column MCV collapses the
-workload's worst query, \texttt{query.184}, from a baseline q-error of 4{,}162
-(13 true rows against ~54k estimated) to 1.08. (ANALYZE cost likewise grows
-with target and with the number of installed statistics,
-\S\ref{sec:measure-runtime}.) This motivates treating
-$(\text{columns},\text{capacity})$ as a joint decision
-(Prop.~\ref{prop:linear}).
+at 10000 it becomes near-exact (1.04). Capacity is not always the binding
+constraint, however: on the wide CENSUS \texttt{climate} table, extreme-selectivity
+queries are caught even at a \emph{low} target --- the workload's worst query,
+\texttt{query.184} (baseline q-error 4{,}162, 13 true rows against ~54k
+estimated), is collapsed to 1.08 by a single 3-column MCV already at target 100.
+Capacity therefore sets a \emph{per-query} precision floor that competes for
+the same budget --- some queries are repaired at low capacity, others need
+high --- which is precisely why \emph{how much} must be decided jointly with
+\emph{which} statistics to build (Prop.~\ref{prop:linear}). (ANALYZE cost
+likewise grows with target and with the number of installed statistics,
+\S\ref{sec:measure-runtime}.)
 
 \subsection{RQ2: Is One Statistic per Query Sufficient?}
 \label{sec:rq2}
