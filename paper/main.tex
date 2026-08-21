@@ -154,10 +154,15 @@ surviving option. On wide tables the naive protocol (CREATE--ANALYZE--EXPLAIN
 per candidate) is infeasible --- a single CENSUS ANALYZE at target 10000 already
 takes $\sim$22s with a warm cache, and grows linearly with the number of
 statistics (\S\ref{sec:measure-runtime}). Our
-\emph{catalog-mask protocol} (\S\ref{sec:measure}) builds all
+\emph{catalog-mask protocol} (\S\ref{sec:measure}) builds each batch's
 candidates in one ANALYZE and isolates each by masking the others'
-\texttt{pg\_statistic\_ext\_data} payloads, cutting measurement cost by
-roughly $17$--$93\times$ and making the candidate $\times$ capacity space measurable;
+\texttt{pg\_statistic\_ext\_data} payloads. Masking itself has a measured
+per-candidate cost that grows with the batch's payloads, so the protocol
+exposes a \emph{tunable measurement granularity}: per-query when candidate
+sharing is low (CENSUS, $\approx$57$\times$ faster than naive) and
+\emph{workload-wide} when it is high (stats\_CEB\_single, $\approx$188$\times$),
+both against per-candidate CREATE/ANALYZE (\S\ref{sec:measure-runtime}). This
+makes the candidate $\times$ capacity space measurable;
 the resulting MILP then solves at full-workload scale in seconds
 (\S\ref{sec:rq4}). Measurement, not optimization, is the dominant bottleneck.
 
@@ -185,8 +190,12 @@ candidate per query --- whose linearity is a formal consequence
 (\S\ref{sec:rq2}); (ii) a reformulation of extended-statistics selection as
 budgeted \emph{what-and-how-much allocation}, solvable by the resulting MILP
 (\S\ref{sec:formulation}, \S\ref{sec:milp}); (iii) the catalog-mask measurement
-protocol that makes the candidate $\times$ capacity space measurable
-(\S\ref{sec:measure}); and (iv) a \emph{deployment-time interaction} finding:
+protocol --- built on a \emph{measured cost model} that makes masking's
+per-candidate cost explicit and yields a \emph{tunable measurement granularity}
+(per-query vs.\ workload-wide) with a principled optimum, which together make
+the candidate $\times$ capacity space measurable
+(\S\ref{sec:measure}, \S\ref{sec:measure-runtime}); and (iv) a
+\emph{deployment-time interaction} finding:
 we identify a previously-hidden \emph{creation-order} planner choice among
 co-installed overlapping statistics that breaks per-candidate surrogate
 fidelity, characterize it exactly (\S\ref{sec:switch}), and --- via a
@@ -507,12 +516,14 @@ temporary backup table via \texttt{UPDATE ... FROM} (the \texttt{pg\_mcv\_list}
 type has no bytea cast, so the round-trip must happen inside the server).
 Multiple capacity levels are measured with one object per (candidate, level)
 via \texttt{ALTER STATISTICS ... SET STATISTICS}, again built by a single
-ANALYZE at the maximum target. Protocol-M therefore costs one ANALYZE (for the
-whole table) plus a cheap EXPLAIN per candidate, instead of two ANALYZEs per
-candidate. The saving is entirely about \emph{amortizing the fixed ANALYZE
-base cost} (\S\ref{sec:measure-runtime}): a table's sample and per-column
+ANALYZE at the maximum target. Protocol-M therefore replaces two ANALYZEs per
+candidate with \emph{one} mask--EXPLAIN--restore cycle per candidate, whose cost
+is dominated by the catalog UPDATE and grows with the number of payloads
+mounted on the table (a tunable granularity; \S\ref{sec:measure-runtime}) ---
+not by a fixed EXPLAIN. The saving is about amortizing the fixed ANALYZE
+base cost (\S\ref{sec:measure-runtime}): a table's sample and per-column
 statistics are recomputed on every ANALYZE, so Protocol-A pays that base twice
-per candidate, whereas Protocol-M pays it once for all candidates on the table.
+per candidate, whereas Protocol-M pays it once per batch of candidates.
 
 \begin{figure*}[t]
 \centering
@@ -544,8 +555,9 @@ per candidate, whereas Protocol-M pays it once for all candidates on the table.
 built in one ANALYZE; to measure S1 we NULL the others' payloads in
 \texttt{pg\_statistic\_ext\_data}, so the planner's
 \texttt{statext\_is\_kind\_built()} includes only S1 in
-\texttt{rel->statlist}. Measuring each candidate costs an EXPLAIN, not an
-ANALYZE.}
+\texttt{rel->statlist}. Measuring each candidate is a mask--EXPLAIN--restore
+cycle (
+\S\ref{sec:measure-runtime}) rather than an ANALYZE.}
 \label{fig:mask}
 \end{figure*}
 
@@ -573,7 +585,9 @@ system facts make the manipulation safe and correct in practice:
 invalidation, and we re-issue a fresh \texttt{EXPLAIN} per candidate, so we
 never reuse an estimate computed from a pre-update cache; and
 (ii) \emph{update-in-place, not rewrite} --- NULLing a payload does not re-run
-ANALYZE, so masking cost is independent of table size. Because the protocol
+ANALYZE, so masking cost is independent of table \emph{size} (row count); it is,
+however, linear in the number of payloads mounted on the table, which is why
+measurement granularity matters (\S\ref{sec:measure-runtime}). Because the protocol
 relies on the layout of the system catalog, it is specific to PostgreSQL 16 and
 to \emph{MCV} statistics (\texttt{ndistinct}/\texttt{dependencies} masking is
 untested); both the catalog layout and the planner's OID-order selection
@@ -595,75 +609,109 @@ contributing nothing. This is why measurements use target\,10000 (sometimes 1000
 for cross-checks): exactly reproducible, with only accuracy varying with
 capacity.
 
-\subsection{Runtime: Measurement Is the Bottleneck, Not the Solve}
+\subsection{Runtime: A Tunable Measurement-Granularity Cost Model}
 \label{sec:measure-runtime}
 
-Table \ref{tab:measurement} shows the cost structure that makes masking win.
-An ANALYZE has a sizable \emph{fixed} base cost --- sampling the table and
-recomputing its per-column statistics (about 22s here at target 10000, measured
-with a warm cache) --- plus a
-\emph{variable} cost that grows (roughly linearly) with the number of extended
-statistics $N$. Protocol-A repeats that fixed base $2N$ times (two ANALYZEs
-per candidate), so it scales as $\sim 2N\times(\text{fixed}+c)$; Protocol-M pays
-the fixed base \emph{once} --- on a single table, one ANALYZE covers the whole
-workload's candidates --- and then only the variable cost, one ANALYZE plus $N$
-cheap EXPLAIN payloads: a $17\times$ saving at 10 candidates growing to
-$\sim$89$\times$ at 500 and $\sim$93$\times$ at 1000. Because both protocols
-share the same variable slope, the advantage is \emph{monotone in $N$}: writing
-the fixed base as $B$, Protocol-A costs $2N(B+c)$ while Protocol-M costs
-$B+(c+\epsilon)N$, so the speedup $\frac{2N(B+c)}{B+(c+\epsilon)N}$ increases
-with $N$ and saturates at the fixed-cost amortization ceiling
-$2(B+c)/(c+\epsilon)\approx 98\times$ --- the larger the candidate space, the
-more Protocol-M's single-build amortization pays off. This is why the
-catalog-mask protocol --- not the MILP --- is the enabling component that makes
-the candidate $\times$ capacity space measurable, and why the optimization
-(\S\ref{sec:rq4}) is the cheap part of the pipeline.
+Protocol-M dominates Protocol-A by replacing per-candidate ANALYZEs with
+per-candidate masking, but \emph{masking is not free}: it rewrites the system
+catalog, and per (candidate, level) the measurement loop
+(Fig.~\ref{fig:mask}, \S\ref{sec:measure-mask}) is
+\[
+  \underbrace{\text{mask all but one payload}}_{\text{UPDATE }\times\,N}\;\to\;
+  \underbrace{\text{EXPLAIN}}_{\approx 0.002\text{s}}\;\to\;
+  \underbrace{\text{restore all payloads}}_{\text{UPDATE }\times\,N}.
+\]
+We measured each component directly on CENSUS \texttt{climate} by sweeping the
+number of payloads $N$ on the table (target 10000; Fig.~anchors in
+Tab.~\ref{tab:measurement}): the mask and restore are
+\emph{linear in the table's payload count} ($\approx0.0008$\,s and
+$\approx0.00003$\,s per payload respectively), while the EXPLAIN is a constant
+$\approx0.002$\,s. So a single masked measurement costs
+\[
+  \epsilon(N) \;=\; 0.0008\,N + 0.00003\,N + 0.002 \;\approx\; 0.0008\,N \;\text{s},
+\]
+i.e.\ masking is \emph{not} a constant -- it grows with the number of
+statistics mounted on the table during that measurement, which is a property of
+the measurement \emph{granularity}, not of Protocol-M per se.
 
-\emph{Two measurement scopes, one protocol.} The same masking scheme can be
-driven at two granularities, and the fixed-cost structure dictates when each
-is preferred. \emph{(i) Per-query:} each query's candidate set is built by its
-own ANALYZE and measured in isolation. This is the natural default for
-multi-table or heterogeneous workloads (different queries touch different
-tables, so they cannot share a build anyway), and it confines any failure to a
-single query; but it repeats the fixed base cost once per query. \emph{(ii)
-Workload-wide:} when a workload is dominated by one table, all of that table's
-distinct candidates are built and ANALYZEd \emph{once}, and every query is then
-measured by masking against that single build. This pays the fixed base cost a
-single time --- the full payoff of Table \ref{tab:measurement} --- at the price
-of one (large) ANALYZE over all candidates and no per-query isolation. It also
-cuts the \emph{variable} cost: because the build is over the \emph{deduplicated}
-candidate universe rather than the per-query sum, the same column combination
-appearing in many queries is ANALYZEd once and measured by masking for each, so
-neither the fixed base nor the per-statistic variable cost is paid for duplicate
-candidates across queries. On CENSUS this is exactly the gap between the
-per-query candidate total and the 19{,}245 distinct combinations
-(Tab.~\ref{tab:bench}); on stats\_CEB\_single it merges the 632 multi-table
-sub-plans into a single .posts/.users/.votes build. In
-practice: use per-query when the workload is heterogeneous or small; use the
-workload-wide build when a single table carries most of the queries and the
-fixed ANALYZE cost dominates (exactly our CENSUS and stats\_CEB\_single
-workloads).
+This makes the measurement \emph{scope} a first-class, tunable decision. Group
+the queries' candidates into $B$ batches; inside a batch $b$ we run
+workload-wide: build the batch's $N_b$ distinct (candidate$\,{\times}\,$level)
+objects, ANALYZE once, then measure each of the batch's $M_b$ (query,
+candidate, level) cells by masking against the $N_b$ payloads. The total
+measurement time is
+\begin{equation}\label{eq:batch-cost}
+  T(B) \;=\;\underbrace{\sum_{b=1}^{B}\big(B_0 + c\,N_b\big)}_{\text{one ANALYZE per batch}}
+      \;+\;\underbrace{\mu\sum_{b=1}^{B} M_b\,N_b}_{\text{mask + restore}}
+      \;+\;\underbrace{\epsilon\,M_{\text{tot}}}_{\text{EXPLAIN}},
+\end{equation}
+where $B_0{=}22$\,s is the fixed ANALYZE base (warm cache), $c{\approx}0.35$\,s
+per statistic, $\mu{\approx}0.0008$\,s per payload, improving on
+the earlier constant-\textsc{epsilon} model (which treated masking as free).
+The two extremes of $B$ are exactly the two ``scopes'': $B{=}n$ queries is
+\emph{per-query} (each query ANALYZEs and masks only its own candidates) and
+$B{=}1$ is \emph{workload-wide}.
+
+\eqref{eq:batch-cost} exposes the real trade-off that determines the optimal
+granularity. Growing the batch (smaller $B$) amortizes the ANALYZE fixed base
+over more candidates (the standard story), but it \emph{also} mounts more
+payloads on the table, so every measurement masks a longer catalog and the mask
+term $\mu M_bN_b$ grows -- \emph{quadratically} in batch size when the batch's
+distinct payloads are close to its raw measurement count. The winner is set by
+the workload's \textbf{deduplication ratio} $\rho_b=N_b/M_b$ (distinct
+candidates encountered per raw candidate) and by $B_0$: per-query wins when the
+ANALYZE base is small or sharing is low, workload-wide wins when sharing is high
+enough that $N_b$ stays small relative to $M_b$.
+
+The two real workloads sit on opposite sides of this trade-off (measured with
+our candidate generator, \S\ref{sec:findings}). \emph{stats\_CEB\_single} has
+only 78 distinct column combinations out of 616 raw candidates
+($\rho{=}0.13$): its queries reuse the same few combinations, so mounting all
+of them on \texttt{posts} adds few payloads, and \textbf{workload-wide
+($B{=}1$) is optimal} -- $\approx0.12$\,h vs.\ $\approx1.29$\,h for per-query.
+\emph{CENSUS} is the mirror image: 19{,}245 distinct of 30{,}856 ($\rho{=}0.62$),
+so mounting them all is expensive and \textbf{per-query ($B{=}n$) is optimal} --
+$\approx20$\,h vs.\ $\approx$1{,}200\,h for a single all-payload build.
+Equivalently, a batch of size $Q/B$ beats per-query on CENSUS only once the
+ANALYZE base $B_0$ exceeds a crossover threshold (e.g.\ $Q/2{=}2$ queries
+per batch needs $B_0{\ge}122$\,s; a single workload-wide build needs
+$B_0{\ge}9{,}086$\,s), far above the measured $22$\,s. \eqref{eq:batch-cost}
+therefore gives a \emph{principled, measurable criterion} for choosing the
+granularity -- tune $B$ to minimize it -- instead of a blanket rule, and it is
+why our reported numbers use per-query on CENSUS and workload-wide on
+stats\_CEB\_single.
+
+In either case the catalog-mask protocol --- not the MILP --- is the enabling
+component that makes the candidate ${\times}$ capacity space measurable, and the
+optimization (\S\ref{sec:rq4}) stays the cheap part of the pipeline; the
+granularity analysis above turns Protocol-M from a fixed trick into a tunable
+component whose operating point is chosen by a measurable cost model.
 
 \begin{table*}[t]
-\caption{ANALYZE cost with $N$ extended statistics on CENSUS \texttt{climate}
-(measured at target 10000; base $\approx$22s with a warm cache, plus a roughly
-linear $\sim$0.35s-per-statistic growth), and the implied naive (Protocol-A) vs.\
-catalog-mask (Protocol-M) total phase-1 cost for $N$ candidates. ``base'' is
-the fixed ANALYZE cost per table; Protocol-A pays it twice per candidate ($2N$
-ANALYZEs), Protocol-M once plus $N$ cheap EXPLAIN/mask payloads ($\approx$0.1s
-each). Measured ANALYZE-at-$N$ anchors: 1{,}000 stats $\to$420s, 3{,}000
-$\to$1{,}013s, 6{,}000 $\to$2{,}003s, 10{,}000 $\to$3{,}507s.}
+\caption{ANALYZE and masking cost with $N$ statistics on CENSUS \texttt{climate}
+(target 10000, warm cache; base $\approx$22s plus $\approx$0.35s per statistic,
+mask/restore $\approx$0.0008$/$0.00003 s per payload, EXPLAIN $\approx$0.002s),
+and the implied naive (Protocol-A) vs.\ workload-wide catalog-mask (Protocol-M)
+total phase-1 cost for $N$ candidates mounted on the table. ``base'' is the
+fixed ANALYZE cost per table; Protocol-A pays it twice per candidate ($2N$
+ANALYZEs); Protocol-M pays it once plus $N$ mask--EXPLAIN--restore cycles, whose
+mask term grows as $\mu N^2$ (Eq.~\ref{eq:batch-cost}). The speedup therefore
+\emph{peaks} and then falls as $N$ grows -- masking is not free -- until a
+different granularity (per-query) wins (Eq.~\ref{eq:batch-cost},
+\S\ref{sec:measure-runtime}). Measured ANALYZE-at-$N$ anchors: 1{,}000 stats
+$\to$420s, 3{,}000 $\to$1{,}013s, 6{,}000 $\to$2{,}003s, 10{,}000 $\to$3{,}507s.}
 \label{tab:measurement}
 \small
 \begin{tabular}{lcc|rrr}
 \toprule
 $N$ & base & ANALYZE & naive & Protocol-M & speedup\\
- & (0 st.) & (at $N$) & (Proto-A) & & \\
+ & (0 st.) & (at $N$) & (Proto-A) & (workload-wide) & \\
 \midrule
 10   & 22s & 26s   & 440s   & 26s   & 17$\times$\\
-100  & 22s & 57s   & 4{,}400s & 67s  & 66$\times$\\
-500  & 22s & 197s  & 22{,}000s & 247s & 89$\times$\\
-1000 & 22s & 372s  & 44{,}000s & 472s & 93$\times$\\
+100  & 22s & 57s   & 4{,}400s & 66s  & 67$\times$\\
+500  & 22s & 197s  & 22{,}000s & 406s & 54$\times$\\
+1000 & 22s & 372s  & 44{,}000s & 1{,}204s & 37$\times$\\
+19{,}245 & 22s & 6{,}758s & 846{,}780s & 314{,}203s & 3$\times$\\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -681,7 +729,7 @@ $N$ & base & ANALYZE & naive & Protocol-M & speedup\\
 \node[bs] (b) at (3.1,0) {candidate $\times$ capacity\\[-0.5mm]\textbf{measurement}};
 \node[bs] (c) at (6.2,0) {sparse\\[-0.5mm]MILP};
 \node[bs] (d) at (9.2,0) {\\[-0.5mm]\textbf{deploy}};
-\node[bs, exp] (b2) at (3.1,-1.9) {expensive\\[-0.5mm]($17$--$93\times$ speedup)};
+\node[bs, exp] (b2) at (3.1,-1.9) {expensive\\[-0.5mm]($\approx$57--188$\times$ vs. naive)};
 \node[bs, cheap] (c2) at (6.2,-1.9) {cheap\\[-0.5mm]($<$5\,s)};
 \draw[arr] (a.east) -- (b.west);
 \draw[arr] (b.east) -- (c.west);
@@ -690,19 +738,23 @@ $N$ & base & ANALYZE & naive & Protocol-M & speedup\\
 \draw (c2.north) -- (c.south);
 \end{tikzpicture}
 \caption{Pipeline cost profile. The candidate $\times$ capacity
-\emph{measurement} (\S\ref{sec:measure}) is the expensive step -- $17$--$93\times$
-cheaper with the catalog-mask protocol (Tab.~\ref{tab:measurement}), yet still dominant -- whereas the sparse
+\emph{measurement} (\S\ref{sec:measure}) is the expensive step -- but the
+catalog-mask protocol makes it feasible by amortizing ANALYZE and exposing a
+tunable granularity (Tab.~\ref{tab:measurement}), $\approx$57--188$\times$
+faster than per-candidate CREATE/ANALYZE on our workloads -- whereas the sparse
 MILP solves in under five seconds (\S\ref{sec:rq4}). The bottleneck is obtaining
 the data the optimization needs, not the optimization itself.}
 \label{fig:pipeline}
 \end{figure*}
 
-\textbf{Scalability and overhead.} On a controlled 40-column synthetic table
-(target 1000) swept from $N{=}1$ to 5{,}000 candidates, Protocol-M's speedup is
-already $17\times$ at $N{=}10$, peaks near $117\times$ at $N{=}100$, and stays
-above $74\times$ out to $N{=}5000$, while the mask-update overhead is never more
-than $\sim$10\% of total cost. Per-candidate cost thus no longer depends on the
-table size at all.
+\textbf{Scalability and overhead.} The mask overhead is the one cost that grows
+with the number of statistics mounted on a table, and it is why granularity
+matters: it goes as $\mu M_b N_b$ per batch (Eq.~\ref{eq:batch-cost}), so it is
+negligible in per-query mode and in high-dedup workload-wide builds, but it
+becomes the dominant term if a low-dedup workload is measured with a single
+giant build (Tab.~\ref{tab:measurement}'s last row). Tunable granularity keeps
+it small: per-query on CENSUS and workload-wide on stats\_CEB\_single both keep
+the mask term a small fraction of the total (\S\ref{sec:measure-runtime}).
 
 \section{Empirical Findings}
 \label{sec:findings}
