@@ -493,7 +493,10 @@ Multiple capacity levels are measured with one object per (candidate, level)
 via \texttt{ALTER STATISTICS ... SET STATISTICS}, again built by a single
 ANALYZE at the maximum target. Protocol-M therefore costs one ANALYZE (for the
 whole table) plus a cheap EXPLAIN per candidate, instead of two ANALYZEs per
-candidate.
+candidate. The saving is entirely about \emph{amortizing the fixed ANALYZE
+base cost} (\S\ref{sec:measure-runtime}): a table's sample and per-column
+statistics are recomputed on every ANALYZE, so Protocol-A pays that base twice
+per candidate, whereas Protocol-M pays it once for all candidates on the table.
 
 \begin{figure*}[t]
 \centering
@@ -579,14 +582,19 @@ capacity.
 \subsection{Runtime: Measurement Is the Bottleneck, Not the Solve}
 \label{sec:measure-runtime}
 
-Table \ref{tab:measurement} shows the consequence of the measured linear growth
-of ANALYZE time with the number of statistics on a table: Protocol-A costs
-$2N$ ANALYZEs (proportional to $N$), Protocol-M one ANALYZE plus $N$ cheap
-EXPLAIN payloads, a $9\times$ saving at 10 candidates growing to $\sim$60$\times$
-at 100 and $\sim$130$\times$ at 1000. This is why the catalog-mask protocol ---
-not the MILP --- is the enabling component that makes the candidate $\times$
-capacity space measurable, and why the optimization (\S\ref{sec:rq4}) is the
-cheap part of the pipeline.
+Table \ref{tab:measurement} shows the cost structure that makes masking win.
+An ANALYZE has a sizable \emph{fixed} base cost --- sampling the table and
+recomputing its per-column statistics (about 22s here at target 10000) --- plus a
+\emph{variable} cost that grows (roughly linearly) with the number of extended
+statistics $N$. Protocol-A repeats that fixed base $2N$ times (two ANALYZEs
+per candidate), so it scales as $\sim 2N\times(\text{fixed}+c)$; Protocol-M pays
+the fixed base \emph{once} --- on a single table, one ANALYZE covers the whole
+workload's candidates --- and then only the variable cost, one ANALYZE plus $N$
+cheap EXPLAIN payloads: a $9\times$ saving at 10 candidates growing to
+$\sim$60$\times$ at 100 and $\sim$130$\times$ at 1000. This is why the
+catalog-mask protocol --- not the MILP --- is the enabling component that makes
+the candidate $\times$ capacity space measurable, and why the optimization
+(\S\ref{sec:rq4}) is the cheap part of the pipeline.
 
 \begin{table*}[t]
 \caption{ANALYZE cost with $N$ extended statistics on CENSUS \texttt{climate}
