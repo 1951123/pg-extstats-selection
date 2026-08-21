@@ -684,19 +684,19 @@ tail. Hence we report median/P90/max alongside the mean.
 Per-query candidates are the 2/3-column subsets of each query's selection
 predicates; ``cands/query (total)'' is the sum of per-query candidate counts
 before deduplication, ``global dedup'' the number of distinct column
-combinations across the workload, and ``per-query med/max'' the median and
-maximum candidate count per query.}
+combinations across the workload, and ``per-query min/p25/med/p75/max'' the
+five-point summary of the candidate-count distribution per query.}
 \label{tab:bench}
 \small
-\begin{tabular}{lccccc}
+\begin{tabular}{lcccl@{\hskip 3pt}c}
 \toprule
-benchmark & queries & cands/query & with any & global & per-query \\
-          &         & (total)      &          & dedup  & med/max \\
+benchmark & queries & cands/query & with & global & per-query \\
+          &         & (total)     & any  & dedup  & min/p25/med/p75/max \\
 \midrule
-CENSUS           & 468 & 30856 & 467 & 19245 & 56/455\\
-job-light (join) & 70  & 5     & 5   & 1     & 0/1\\
-stats\_CEB (join)& 146 & 609   & 108 & 79    & 2/39\\
-stats\_CEB\_single & 632 & 616 & 180 & 79    & 0/35\\
+CENSUS          & 468 & 30856 & 467 & 19245 & 0/20/56/84/455\\
+job-light (join)& 70  & 5     & 5   & 1     & 0/0/0/0/1\\
+stats\_CEB (join)& 146 & 616  & 111 & 78    & 0/1/2/5/39\\
+stats\_CEB\_single & 632 & 616 & 180 & 78   & 0/0/0/1/35\\
 \bottomrule
 \end{tabular}
 \end{table*}
