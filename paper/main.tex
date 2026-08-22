@@ -263,6 +263,15 @@ menu is appropriate and generous --- many correlated groups are captured at 100
 target 100; \S\ref{sec:rq1}), while high-cardinality groups need the larger
 levels (\texttt{posts(AnswerCount,FavoriteCount,ViewCount)} moves from no
 improvement at 100, q-error 4.58, to near-exact at 10000, 1.04; \S\ref{sec:rq1}).
+The two workloads sit at opposite ends of this axis: the CENSUS \texttt{climate}
+columns are \emph{data-capped}, so across 30{,}856 candidate-level points
+\S\ref{sec:rq1} finds \textbf{91.8\%} of candidates' q-error independent of the
+target and \textbf{73.3\%} fully collapsed (identical q-error and size at every
+level), whereas the high-cardinality \texttt{posts} statistics are
+\emph{target-capped} and gain from escalation. Both ends confirm that capacity
+is a real, per-object decision --- at one extreme it is already decided by the
+data (no gain from escalation), at the other it is the decisive knob --- which
+is why \emph{how much} must be chosen jointly with \emph{which} statistics.
 Capacity thus sets a \emph{per-query} precision floor --- the ``how much''
 dimension --- and is a genuine decision axis, which motivates allocating it
 under a shared budget.
@@ -920,8 +929,20 @@ constraint, however: on the wide CENSUS \texttt{climate} table, extreme-selectiv
 queries are caught even at a \emph{low} target --- the workload's worst query,
 \texttt{query.184} (baseline q-error 4{,}162, 13 true rows against ~54k
 estimated), is collapsed to 1.08 by a single 3-column MCV already at target 100.
-Capacity therefore sets a \emph{per-query} precision floor that competes for
-the same budget --- some queries are repaired at low capacity, others need
+
+This contrast is \emph{systematic}, not anecdotal. Across the full 468-query
+CENSUS workload (30{,}856 measured candidate-level points), raising the target
+from 100 through 1000 to 10000 changes the q-error of \textbf{91.8\%} of
+candidates by \emph{zero} (identical at all three levels), and \textbf{73.3\%}
+are collapsed on both axes --- identical q-error \emph{and} identical
+persistent size. Only \textbf{4.4\%} of candidates actually improve at a higher
+target, and 99.3\% of those also grow in size, i.e.\ the few capacity-sensitive
+points are exactly the target-capped ones. The mechanism is the one in
+\S\ref{sec:mechanisms}: CENSUS's categorical columns are \emph{data-capped},
+their MCV lists already full at target 100, so a larger target neither stores
+more entries nor changes the estimate. Capacity sets a \emph{per-query}
+precision floor that competes for the same budget --- some queries are repaired
+at low capacity, others (the high-cardinality \texttt{posts} combinations) need
 high --- which is precisely why \emph{how much} must be decided jointly with
 \emph{which} statistics to build (Prop.~\ref{prop:linear}). (ANALYZE cost
 likewise grows with target and with the number of installed statistics,
