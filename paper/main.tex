@@ -620,6 +620,22 @@ contributing nothing. This is why measurements use target\,10000 (sometimes 1000
 for cross-checks): exactly reproducible, with only accuracy varying with
 capacity.
 
+\emph{The single-column target is fixed, not swept.} Throughout, the
+\emph{per-column} statistics that drive the baseline are always measured at
+\texttt{statistics\_target}=10000; only the \emph{extended} statistics'
+capacity varies over the menu \{100, 1000, 10000\}. Equivalently, every
+per-candidate q-error $e_{is}$ is measured against the \emph{same}, maximally
+precise single-column baseline, so the extended statistic's capacity is the
+\emph{only} axis that changes between levels. This isolates the
+\emph{marginal} effect of the column correlation: because the single-column
+estimates are already near-exact, the improvement reported for a candidate
+comes from the correlation it captures, not from patching a coarse
+single-column estimate. Consequently most queries have no candidate at all ---
+their selection predicates are served well by the fixed single-column
+statistics, and their baseline q-error is already $\approx$1 (79\% of the 452
+no-candidate queries on stats\_CEB\_single are exactly $1.0$; the remaining
+21\% are $\le 1.1$).
+
 \subsection{Runtime: A Tunable Measurement-Granularity Cost Model}
 \label{sec:measure-runtime}
 
