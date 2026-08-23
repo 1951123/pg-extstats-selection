@@ -130,6 +130,15 @@
       据此外推 **完整 6 级（L=6）模型估 22.1h，÷0.58 校准 ≈ 38-40h**，与估计的 40h 吻合。
       待 `mcv_low_t10000` 跑完后用真实 6 级墙钟核验，再决定是否写进 §measure-runtime
       作为模型校准说明。
+- [ ] **Protocol-A 对比也是 ANALYZE-only、系统性低估 Protocol-A**（强化 Protocol-M 动机）：
+      `exp_catalog_mask_scale.py` 中 Protocol-A 定义为 $N(2B_0 + \text{EXPLAIN})$，
+      **只含 ANALYZE，忽略每候选的 CREATE/DROP STATISTICS DDL 开销**。对 CENSUS
+      N=19,245 候选即 38,490 次 CREATE + 38,490 次 DROP + 19,245 次 EXPLAIN 未计。
+      因此即便用 40h 实测（6 级），加速比 $235h/40h \approx 5.9\times$ 仍是下界；
+      计入逐候选 DDL 后 Protocol-A 只会更慢、Protocol-M 优势只会更大（不对称低估：
+      只压低 Protocol-A，不压 Protocol-M）。**建议**：CENSUS 重跑完成后，另起一次
+      不冲突的小 probe 实测单次 CREATE/DROP STATISTICS 开销，以量化这个增量并决定
+      是否写进论文（当前为定性论证，未硬编码数字）。
 - [ ] stats_CEB_single 的 workload-wide/per-query 时长（≈0.12h / ≈1.29h）也是模型外推，
       其 6level 数据已完成（632 查询），可复核是否随 6 级化更新。
 - [ ] 若要做增量容量合并，可新增 `merge_phase1.py`（方法 B，尚未开始）。
