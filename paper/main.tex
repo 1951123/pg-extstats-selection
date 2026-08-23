@@ -864,8 +864,9 @@ of them on \texttt{posts} adds few payloads, and \textbf{workload-wide
 so mounting them all is expensive and the \emph{measured} phase-1 instead uses a
 \emph{sub-batched} Protocol-M (\S\ref{sec:measure-mask}), which builds each
 query's candidate set in one ANALYZE but splits queries with many candidates
-into sub-batches (default $\approx$55, the optimal $m^{*}$ of
-Eq.~\ref{eq:intra-batch-opt}) to bound the mask term (\S\ref{sec:measure-runtime});
+into sub-batches of $\approx$55 (the sub-batch size used in our runs, informed
+by the $m^{*}$ of Eq.~\ref{eq:intra-batch-opt}) to bound the mask term
+(\S\ref{sec:measure-runtime});
 this is orders of magnitude cheaper than a single all-payload workload-wide
 build, while remaining within reach of the per-candidate baseline. (Because we
 unified the capacity menu to six levels, the CENSUS phase-1 is re-measured
