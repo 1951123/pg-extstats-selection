@@ -14,9 +14,36 @@ benchmarks/Census/data/us+census+data+1990.zip
 .venv/
 __pycache__/
 *.pyc
-results/
+
+# 实验输出: 默认忽略 results/ 下所有文件, 但白名单纳入"论文 primary 工件"
+# (论文图表/数值直接依赖、重跑成本高、无法从脚本再生的测量数据)。
+# 详见 docs/reproducibility.md 的"数值 ↔ 源 JSON ↔ 复现脚本"清单。
 output/
 experiments/
+
+# ---- 论文 primary 工件 (必须纳入 git, 保证图表与数值可复现) ----
+# 其余 results/ 下文件保持忽略 (smoke / 临时探测 / 可再生中间量)
+# 注: 否定(!)模式尾部不要加 '# 注释' — 会破坏 gitignore 对该规则的解析
+results/*
+# 三个论文图的数据源头 (analyze_sparsity / exp_e2e_scatter / analyze_budget_metrics)
+!results/phase1_ceb_single_mask_full_multi.json
+# RQ1 容量轴 {10..10000} 完整数据
+!results/phase1_ceb_single_mask_6level.json
+# CENSUS {100,1000,10000} 约 15h 正式基线 (30,856 候选)
+!results/phase1_census_mcv_multi.json
+# CENSUS 低档探测 (single-col-50, 历史参考)
+!results/phase1_census_mcv_low.json
+# CENSUS 正式重跑 (single-col-10000) 最终数据
+!results/phase1_census_low_t10000.json
+# stats_CEB mcv 测量与复现
+!results/phase1_stats_ceb_mcv.json
+!results/phase1_stats_ceb_mcv_r3.json
+# 各 phase1 正式运行的测量日志 (记录完整配置/进度, 可审计性)
+!results/phase1_ceb_single_6level.log
+!results/phase1_census_low.log
+!results/phase1_census_low_t10000.log
+!results/phase1_census_mcv_multi.log
+!results/probe_census_fine_capacity.log
 
 # 上游 End-to-End-CardEst-Benchmark 嵌套仓库（仅作数据/参考来源，不纳入本仓库）
 End-to-End-CardEst-Benchmark/
