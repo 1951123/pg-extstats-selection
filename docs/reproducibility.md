@@ -112,8 +112,6 @@
 
 - [ ] `phase1_census_mcv_low_t10000.json` **正式重跑完成后**：确认终值、纳入 git，并替换
       §2.2 / RQ1 中"~30% 敏感 / 22% 改善"的**初步**数字为 single-col-10000 终值。
-- [ ] **等 CENSUS 完整 6 级测量完成后**：确认终值、纳入 git，并替换
-      §2.2 / RQ1 中"~30% 敏感 / 22% 改善"的**初步**数字为 single-col-10000 终值。
 - [x] **`tab:measurement` 已重构为"每候选成本 vs sub-batch size"的协议代价函数采样表**
       （Protocol-A 常数 2B₀=44s vs Protocol-M 凸曲线 B₀/s+cL+μL²s，最优点 s*=55，即
       实际用的 cands-per-batch=55）。这是**纯模型曲线**（锚点 ANALYZE-at-N 数据），
@@ -122,6 +120,16 @@
       "orders of magnitude faster"；待 `phase1_census_mcv_low_t10000.json`
       （低 3 级）+ `phase1_census_mcv_multi.json`（高 3 级）合并成完整 6 级实测后，
       填入真实运行时长数字。
+- [ ] **模型 vs 实测的系统性低估（~1.7×）待用完整 6 级实测校准**：
+      用 §measure-runtime 的代价模型（B₀=22, c=0.35, μ=0.0008, L=3, n_subb=853,
+      M=30,856, ρ=0.624）估算 L=3 CENSUS 约 **12.3h**(ANALYZE 10.8h + mask 1.4h +
+      EXPLAIN 0.1h)，但实测（mcv_multi 3 级含中断）约 **21.2h** —— 模型低估约 **0.58×**
+      （实际 ~1.72× 于模型）。归因：① ANALYZE 实际基成本 > 模型的 22s（climate 表常驻
+      大量 real extended stats），等效 B₀≈60s；② 每子批隐式固定开销（CREATE/DROP
+      统计、restore、连接）约 37.6s/子批未被模型捕获；③ 中断段额外开销。
+      据此外推 **完整 6 级（L=6）模型估 22.1h，÷0.58 校准 ≈ 38-40h**，与估计的 40h 吻合。
+      待 `mcv_low_t10000` 跑完后用真实 6 级墙钟核验，再决定是否写进 §measure-runtime
+      作为模型校准说明。
 - [ ] stats_CEB_single 的 workload-wide/per-query 时长（≈0.12h / ≈1.29h）也是模型外推，
       其 6level 数据已完成（632 查询），可复核是否随 6 级化更新。
 - [ ] 若要做增量容量合并，可新增 `merge_phase1.py`（方法 B，尚未开始）。
