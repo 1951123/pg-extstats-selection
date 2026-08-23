@@ -244,7 +244,10 @@ own \texttt{statistics\_target} via \texttt{ALTER STATISTICS ... SET STATISTICS}
 \emph{largest relevant statistics target} on the relation (including the
 extended statistics' own targets) \cite{pgstats}; consequently, raising an
 extended-statistics target can increase maintenance cost beyond the persistent
-storage cost our objective models (a full scan at 10000). This couples capacity
+storage cost our objective models ($\texttt{ANALYZE}$ reads a larger sample and
+builds richer per-column statistics at higher targets; the measured base cost
+of a table ANALYZE grows from a few seconds at target 100 to $\approx$22\,s at
+10000 in \S\ref{sec:measure-naive}). This couples capacity
 to \emph{maintenance cost}, not only storage. Because of this coupling we
 deliberately optimize a \emph{storage} budget --- the persistent bytes of the
 selected statistics and the estimation quality they deliver --- and treat ANALYZE
