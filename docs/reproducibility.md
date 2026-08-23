@@ -30,7 +30,7 @@
 | 稀疏 regime：每查询至多一个统计量（中心发现） | `phase1_ceb_single_mask_full_multi.json`（CDF 峰值） |
 | RQ1 容量轴：91.8% 候选 q-error 与 target 无关；73.3% 完全塌陷；4.4% 改善（{100,1000,10000}） | `phase1_census_mcv_multi.json`（CENSUS 30,856 候选） |
 | RQ1 容量轴扩展菜单 {10,25,50,100,1000,10000}（两向决策轴） | `phase1_ceb_single_mask_6level.json`（stats_CEB_single 6 级）+ `phase1_census_mcv_multi.json`（{100,1000,10000}） |
-| CENSUS 低档容量再暴露（~30% 敏感 / 22% 改善，正式数字以重跑为准） | `phase1_census_low_t10000.json`（**正式重跑，完成后以它为准**）；旧值 `phase1_census_mcv_low.json`（single-col-50 历史） |
+| CENSUS 低档容量再暴露（~30% 敏感 / 22% 改善，正式数字以重跑为准） | `phase1_census_mcv_low_t10000.json`（**正式重跑，完成后以它为准**）；旧值 `phase1_census_mcv_low.json`（single-col-50 历史） |
 | §5.1 测量成本模型（ANALYZE base ~22s @t10000，T(N)=base+0.334N） | `probe_census_fine_capacity.log` / `probe_census_analyze_scale.py` 输出 |
 | stats_CEB mcv 多变量（multi）效果 | `phase1_stats_ceb_mcv.json`、`phase1_stats_ceb_mcv_r3.json`（复现） |
 
@@ -44,7 +44,7 @@
 | `results/phase1_ceb_single_mask_6level.json` | 860K | RQ1 容量轴 {10..10000} 完整 |
 | `results/phase1_census_mcv_multi.json` | ~21M | CENSUS {100,1000,10000} ~15h 正式基线（30,856 候选），single-col-10000 |
 | `results/phase1_census_mcv_low.json` | ~20M | CENSUS 低档探测（single-col-50，历史参考） |
-| `results/phase1_census_low_t10000.json` | （运行中） | **CENSUS 正式重跑**（single-col-10000 + {10,25,50}），完成后补 add |
+| `results/phase1_census_mcv_low_t10000.json` | （运行中） | **CENSUS 正式重跑**（single-col-10000 + {10,25,50}），完成后更新终值 |
 | `results/phase1_stats_ceb_mcv.json` | 452K | stats_CEB mcv 测量 |
 | `results/phase1_stats_ceb_mcv_r3.json` | 736K | stats_CEB mcv 复现 |
 | `results/phase1_ceb_single_6level.log` | 42 行 | 6 级运行日志（配置/进度） |
@@ -84,7 +84,7 @@
     --bench census --kind mcv --arities 2,3 \
     --target-levels 10,25,50 --single-col-target 10000 \
     --cands-per-batch 55 --checkpoint-every 20 --resume \
-    --out results/phase1_census_low_t10000.json
+    --out results/phase1_census_mcv_low_t10000.json
   ```
 
 ---
@@ -99,6 +99,6 @@
 
 ## 6. 待办
 
-- [ ] `phase1_census_low_t10000.json` **正式重跑完成后**：确认生成、纳入 git，并替换
+- [ ] `phase1_census_mcv_low_t10000.json` **正式重跑完成后**：确认终值、纳入 git，并替换
       §2.2 / RQ1 中"~30% 敏感 / 22% 改善"的**初步**数字为 single-col-10000 终值。
 - [ ] 若要做增量容量合并，可新增 `merge_phase1.py`（方法 B，尚未开始）。
