@@ -522,8 +522,8 @@ a clean, drop-analyzable cycle that costs two ANALYZEs per candidate. On a wide
 table this is prohibitive. On the CENSUS \texttt{climate} table (69 columns,
 $\sim$2.5M rows) a single ANALYZE at \texttt{statistics\_target}=10000 takes
 $\approx$22s with no statistics (warm cache; a fixed base cost), growing
-roughly linearly with the number of statistics already
-on the table (Table \ref{tab:measurement}). Consequently the naive protocol
+roughly linearly with the number of statistics already on the table
+(\S\ref{sec:measure-runtime}). Consequently the naive protocol
 costs $\approx$44s per candidate --- two ANALYZEs $\times$ $\approx$22s. Even
 after deduplication the full workload leaves 19{,}245 distinct candidates, so
 Protocol-A would need $\approx$9.8 days of ANALYZE time at this capacity alone
@@ -792,9 +792,11 @@ $B{>}1$, tightest at $B{=}2$:
 \end{equation}
 On CENSUS ($\rho{=}0.624$, $M_{\text{tot}}{=}92{,}568$) this demands
 $B_0{\ge}\tfrac12(0.0008)(0.624)\,92{,}568^{2}\approx 2.1{\times}10^{6}$\,s
-$\approx594$\,h, far above the measured $22$\,s; per-query is therefore
-optimal, and it is statelessly per query because each query's candidates are
-already the natural minimal batch. On stats\_CEB\_single ($\rho{=}0.127$,
+$\approx594$\,h, far above the measured $22$\,s, so a single workload-wide build
+is decisively suboptimal; the phase-1 instead uses a \emph{sub-batched}
+protocol that keeps each ANALYZE+mask batch near the per-query minimum
+(the $b{=}55$ operating point of Tab.~\ref{tab:measurement}). On
+stats\_CEB\_single ($\rho{=}0.127$,
 $M_{\text{tot}}{=}1{,}848$) the same condition is $B_0{\ge}\approx 174$\,s,
 still above $22$\,s in the uniform model yet the measured optimum is
 workload-wide -- the discrepancy is the model's uniform-$\rho$ approximation:
@@ -884,35 +886,35 @@ granularity analysis above turns Protocol-M from a fixed trick into a tunable
 component whose operating point is chosen by a measurable cost model.
 
 \begin{table*}[t]
-\caption{ANALYZE and masking cost with $N$ statistics on CENSUS \texttt{climate}
-(target 10000, warm cache; base $\approx$22s plus $\approx$0.35s per statistic,
-mask/restore $\approx$0.0008$/$0.00003 s per payload, EXPLAIN $\approx$0.002s),
-and the implied naive (Protocol-A) vs.\ catalog-mask (Protocol-M) phase-1 cost
-for $N$ candidates mounted on the table. ``base'' is the fixed ANALYZE cost per
-table; Protocol-A pays it twice per candidate ($2N$ ANALYZEs); Protocol-M pays
-it once plus $N$ mask--EXPLAIN--restore cycles, whose mask term grows as
-$\mu N^2$ (Eq.~\ref{eq:batch-cost}). The first four rows show the
-\emph{workload-wide} (single all-payload build) protocol --- included only to
-expose the mechanism that masking is not free: the speedup \emph{peaks} and
-then falls as $N$ grows. The last row gives the CENSUS phase-1 at its
-\emph{measured} operating point, a \emph{sub-batched} Protocol-M
-($\approx$55 candidates/batch, \S\ref{sec:measure-runtime}), whose wall-clock
-we report once the full six-level re-run completes (\S\ref{sec:measure-runtime});
-the workload-wide figure in the same row is the single all-payload build it
-avoids. Measured ANALYZE-at-$N$ anchors: 1{,}000 stats $\to$420s, 3{,}000
-$\to$1{,}013s, 6{,}000 $\to$2{,}003s, 10{,}000 $\to$3{,}507s.}
+\caption{Per-candidate phase-1 measurement cost as a function of the
+\emph{sub-batch size} $s$ (number of candidates mounted per ANALYZE+mask build;
+each measured at $L{=}3$ capacity levels) on CENSUS \texttt{climate}
+(target 10000, warm cache). Protocol-A is \emph{constant} ($2B_0{=}44$\,s per
+candidate: two ANALYZEs each), while Protocol-M per candidate follows
+$C_M(s){=}\underbrace{B_0/s}_{\text{ANALYZE}}+\underbrace{cL}_{\text{per-cand}}+
+\underbrace{\mu L^2 s}_{\text{mask}}$,
+with $B_0{=}22$\,s, $c{\approx}0.35$\,s/stat, $\mu{\approx}0.0008$\,s/payload.
+Because masking grows as $\mu L^2 s$, $C_M$ is strictly convex and bottoms at
+$s^{*}{=}\sqrt{B_0/(\mu L^2)}{=}55$ candidates/batch (equivalently
+$\sqrt{B_0/\mu}{=}164$ per-batch capability-measurements, matching
+Cor.~\ref{cor:intraquery}), where Protocol-M is $\approx$24$\times$ cheaper than
+Protocol-A; larger batches make masking dominate and the speedup fade. Measured
+ANALYZE-at-$N$ anchors: 1{,}000 stats $\to$420s, 3{,}000 $\to$1{,}013s,
+6{,}000 $\to$2{,}003s, 10{,}000 $\to$3{,}507s.}
 \label{tab:measurement}
 \small
-\begin{tabular}{lcc|rrrr}
+\begin{tabular}{lcrr}
 \toprule
-$N$ & base & ANALYZE & naive & \multicolumn{2}{c}{Protocol-M} & speedup\\
- & (0 st.) & (at $N$) & (Proto-A) & \multicolumn{1}{c}{workload-wide} & \multicolumn{1}{c}{sub-batch\#55} & \\
+sub-batch $s$ & Proto-M $C_M(s)$ & Proto-A & speedup\\
+(candidates) & (s/candidate) & (s/candidate) & \\
 \midrule
-10   & 22s & 26s   & 440s   & 26s   & -- & 17$\times$\\
-100  & 22s & 57s   & 4{,}400s & 66s  & -- & 67$\times$\\
-500  & 22s & 197s  & 22{,}000s & 406s & -- & 54$\times$\\
-1000 & 22s & 372s  & 44{,}000s & 1{,}204s & -- & 37$\times$\\
-19{,}245 & 22s & 6{,}758s & 846{,}780s & 314{,}203s & \emph{(pending)} & \emph{(pending)}\\
+10  & 3.32s & 44s & 13$\times$\\
+25  & 2.11s & 44s & 21$\times$\\
+\textbf{55} & \textbf{1.85s} & 44s & \textbf{24$\times$}\\
+100 & 2.00s & 44s & 22$\times$\\
+500 & 4.76s & 44s & 9$\times$\\
+1000 & 8.41s & 44s & 5$\times$\\
+2000 & 15.7s & 44s & 3$\times$\\
 \bottomrule
 \end{tabular}
 \end{table*}

@@ -112,13 +112,16 @@
 
 - [ ] `phase1_census_mcv_low_t10000.json` **正式重跑完成后**：确认终值、纳入 git，并替换
       §2.2 / RQ1 中"~30% 敏感 / 22% 改善"的**初步**数字为 single-col-10000 终值。
-- [ ] **等 CENSUS 完整 6 级测量完成后，重做 `tab:measurement` 和 §measure-runtime 的成本数字**。
-      原因：容量菜单从 3 级 {100,1000,10000} 扩到 6 级 {10,25,50,100,1000,10000} 后，
-      每个候选的测量次数 (L) 翻倍，ANALYZE 项 vs mask 项的比例、最优子批大小 $m^{*}$、
-      以及总墙钟时间都随之变化。**当前论文中的 CENSUS 成本数字（≈20h / ~12× / workload-wide
-      87h）基于旧 3 级数据，已回退为定性/待填表述**，待
-      `phase1_census_mcv_low_t10000.json`（低 3 级）+ `phase1_census_mcv_multi.json`（高 3 级）
-      合并成完整 6 级实测后填入真实值。
+- [ ] **等 CENSUS 完整 6 级测量完成后**：确认终值、纳入 git，并替换
+      §2.2 / RQ1 中"~30% 敏感 / 22% 改善"的**初步**数字为 single-col-10000 终值。
+- [x] **`tab:measurement` 已重构为"每候选成本 vs sub-batch size"的协议代价函数采样表**
+      （Protocol-A 常数 2B₀=44s vs Protocol-M 凸曲线 B₀/s+cL+μL²s，最优点 s*=55，即
+      实际用的 cands-per-batch=55）。这是**纯模型曲线**（锚点 ANALYZE-at-N 数据），
+      **不依赖 CENSUS 6 级运行**，故表格本身无需等重跑。
+- [ ] **§measure-runtime 的 CENSUS 实际墙钟时长仍待填**：正文目前只定性说
+      "orders of magnitude faster"；待 `phase1_census_mcv_low_t10000.json`
+      （低 3 级）+ `phase1_census_mcv_multi.json`（高 3 级）合并成完整 6 级实测后，
+      填入真实运行时长数字。
 - [ ] stats_CEB_single 的 workload-wide/per-query 时长（≈0.12h / ≈1.29h）也是模型外推，
       其 6level 数据已完成（632 查询），可复核是否随 6 级化更新。
 - [ ] 若要做增量容量合并，可新增 `merge_phase1.py`（方法 B，尚未开始）。
