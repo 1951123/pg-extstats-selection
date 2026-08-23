@@ -70,6 +70,7 @@ class QueryMaskMeasurement:
     estimate_base: int
     actual: Optional[int]
     candidates: dict[str, dict] = field(default_factory=dict)
+    single_col_target: int = 10000  # capacity of the fixed per-column baseline
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +169,7 @@ def measure_query_mask(
     stat_prefix: str = "ext_",
     target: Optional[int] = None,
     target_levels: Optional[tuple[int, ...]] = None,
+    single_col_target: int = 10000,
     table: Optional[str] = None,
     backup_table: str = "_ext_mask_backup",
 ) -> QueryMaskMeasurement:
@@ -177,10 +179,17 @@ def measure_query_mask(
     ``target_levels`` (a tuple, e.g. ``(100, 1000, 10000)``). When more than
     one level is given, each candidate is materialised as **one statistic
     object per level** (``ALTER STATISTICS ... SET STATISTICS``) and ALL levels
-    are built by a SINGLE ANALYZE (sampling takes the max target), then each
-    (candidate, level) is measured independently by masking the others. This is
-    the "multi-object one-ANALYZE" scheme, so a 3-level phase-1 needs only ONE
-    ANALYZE per table (sampling at max target), not one per level.
+    are built by a SINGLE ANALYZE (sampling at the single-column target), then
+    each (candidate, level) is measured independently by masking the others.
+
+    ``single_col_target`` fixes the capacity of the *per-column* statistics
+    (i.e. ``default_statistics_target``), which drive the baseline and the
+    ANALYZE; it is deliberately decoupled from the extended statistics' own
+    per-object targets (set via ``ALTER STATISTICS ... SET STATISTICS``).
+    The default 10000 follows the paper's design: fixed, generous single-column
+    baseline so that ext-stat improvements reflect column correlations only.
+    This should always be recorded in results metadata so that two runs whose
+    ``single_col_target`` differs are not incorrectly merged.
 
     ``table`` forces a base table for all candidates (use when every candidate
     shares one table, e.g. Census ``climate``); otherwise each candidate's own
@@ -203,11 +212,11 @@ def measure_query_mask(
     else:
         levels = (0,)
 
-    max_level = max(levels)
+    max_level = max(levels)  # only used for the extended stats' own targets
 
-    # deterministic single-column baseline
-    if max_level > 0:
-        _set_target(conn, max_level)
+    # deterministic single-column baseline at the FIXED single_col_target
+    if single_col_target > 0:
+        _set_target(conn, single_col_target)
     base = estimate_count_query(conn, query.sql, actual=query.ground_truth)
     mes = QueryMaskMeasurement(
         qid=query.qid,
@@ -215,6 +224,7 @@ def measure_query_mask(
         qerror_base=base.qerror if base.qerror is not None else float("nan"),
         estimate_base=base.estimate,
         actual=query.ground_truth,
+        single_col_target=single_col_target,
     )
     if not candidates:
         _drop_backup(conn, backup_table)
@@ -227,7 +237,8 @@ def measure_query_mask(
 
     for tbl, cands in by_table.items():
         _measure_one_table(conn, query, tbl, cands, kind, stat_prefix,
-                           levels, backup_table, mes, multi=len(levels) > 1)
+                           levels, single_col_target, backup_table, mes,
+                           multi=len(levels) > 1)
 
     # _measure_one_table already drops the stats it created and re-ANALYZEs the
     # table (in a finally); just drop any leftover backup table for safety.
@@ -244,6 +255,7 @@ def _measure_one_table(
     kind: str,
     stat_prefix: str,
     levels: tuple[int, ...],
+    single_col_target: int,
     backup_table: str,
     mes: QueryMaskMeasurement,
     *,
@@ -254,7 +266,10 @@ def _measure_one_table(
 
     When ``multi`` is True, each candidate gets one statistic object PER level,
     each with ``ALTER STATISTICS ... SET STATISTICS <level>``; a SINGLE ANALYZE
-    (sampling at the max level) builds all of them. Each (candidate, level) is
+    (sampling at the fixed ``single_col_target``) builds all of them. The
+    per-column statistics (and hence the baseline and every EXPLAIN) are always
+    measured at ``single_col_target`` (default 10000), independent of the
+    extended statistics' own per-object targets. Each (candidate, level) is
     then measured by keeping only that object's payload and NULL-ing every
     other object (all other candidates AND the same candidate's other levels).
     """
@@ -279,9 +294,9 @@ def _measure_one_table(
                         cur.execute(
                             f"ALTER STATISTICS {name} SET STATISTICS {int(lvl)}")
 
-        # ONE ANALYZE builds all objects (sampling at max level)
-        if max(levels) > 0:
-            _set_target(conn, max(levels))
+        # ONE ANALYZE builds all objects (sampling at the fixed single-col target)
+        if single_col_target > 0:
+            _set_target(conn, single_col_target)
         _analyze(conn, tbl)
 
         # oids + snapshot: one payload per (cand, level) object
@@ -296,8 +311,8 @@ def _measure_one_table(
             for lvl in levels:
                 keep = {oids[(c, lvl)]}
                 _mask_payload_all_but(conn, backup_table, keep, kind)
-                if max(levels) > 0:
-                    _set_target(conn, max(levels))
+                if single_col_target > 0:
+                    _set_target(conn, single_col_target)
                 res = estimate_count_query(conn, query.sql,
                                            actual=query.ground_truth)
                 key = f"{tbl}({','.join(c.columns)})"
@@ -332,6 +347,7 @@ def measure_table_workload_mask(
     kind: str = "mcv",
     stat_prefix: str = "ext_",
     levels: tuple[int, ...] = (100, 1000, 10000),
+    single_col_target: int = 10000,
     table: Optional[str] = None,
     backup_table: str = "_ext_workload_backup",
 ) -> list[QueryMaskMeasurement]:
@@ -344,6 +360,9 @@ def measure_table_workload_mask(
     see the module docstring "Scopes") is paid exactly once for the whole
     workload, at the price of one large ANALYZE over every distinct candidate
     simultaneously and no per-query failure isolation.
+
+    ``single_col_target`` fixes the capacity of the per-column statistics /
+    baseline (default 10000), decoupled from the extended stats' own targets.
 
     ``queries_and_cands`` must all share the same base table (pass ``table``
     to force one, e.g. Census ``climate`` / stats_CEB_single ``posts``).
@@ -389,8 +408,10 @@ def measure_table_workload_mask(
                     if len(levels) > 1:
                         cur.execute(f"ALTER STATISTICS {nm} SET STATISTICS {int(lvl)}")
 
-        # ---- 2) ONE ANALYZE builds all objects (sampling at max level) ----
-        _set_target(conn, max_level)
+        # ---- 2) ONE ANALYZE builds all objects (sampling at the fixed
+        #          single-column target; extended stats use their own targets) ----
+        if single_col_target > 0:
+            _set_target(conn, single_col_target)
         _analyze(conn, tbl)
 
         # snapshot all payload oids
@@ -405,11 +426,14 @@ def measure_table_workload_mask(
         for query, cands in queries_and_cands:
             # baseline: no extended stat active (all payloads NULL)
             _mask_payload_all_but(conn, backup_table, set(), kind)
+            if single_col_target > 0:
+                _set_target(conn, single_col_target)
             base = estimate_count_query(conn, query.sql, actual=query.ground_truth)
             mes = QueryMaskMeasurement(
                 qid=query.qid, bench=query.bench,
                 qerror_base=base.qerror if base.qerror is not None else float("nan"),
-                estimate_base=base.estimate, actual=query.ground_truth)
+                estimate_base=base.estimate, actual=query.ground_truth,
+                single_col_target=single_col_target)
             # per (candidate, level) isolation
             for c in cands:
                 key_cols = tuple(c.columns)

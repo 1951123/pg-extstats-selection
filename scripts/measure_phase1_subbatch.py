@@ -55,6 +55,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="max candidates per ANALYZE+mask sub-batch (0 = no split, "
                          "true per-query b=1). For L-level sweep, an optimal m*="
                          "sqrt(B0/mu) gives ~L*sqrt(B0/mu)/L cands; use 55 for L=3@t10000.")
+    ap.add_argument("--single-col-target", type=int, default=10000,
+                    help="capacity (statistics_target) of the fixed per-column "
+                         "baseline (default 10000). Decoupled from the extended "
+                         "stats' own per-object targets; recorded in output metadata.")
     ap.add_argument("--limit", type=int, default=0, help="only first N queries")
     ap.add_argument("--qids", default="")
     ap.add_argument("--resume", default=None,
@@ -125,6 +129,7 @@ def main(argv: list[str] | None = None) -> int:
             out.write_text(json.dumps({
                 "bench": bench, "kind": args.kind,
                 "target_levels": list(level_list),
+                "single_col_target": args.single_col_target,
                 "cands_per_batch": split, "scope": "intra-query sub-batched (Cor.)",
                 "n_queries": len(results) + len(resume_results),
                 "n_sub_batches": n_subb,
@@ -132,7 +137,8 @@ def main(argv: list[str] | None = None) -> int:
             }, indent=2))
 
         print(f"=== phase1[subbatch] {bench} (db={dbname}, kind={args.kind}, "
-              f"levels={list(level_list)}, cands/batch={split or 'b=1'}) ===")
+              f"levels={list(level_list)}, single_col_target={args.single_col_target}, "
+              f"cands/batch={split or 'b=1'}) ===")
         print(f"queries={len(queries)}  total_candidates={total_cands}  "
               f"sub-batches={n_subb}  out={out}")
 
@@ -172,6 +178,7 @@ def main(argv: list[str] | None = None) -> int:
                     mes = measure_query_mask(
                         conn, q, batch, kind=args.kind, target=target,
                         target_levels=level_list if len(level_list) > 1 else None,
+                        single_col_target=args.single_col_target,
                         table=forced_table, backup_table=bt)
                     if first_mes is None:
                         first_mes = mes
@@ -182,6 +189,7 @@ def main(argv: list[str] | None = None) -> int:
                     "actual": first_mes.actual,
                     "qerror_base": first_mes.qerror_base,
                     "estimate_base": first_mes.estimate_base,
+                    "single_col_target": first_mes.single_col_target,
                     "target_levels": list(level_list),
                     "n_subbatches": len(batches),
                     "candidates": merged,
