@@ -620,10 +620,20 @@ contributing nothing. This is why measurements use target\,10000 (sometimes 1000
 for cross-checks): exactly reproducible, with only accuracy varying with
 capacity.
 
-\emph{The single-column target is fixed, not swept.} Throughout, the
-\emph{per-column} statistics that drive the baseline are always measured at
-\texttt{statistics\_target}=10000; only the \emph{extended} statistics'
-capacity varies over the menu \{100, 1000, 10000\}. Equivalently, every
+\emph{The single-column target is fixed, not swept.} In principle the
+per-column statistics also carry a capacity axis: \texttt{statistics\_target}
+also caps a column histogram/MCV's resolution, so raising it is a (postponed)
+decision a DBA could in principle make. We deliberately \emph{do not} make
+single-column capacity a decision variable in this paper: PostgreSQL builds
+per-column statistics automatically (unlike extended statistics, which are
+only created on explicit \texttt{CREATE}), so the single-column target is a
+default, non-selected baseline. We instead fix it at a generous
+\texttt{statistics\_target}=10000 and focus our budgeted capacity decision
+entirely on extended statistics --- the axis whose construction is our new
+choice. Concretely, the \emph{per-column} statistics that drive the baseline
+are always measured at \texttt{statistics\_target}=10000 while only the
+\emph{extended} statistics' capacity varies over the menu \{100, 1000, 10000\}.
+Equivalently, every
 per-candidate q-error $e_{is}$ is measured against the \emph{same}, maximally
 precise single-column baseline, so the extended statistic's capacity is the
 \emph{only} axis that changes between levels. This isolates the
