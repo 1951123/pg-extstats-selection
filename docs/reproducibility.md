@@ -42,7 +42,7 @@
 |---|---|---|
 | `results/phase1_ceb_single_mask_full_multi.json` | 564K | **三张论文图的数据源头**，632 查询 |
 | `results/phase1_ceb_single_mask_6level.json` | 860K | RQ1 容量轴 {10..10000} 完整 |
-| `results/phase1_census_mcv_multi.json` | ~21M | CENSUS {100,1000,10000} ~15h 正式基线（30,856 候选），single-col-10000 |
+| `results/phase1_census_mcv_multi.json` | ~21M | CENSUS {100,1000,10000} 正式基线（30,856 候选），single-col-10000。**总耗时约 21h**（中断过一次：`phase1_census_mcv_multi.log` 开头 `[resume] loaded 140 done queries`，其 `53857s` 仅含续跑段 328 查询；第一段 140 查询 ~6.2h 无独立日志，为按 ~160s/q 估算） |
 | `results/phase1_census_mcv_low.json` | ~20M | CENSUS 低档探测（single-col-50，历史参考） |
 | `results/phase1_census_mcv_low_t10000.json` | （运行中） | **CENSUS 正式重跑**（single-col-10000 + {10,25,50}），完成后更新终值 |
 | `results/phase1_stats_ceb_mcv.json` | 452K | stats_CEB mcv 测量 |
