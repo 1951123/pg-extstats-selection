@@ -620,7 +620,22 @@ never reuse an estimate computed from a pre-update cache; and
 (ii) \emph{update-in-place, not rewrite} --- NULLing a payload does not re-run
 ANALYZE, so masking cost is independent of table \emph{size} (row count); it is,
 however, linear in the number of payloads mounted on the table, which is why
-measurement granularity matters (\S\ref{sec:measure-runtime}). Because the protocol
+measurement granularity matters (\S\ref{sec:measure-runtime}).
+
+\emph{Protocol-M's advantage grows with table size.} The masking step's
+independence of row count is what makes the protocol scalable: the analysis
+(ANALYZE) cost $T(N)=B_0+cN$ of \S\ref{sec:measure-naive} has a base term
+$B_0$ that is proportional to table size, while the classical per-candidate
+protocol pays this base $2N$ times. Protocol-M pays it once. The saved cost is
+therefore $(2N-1)\,B_0$, which grows linearly in $B_0$ and hence in table size
+--- so Protocol-M's advantage is not a constant offset but a \emph{monotone
+increasing function of dataset scale}. Our two benchmarks (CENSUS
+$\approx$740\,MB; the small \texttt{stats\_CEB\_single} tables, largest
+$\approx$9\,MB) are both \emph{small} by production standards; at the
+multi-hundred-GB scale of real workloads $B_0$ is orders of magnitude larger
+and the per-candidate protocol becomes infeasible, making the catalog-mask
+approach the \emph{only} tractable measurement path rather than merely an
+optimization. Because the protocol
 relies on the layout of the system catalog, it is specific to PostgreSQL 16 and
 to \emph{MCV} statistics (\texttt{ndistinct}/\texttt{dependencies} masking is
 untested); both the catalog layout and the planner's OID-order selection
