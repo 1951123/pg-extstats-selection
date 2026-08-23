@@ -14,7 +14,7 @@ to the mean choice. If they diverge, we explain the (geometric) choice.
 
 Run:
     python scripts/exp_geometric_vs_arithmetic.py \
-        --input results/phase1_ceb_single_mask_full_multi.json \
+        --input results/phase1_ceb_single_mask_6level.json \
         --budgets 10000,40000,100000,250000,500000 \
         --out results/p10_mean_robustness.json
 """
@@ -110,7 +110,7 @@ def build_sparse_lp(phys, opts, qbase, budget_bytes,
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--input", default="results/phase1_ceb_single_mask_full_multi.json")
+    ap.add_argument("--input", default="results/phase1_ceb_single_mask_6level.json")
     ap.add_argument("--budgets", default="10000,40000,100000,250000,500000")
     ap.add_argument("--out", default="results/p10_mean_robustness.json")
     args = ap.parse_args(argv)

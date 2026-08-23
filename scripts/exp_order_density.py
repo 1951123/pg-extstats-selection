@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     prefix = "od_"
 
     # per-query prediction (winner's phase-1 per-query q-error) under the winner
-    phase1 = json.load(open("results/phase1_ceb_single_mask_full_multi.json"))
+    phase1 = json.load(open("results/phase1_ceb_single_mask_6level.json"))
     pred_by_q = {}
     for r in phase1["results"]:
         lvl = str(args.level)

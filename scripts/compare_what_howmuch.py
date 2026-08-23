@@ -25,7 +25,7 @@ Usage
 -----
     source .venv/bin/activate
     python scripts/compare_what_howmuch.py \
-        --input results/phase1_ceb_single_mask_full_multi.json \
+        --input results/phase1_ceb_single_mask_6level.json \
         --budgets 1000,2000,5000,10000,20000,40000,100000,250000,500000 \
         --out results/p2_what_vs_howmuch.json
 """

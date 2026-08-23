@@ -132,7 +132,7 @@ def part_a(conn, out):
     qs = parse_stats_ceb_single_dir(Path("benchmarks/stats_CEB/queries"))
     byid = {q.qid: q for q in qs}
 
-    p1f = Path("results/phase1_ceb_single_mask_full_multi.json")
+    p1f = Path("results/phase1_ceb_single_mask_6level.json")
     if not p1f.exists():
         out["part_a"] = {"error": "phase-1 input not found"}
         return []

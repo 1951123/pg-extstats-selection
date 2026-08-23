@@ -12,14 +12,21 @@
 ## 1. 论文图 ← 数据源头 ← 复现脚本
 
 三张论文图的**数据源头均为同一个 primary 工件**：
-`results/phase1_ceb_single_mask_full_multi.json`（632 查询 stats_CEB_single 正式测量）。
+`results/phase1_ceb_single_mask_6level.json`（632 查询 stats_CEB_single 正式测量，6 级
+{10,25,50,100,1000,10000}）。
+
+> 该文件**取代**了更早的 `phase1_ceb_single_mask_full_multi.json`（仅 3 级
+> {100,1000,10000}）。已验证 6level 是其**严格超集**：632/632 查询、616/616
+> 候选完全一致，且共享 {100,1000,10000} 上的 1,848 项 (候选×档) 逐位一致。
+> 用 6level 跑 `analyze_sparsity.py` 产生的覆盖率/稀疏指标与 multi 逐位相同
+> （coverage_median=0.999, frac_ge_0_9=0.9429, frac_ge_0_99=0.7714）。
 
 | 论文图 | 复现脚本 | 生成命令 |
 |---|---|---|
-| `figures/sparsity_cdf`（稀疏 regime CDF） | `scripts/analyze_sparsity.py` | `python scripts/analyze_sparsity.py --input results/phase1_ceb_single_mask_full_multi.json --out results/p4_sparsity.json --fig paper/figures/sparsity_cdf` |
-| `figures/e2e_predict`（E2E 预算 vs 增益散点） | `scripts/exp_e2e_scatter.py` | `python scripts/exp_e2e_scatter.py --input results/phase1_ceb_single_mask_full_multi.json --db stats --table posts --target 10000 --budgets 10000,40000,100000,250000 --out results/p4_e2e_scatter.json --fig paper/figures/e2e_predict` |
-| `figures/budget_quality`（预算分配质量） | `scripts/analyze_budget_metrics.py` | `python scripts/analyze_budget_metrics.py --input results/phase1_ceb_single_mask_full_multi.json --budgets 5000,10000,20000,40000,100000,250000,500000,1000000 --out results/p3_metrics.json --fig paper/figures/budget_quality` |
-| `figures/upgrade_vs_add`（容量升级 vs 新增） | `scripts/fig_upgrade_vs_add.py` | `python scripts/fig_upgrade_vs_add.py --phase1 results/phase1_ceb_single_mask_full_multi.json --out paper/figures/upgrade_vs_add` |
+| `figures/sparsity_cdf`（稀疏 regime CDF） | `scripts/analyze_sparsity.py` | `python scripts/analyze_sparsity.py --input results/phase1_ceb_single_mask_6level.json --out results/p4_sparsity.json --fig paper/figures/sparsity_cdf` |
+| `figures/e2e_predict`（E2E 预算 vs 增益散点） | `scripts/exp_e2e_scatter.py` | `python scripts/exp_e2e_scatter.py --input results/phase1_ceb_single_mask_6level.json --db stats --table posts --target 10000 --budgets 10000,40000,100000,250000 --out results/p4_e2e_scatter.json --fig paper/figures/e2e_predict` |
+| `figures/budget_quality`（预算分配质量） | `scripts/analyze_budget_metrics.py` | `python scripts/analyze_budget_metrics.py --input results/phase1_ceb_single_mask_6level.json --budgets 5000,10000,20000,40000,100000,250000,500000,1000000 --out results/p3_metrics.json --fig paper/figures/budget_quality` |
+| `figures/upgrade_vs_add`（容量升级 vs 新增） | `scripts/fig_upgrade_vs_add.py` | `python scripts/fig_upgrade_vs_add.py --phase1 results/phase1_ceb_single_mask_6level.json --out paper/figures/upgrade_vs_add` |
 
 ---
 
@@ -27,7 +34,7 @@
 
 | 论文中的数值 / 结论 | 数据源头 primary 工件 |
 |---|---|
-| 稀疏 regime：每查询至多一个统计量（中心发现） | `phase1_ceb_single_mask_full_multi.json`（CDF 峰值） |
+| 稀疏 regime：每查询至多一个统计量（中心发现） | `phase1_ceb_single_mask_6level.json`（CDF 峰值） |
 | RQ1 容量轴：91.8% 候选 q-error 与 target 无关；73.3% 完全塌陷；4.4% 改善（{100,1000,10000}） | `phase1_census_mcv_multi.json`（CENSUS 30,856 候选） |
 | RQ1 容量轴扩展菜单 {10,25,50,100,1000,10000}（两向决策轴） | `phase1_ceb_single_mask_6level.json`（stats_CEB_single 6 级）+ `phase1_census_mcv_multi.json`（{100,1000,10000}） |
 | CENSUS 低档容量再暴露（~30% 敏感 / 22% 改善，正式数字以重跑为准） | `phase1_census_mcv_low_t10000.json`（**正式重跑，完成后以它为准**）；旧值 `phase1_census_mcv_low.json`（single-col-50 历史） |
@@ -40,8 +47,7 @@
 
 | 文件 | 大小 | 内容 / 用途 |
 |---|---|---|
-| `results/phase1_ceb_single_mask_full_multi.json` | 564K | **三张论文图的数据源头**，632 查询 |
-| `results/phase1_ceb_single_mask_6level.json` | 860K | RQ1 容量轴 {10..10000} 完整 |
+| `results/phase1_ceb_single_mask_6level.json` | 860K | **三张论文图的数据源头** + RQ1 容量轴 {10..10000} 完整。取代 `full_multi` |
 | `results/phase1_census_mcv_multi.json` | ~21M | CENSUS {100,1000,10000} 正式基线（30,856 候选），single-col-10000。**总耗时约 21h**（中断过一次：`phase1_census_mcv_multi.log` 开头 `[resume] loaded 140 done queries`，其 `53857s` 仅含续跑段 328 查询；第一段 140 查询 ~6.2h 无独立日志，为按 ~160s/q 估算） |
 | `results/phase1_census_mcv_low.json` | ~20M | CENSUS 低档探测（single-col-50，历史参考） |
 | `results/phase1_census_mcv_low_t10000.json` | （运行中） | **CENSUS 正式重跑**（single-col-10000 + {10,25,50}），完成后更新终值 |

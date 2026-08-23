@@ -12,7 +12,7 @@ how often a single candidate reaches the estimation floor. Produces:
 Usage:
     source .venv/bin/activate
     python scripts/analyze_sparsity.py \
-        --input results/phase1_ceb_single_mask_full_multi.json \
+        --input results/phase1_ceb_single_mask_6level.json \
         --out results/p4_sparsity.json --fig paper/figures/sparsity_cdf
 """
 from __future__ import annotations

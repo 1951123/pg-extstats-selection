@@ -22,7 +22,7 @@ overlapping points scatter above it.
 Usage:
     source .venv/bin/activate
     python scripts/exp_e2e_scatter.py \\
-        --input results/phase1_ceb_single_mask_full_multi.json \\
+        --input results/phase1_ceb_single_mask_6level.json \\
         --db stats --table posts --target 10000 \\
         --budgets 10000,40000,100000,250000 \\
         --out results/p4_e2e_scatter.json \\

@@ -25,9 +25,7 @@ experiments/
 # 其余 results/ 下文件保持忽略 (smoke / 临时探测 / 可再生中间量)
 # 注: 否定(!)模式尾部不要加 '# 注释' — 会破坏 gitignore 对该规则的解析
 results/*
-# 三个论文图的数据源头 (analyze_sparsity / exp_e2e_scatter / analyze_budget_metrics)
-!results/phase1_ceb_single_mask_full_multi.json
-# RQ1 容量轴 {10..10000} 完整数据
+# 三个论文图的数据源头 + RQ1 容量轴 {10..10000} 完整 (取代旧的 full_multi)
 !results/phase1_ceb_single_mask_6level.json
 # CENSUS {100,1000,10000} 约 21h 正式基线 (30,856 候选, 含一次中断后续跑)
 !results/phase1_census_mcv_multi.json

@@ -16,7 +16,7 @@ lower q-error) of B, so the per-candidate surrogate will rationally spend the
 marginal budget upgrading A rather than adding B.
 
 Data: per-query per-level (size_bytes, qerror) from
-results/phase1_ceb_single_mask_full_multi.json.
+results/phase1_ceb_single_mask_6level.json.
 
 Run:
     python scripts/fig_upgrade_vs_add.py [--out paper/figures/upgrade_vs_add]
@@ -29,7 +29,7 @@ from pathlib import Path
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("--phase1", default="results/phase1_ceb_single_mask_full_multi.json")
+    ap.add_argument("--phase1", default="results/phase1_ceb_single_mask_6level.json")
     ap.add_argument("--out", default="paper/figures/upgrade_vs_add")
     args = ap.parse_args(argv)
 

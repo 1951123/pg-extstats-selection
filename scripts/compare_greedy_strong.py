@@ -29,7 +29,7 @@ is because greedy cannot globally reallocate the shared capacity budget.
 Usage:
     source .venv/bin/activate
     python scripts/compare_greedy_strong.py \
-        --input results/phase1_ceb_single_mask_full_multi.json \
+        --input results/phase1_ceb_single_mask_6level.json \
         --budgets 5000,10000,20000,40000,100000,250000 \
         --out results/p6_greedy_strong.json
 """

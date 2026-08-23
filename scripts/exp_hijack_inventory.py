@@ -27,7 +27,7 @@ ALL = ("ext_", "e2e_", "e4_", "p0_", "sw_", "od_", "sg_", "pi_", "cl_", "mask_",
 
 
 def main():
-    phase1 = json.load(open("results/phase1_ceb_single_mask_full_multi.json"))
+    phase1 = json.load(open("results/phase1_ceb_single_mask_6level.json"))
     pool = set()
     for r in phase1["results"]:
         for ck, c in r["candidates"].items():

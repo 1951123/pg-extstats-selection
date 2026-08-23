@@ -1,3 +1,15 @@
 nohup: ignoring input
 === phase1[subbatch] census (db=census, kind=mcv, levels=[10, 25, 50], single_col_target=10000, cands/batch=55) ===
 queries=468  total_candidates=30856  sub-batches=853  out=results/phase1_census_mcv_low_t10000.json
+  [query.20] done 20/468 (3104s, 155.2s/q, 20 total)
+  [checkpoint] wrote results/phase1_census_mcv_low_t10000.json (20 queries)
+  [query.40] done 40/468 (5439s, 136.0s/q, 40 total)
+  [checkpoint] wrote results/phase1_census_mcv_low_t10000.json (40 queries)
+  [query.60] done 60/468 (8966s, 149.4s/q, 60 total)
+  [checkpoint] wrote results/phase1_census_mcv_low_t10000.json (60 queries)
+  [query.80] done 80/468 (12156s, 152.0s/q, 80 total)
+  [checkpoint] wrote results/phase1_census_mcv_low_t10000.json (80 queries)
+  [query.100] done 100/468 (14935s, 149.3s/q, 100 total)
+  [checkpoint] wrote results/phase1_census_mcv_low_t10000.json (100 queries)
+  [query.120] done 120/468 (18747s, 156.2s/q, 120 total)
+  [checkpoint] wrote results/phase1_census_mcv_low_t10000.json (120 queries)

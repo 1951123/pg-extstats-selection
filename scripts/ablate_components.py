@@ -14,7 +14,7 @@ configurations that turn off individual components of the sparse MILP:
 Usage:
     source .venv/bin/activate
     python scripts/ablate_components.py \
-        --input results/phase1_ceb_single_mask_full_multi.json --budget 100000
+        --input results/phase1_ceb_single_mask_6level.json --budget 100000
 """
 from __future__ import annotations
 

@@ -14,7 +14,7 @@ budget for each, isolating when MILP (exact capacity allocation) beats greedy.
 Usage:
     source .venv/bin/activate
     python scripts/compare_greedy_budget.py \
-        --input results/phase1_ceb_single_mask_full_multi.json --budget 20000
+        --input results/phase1_ceb_single_mask_6level.json --budget 20000
 """
 from __future__ import annotations
 

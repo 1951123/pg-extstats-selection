@@ -15,7 +15,7 @@ objective.
 Usage:
     source .venv/bin/activate
     python scripts/analyze_budget_metrics.py \\
-        --input results/phase1_ceb_single_mask_full_multi.json \\
+        --input results/phase1_ceb_single_mask_6level.json \\
         --budgets 5000,10000,20000,40000,100000,250000,500000,1000000 \\
         --out results/p3_metrics.json --fig paper/figures/budget_quality
 """
