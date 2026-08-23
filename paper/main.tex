@@ -511,6 +511,15 @@ after deduplication the full workload leaves 19{,}245 distinct candidates, so
 Protocol-A would need $\approx$9.8 days of ANALYZE time at this capacity alone
 --- not a tractable phase-1.
 
+Crucially, this infeasibility is \emph{not} an accident of an arbitrarily
+large menu: the $\approx$22s per-ANALYZE base cost is the necessary
+consequence of fixing the single-column statistics at a generous target for
+determinism, completeness, and attribution (\S\ref{sec:measure-determinism}).
+One cannot buy it away by shrinking the single-column target without
+sacrificing exactly those guarantees. Protocol-M is therefore the mechanism
+that makes a principled (expensive-but-stable) measurement tractable, rather
+than a way to paper over an unnecessarily high cost.
+
 \subsection{The Catalog-Mask Protocol (Protocol-M)}
 \label{sec:measure-mask}
 
@@ -619,6 +628,26 @@ combinations can even be built \emph{empty} (a \texttt{NULL} payload),
 contributing nothing. This is why measurements use target\,10000 (sometimes 1000
 for cross-checks): exactly reproducible, with only accuracy varying with
 capacity.
+
+\emph{Why we fixed a large single-column target.} Three independent reasons
+drive the choice of a generous per-column \texttt{statistics\_target} rather
+than PostgreSQL's default of 100. First, \emph{determinism}: as just measured,
+target 100 leaves a $1$--$2\%$ run-to-run drift that would make any
+\emph{relative} comparison of q-errors across capacity levels unreliable,
+whereas target $\ge$1000 is exactly reproducible (CV $0$). Second,
+\emph{completeness}: at low targets, high-cardinality statistics can be built
+\emph{empty} (a \texttt{NULL} payload that contributes nothing), so a small
+single-column target risks a degraded, non-credible baseline. Third,
+\emph{attribution} (\S\ref{sec:rq1}): with a maximally precise single-column
+baseline, any improvement attributed to an extended statistic is a \emph{pure}
+effect of the column correlation it captures, not of compensating for a coarse
+per-column estimate. These three requirements jointly and necessarily make the
+single-column ANALYZE \emph{expensive} on a wide table --- a single CENSUS
+ANALYZE at target\,10000 costs $\approx$22s --- which is precisely the cost that
+forces the catalog-mask protocol (\S\ref{sec:measure-naive},
+\S\ref{sec:measure-mask}). The fixed large single-column target and
+Protocol-M are therefore two halves of one design decision, not independent
+choices.
 
 \emph{The single-column target is fixed, not swept.} In principle the
 per-column statistics also carry a capacity axis: \texttt{statistics\_target}
