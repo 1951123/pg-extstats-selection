@@ -104,14 +104,17 @@ that choice can be automated, and what structure it has in practice.
 
 \textbf{(A) The problem: a joint ``what and how much'' allocation.} A statistic
 is not atomic. Each has a \emph{capacity}, the number of MCV entries it stores,
-controlled by its \texttt{statistics\_target} (100, 1000, or 10000). Capacity
-determines both storage and estimation precision: a 3-column correlation that is
-invisible at target 100 becomes accurate at 1000 and exact at 10000. Automated
+controlled by its \texttt{statistics\_target}. Capacity
+determines both storage and estimation precision: it caps how many
+most-common-value tuples the list stores, so a 3-column correlation that is
+invisible at a small target becomes accurate at a larger one and exact when the
+list is large enough. Automated
 statistics management is a well-studied problem (Chaudhuri and Narasayya
 \cite{chaudhuri2000automating}), but it chooses \emph{which} statistics to
 create. Extended-statistics selection is richer: a storage budget can be spent
-either by \emph{adding} a statistic or by \emph{upgrading an existing one}
-from L100 to L1000 to L10000. The right question is therefore a
+either by \emph{adding} a statistic or by \emph{adjusting an existing one's}
+capacity --- upward from a low target to a higher one, or downward to a coarser
+but cheaper one. The right question is therefore a
 \emph{resource-allocation} one --- given a budget, which
 $(\text{table},\text{columns},\text{capacity})$ objects to instantiate --- not
 merely which column combinations:
@@ -129,12 +132,13 @@ per-statistic \texttt{statistics\_target} as a competing resource-allocation
 dimension under a shared storage budget (\S\ref{sec:back}).
 
 \emph{Running example.} \texttt{posts(AnswerCount,ViewCount)} can be stored at
-L100, L1000, or L10000 (an \emph{evaluated capacity menu}, \S\ref{sec:disc}):
-L100 loses the 3-column correlation (q-error stays $\sim$4.7), while L10000
-drives it to $\approx$1.0 at $\sim$100\,KB vs.\ $\sim$2\,KB. So
+any of the \emph{evaluated capacity menu} $\{10, 25, 50, 100, 1000, 10000\}$
+(\S\ref{sec:disc}): at L100 the list is too small to hold the 3-column
+correlation (q-error stays $\sim$4.7), while L10000 drives it to $\approx$1.0 at
+$\sim$100\,KB vs.\ $\sim$2\,KB. So
 ``should we build this statistic?'' admits no answer without ``\emph{at what
-capacity}?'' --- spending on \emph{upgrading} it competes directly with
-spending on \emph{adding} another combination.
+capacity}?'' --- spending on \emph{adjusting} its capacity competes directly
+with spending on \emph{adding} another combination.
 
 \textbf{(B) A measurable sparse regime, discovered, not assumed.} At first
 glance the problem looks like a combinatorial multi-select. Our measurements
@@ -255,26 +259,32 @@ column-combination with fewer frequent tuples than the cap is fully captured at
 any larger target, so raising the target helps only while the list is
 \emph{target-capped} (still filling) rather than \emph{data-capped} (bounded by
 the data's own cardinality). We therefore model capacity as a small menu of
-levels anchored on the PostgreSQL default: 100 (low precision; often
-data-capped for categorical correlations), and 1000 and 10000 as escalation
-levels for higher-cardinality combinations. On the evaluated workloads this
-menu is appropriate and generous --- many correlated groups are captured at 100
-(e.g. the CENSUS tail collapses from baseline q-error 4{,}162 to 1.08 already at
-target 100; \S\ref{sec:rq1}), while high-cardinality groups need the larger
-levels (\texttt{posts(AnswerCount,FavoriteCount,ViewCount)} moves from no
-improvement at 100, q-error 4.58, to near-exact at 10000, 1.04; \S\ref{sec:rq1}).
+levels spanning both directions of this axis,
+$$\{10, 25, 50, 100, 1000, 10000\},$$
+anchored on the PostgreSQL default (100) and extending \emph{below} it (10, 25,
+50 --- coarser but cheaper) and \emph{above} it (1000, 10000 --- finer for
+higher-cardinality combinations). We include sub-default levels deliberately: a
+DBA may legitimately \emph{lower} capacity to save storage or speed up analysis
+on data-capped combinations, so the decision axis is two-sided and the menu must
+be wide enough to expose it. On the evaluated workloads, many correlated groups
+are captured by target 50-100 (e.g. the CENSUS tail collapses from baseline
+q-error 4{,}162 to 1.08 already at target 100; \S\ref{sec:rq1}), while
+high-cardinality groups need the larger levels
+(\texttt{posts(AnswerCount,FavoriteCount,ViewCount)} moves from no improvement
+at 100, q-error 4.58, to near-exact at 10000, 1.04; \S\ref{sec:rq1}).
 The two workloads sit at opposite ends of this axis: the CENSUS \texttt{climate}
-columns are \emph{data-capped}, so across 30{,}856 candidate-level points
-\S\ref{sec:rq1} finds \textbf{91.8\%} of candidates' q-error independent of the
-target and \textbf{73.3\%} fully collapsed (identical q-error and size at every
-level), whereas the high-cardinality \texttt{posts} statistics are
-\emph{target-capped} and gain from escalation. Both ends confirm that capacity
-is a real, per-object decision --- at one extreme it is already decided by the
-data (no gain from escalation), at the other it is the decisive knob --- which
-is why \emph{how much} must be chosen jointly with \emph{which} statistics.
-Capacity thus sets a \emph{per-query} precision floor --- the ``how much''
-dimension --- and is a genuine decision axis, which motivates allocating it
-under a shared budget.
+columns are \emph{data-capped} at a very low cardinality, so over
+$\{100,1000,10000\}$ \S\ref{sec:rq1} finds \textbf{91.8\%} of candidates'
+q-error independent of the target and \textbf{73.3\%} fully collapsed, yet the
+axis is real: lowering the menu to $\{10,25,50\}$ makes $\approx$30\% of
+candidates vary with target. The high-cardinality \texttt{posts} statistics, by
+contrast, are \emph{target-capped} and gain from escalation. Both ends confirm
+that capacity is a real, per-object, two-sided decision --- at one extreme it is
+already satisfied by the data at or below the default, at the other it is the
+decisive knob --- which is why \emph{how much} must be chosen jointly with
+\emph{which} statistics. Capacity thus sets a \emph{per-query} precision floor
+--- the ``how much'' dimension --- and is a genuine decision axis, which
+motivates allocating it under a shared budget.
 
 \subsection{Related Work}
 
@@ -661,7 +671,8 @@ default, non-selected baseline. We instead fix it at a generous
 entirely on extended statistics --- the axis whose construction is our new
 choice. Concretely, the \emph{per-column} statistics that drive the baseline
 are always measured at \texttt{statistics\_target}=10000 while only the
-\emph{extended} statistics' capacity varies over the menu \{100, 1000, 10000\}.
+\emph{extended} statistics' capacity varies over the evaluated menu
+$\{10, 25, 50, 100, 1000, 10000\}$.
 Equivalently, every
 per-candidate q-error $e_{is}$ is measured against the \emph{same}, maximally
 precise single-column baseline, so the extended statistic's capacity is the
@@ -931,10 +942,12 @@ clauses actually exercise, MCV-list accuracy degrades with dimensionality, and
 the candidate set is already large at width 3 (e.g.\ 19{,}245 distinct
 combinations on CENSUS); 1-column predicates are already served well by
 per-column statistics, and higher-order combinations are a limitation rather
-than a hidden win ($\S\ref{sec:disc}$). We measure at the highest-capacity setting
-(\texttt{statistics\_target} 10000), which on the evaluated queries is
-near-exact, and report 1000 as the default operating point. We organize
-the results around six research questions.
+than a hidden win ($\S\ref{sec:disc}$). We evaluate the full capacity menu
+$\{10, 25, 50, 100, 1000, 10000\}$ with the per-column baseline fixed at
+\texttt{statistics\_target}=10000 (\S\ref{sec:measure}), so capacity is a
+free, two-sided decision axis rather than a fixed "highest-precision"
+setting; where a single operating point is needed we report 1000 as the
+practical default. We organize the results around six research questions.
 
 The \emph{mean} q-error on stats\_CEB\_single is only $\approx$1.1 --- but this
 is not a marginal problem. q-error is \emph{multiplicative}, so its cost
@@ -985,21 +998,29 @@ queries are caught even at a \emph{low} target --- the workload's worst query,
 \texttt{query.184} (baseline q-error 4{,}162, 13 true rows against ~54k
 estimated), is collapsed to 1.08 by a single 3-column MCV already at target 100.
 
-This contrast is \emph{systematic}, not anecdotal. Across the full 468-query
-CENSUS workload (30{,}856 measured candidate-level points), raising the target
-from 100 through 1000 to 10000 changes the q-error of \textbf{91.8\%} of
+This contrast is \emph{systematic}, not anecdotal --- once the capacity menu is
+wide enough to expose it. Over the originally-chosen coarse menu
+$\{100,1000,10000\}$ the capacity axis on CENSUS \emph{appears} absent: across
+the full 468-query workload (30{,}856 candidate-level points), raising the
+target from 100 through 1000 to 10000 changes the q-error of \textbf{91.8\%} of
 candidates by \emph{zero} (identical at all three levels), and \textbf{73.3\%}
 are collapsed on both axes --- identical q-error \emph{and} identical
-persistent size. Only \textbf{4.4\%} of candidates actually improve at a higher
-target, and 99.3\% of those also grow in size, i.e.\ the few capacity-sensitive
-points are exactly the target-capped ones. The mechanism is the one in
-\S\ref{sec:mechanisms}: CENSUS's categorical columns are \emph{data-capped},
-their MCV lists already full at target 100, so a larger target neither stores
-more entries nor changes the estimate. Capacity sets a \emph{per-query}
-precision floor that competes for the same budget --- some queries are repaired
-at low capacity, others (the high-cardinality \texttt{posts} combinations) need
-high --- which is precisely why \emph{how much} must be decided jointly with
-\emph{which} statistics to build (Prop.~\ref{prop:linear}). (ANALYZE cost
+persistent size. Yet this collapse is an artifact of the coarse menu's lower
+bound: CENSUS's saturation point is \emph{below} the default target 100, so
+when we extend the menu downward to $\{10,25,50\}$, the capacity axis
+re-emerges --- across that low sub-menu, $\approx$30\% of candidates now vary
+with target and $\approx$22\% improve as capacity rises from 10 to 50. The
+mechanism is the one in \S\ref{sec:mechanisms}: CENSUS's categorical columns
+are \emph{data-capped} at a very low cardinality, so their MCV lists are
+already full by target 50-100; above that no larger target stores more entries
+or changes the estimate, but \emph{below} it a smaller target genuinely loses
+entries. The capacity axis is therefore real and two-sided on both workloads:
+a DBA may need to \emph{raise} it on high-cardinality combinations (the
+\texttt{posts} case) or \emph{it is already satisfied at or below the default}
+(data-capped CENSUS combinations) --- and the menu must be wide enough to tell
+these apart. Capacity sets a \emph{per-query} precision floor that competes for
+the same budget, which is precisely why \emph{how much} must be decided jointly
+with \emph{which} statistics to build (Prop.~\ref{prop:linear}). (ANALYZE cost
 likewise grows with target and with the number of installed statistics,
 \S\ref{sec:measure-runtime}.)
 
