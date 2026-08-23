@@ -65,12 +65,15 @@ def main(argv: list[str] | None = None) -> int:
 
     base_metrics = summarize(qerror_base)
 
+    # full evaluated capacity menu (two-sided: below and above the PG default 100)
+    LEVELS = ["10", "25", "50", "100", "1000", "10000"]
+
     rows = []
     for B in budgets:
         res = solve_ilp(phys_stats, queries_options, qerror_base, B,
                         per_query_cap=1)
         sel_metrics = summarize(res.qerror_per_query)
-        level_counts = {"100": 0, "1000": 0, "10000": 0}
+        level_counts = {L: 0 for L in LEVELS}
         for ps in res.selected_stats:
             level_counts[str(ps.level)] = level_counts.get(str(ps.level), 0) + 1
         rows.append({
@@ -87,14 +90,15 @@ def main(argv: list[str] | None = None) -> int:
     print(f"baseline ({len(qerror_base)} queries): "
           f"mean={base_metrics['mean']:.4f} median={base_metrics['median']:.4f} "
           f"p90={base_metrics['p90']:.3f} max={base_metrics['max']:.1f}\n")
+    hdr_l = " ".join(f"L{x:>5}" for x in LEVELS)
     print(f"{'budget':>9} {'stats':>5} | {'mean':>7} {'median':>7} {'P90':>7} "
-          f"{'max':>7} | {'L100':>5} {'L1000':>6} {'L10000':>7}")
+          f"{'max':>7} | {hdr_l}")
     for r in rows:
         s = r["selected"]; lc = r["level_counts"]
+        cells = " ".join(f"{lc[L]:>6}" for L in LEVELS)
         print(f"{r['budget_bytes']:>9} {r['n_stats']:>5} | "
               f"{s['mean']:>7.3f} {s['median']:>7.3f} {s['p90']:>7.3f} "
-              f"{s['max']:>7.1f} | "
-              f"{lc['100']:>5} {lc['1000']:>6} {lc['10000']:>7}")
+              f"{s['max']:>7.1f} | {cells}")
 
     # ---- figure ----
     fig, (ax1, ax2) = plt.subplots(
@@ -115,15 +119,18 @@ def main(argv: list[str] | None = None) -> int:
     ax1.grid(True, which="both", alpha=0.3)
     ax1.legend(fontsize=7)
 
-    # stacked level distribution
-    L100 = [r["level_counts"]["100"] for r in rows]
-    L1000 = [r["level_counts"]["1000"] for r in rows]
-    L10000 = [r["level_counts"]["10000"] for r in rows]
+    # stacked level distribution over the full 6-level capacity menu
+    levels_colors = {
+        "10": "#c5b0d5", "25": "#ffbb78", "50": "#98df8a",
+        "100": "#ff9896", "1000": "#aec7e8", "10000": "#d62728",
+    }
     inds = np.arange(len(xs))
-    ax2.bar(inds, L100, color="#ff9896", label="L100")
-    ax2.bar(inds, L1000, bottom=L100, color="#ffbb78", label="L1000")
-    ax2.bar(inds, L10000, bottom=np.array(L100)+np.array(L1000),
-            color="#98df8a", label="L10000")
+    bottoms = np.zeros(len(xs))
+    for L in LEVELS:
+        counts = [r["level_counts"].get(L, 0) for r in rows]
+        ax2.bar(inds, counts, bottom=bottoms, color=levels_colors[L],
+                label=f"L{L}")
+        bottoms = bottoms + np.array(counts)
     ax2.set_xticks(inds)
     ax2.set_xticklabels([f"{b//1000}K" for b in xs], rotation=45, fontsize=7)
     ax2.set_xlabel("budget")

@@ -21,6 +21,11 @@
 > 用 6level 跑 `analyze_sparsity.py` 产生的覆盖率/稀疏指标与 multi 逐位相同
 > （coverage_median=0.999, frac_ge_0_9=0.9429, frac_ge_0_99=0.7714）。
 
+> `analyze_budget_metrics.py` 的右侧 level-mix 图展示**完整 6 档**容量菜单
+> {10,25,50,100,1000,10000}（脚本 `LEVELS` 常量）。在最小预算下解会选择低档
+> （如 5KB 时 6 个物理统计全部落在 L10/L50），随预算升级到 L1000/L10000 ——
+> 这是"降容量省钱"决策轴的可视化，取代了旧的 3 档 hardcode。
+
 | 论文图 | 复现脚本 | 生成命令 |
 |---|---|---|
 | `figures/sparsity_cdf`（稀疏 regime CDF） | `scripts/analyze_sparsity.py` | `python scripts/analyze_sparsity.py --input results/phase1_ceb_single_mask_6level.json --out results/p4_sparsity.json --fig paper/figures/sparsity_cdf` |

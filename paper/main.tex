@@ -1228,8 +1228,13 @@ distribution.
 \centering
 \includegraphics[width=\linewidth]{figures/budget_quality}
 \caption{Budget-quality curve (left) and capacity-level mix (right) on the full
-632-query stats\_CEB\_single workload. Mean, median and P90 all decrease; the
-level mix shows budget spent on capacity (L100/L1000/L10000), not just coverage.}
+632-query stats\_CEB\_single workload. Mean, median and P90 all decrease as the
+budget rises. The right panel shows the mix of chosen
+\texttt{statistics\_target} levels across the full two-sided menu
+$\{10,25,50,100,1000,10000\}$: under the tightest budgets the solver spends on
+\emph{low} capacity (L10/L25/L50) to fit many statistics, and shifts to
+\emph{high} capacity (L1000/L10000) as the budget grows --- capacity is a real
+allocation axis, not just coverage.}
 \label{fig:budgetquality}
 \end{figure}
 
