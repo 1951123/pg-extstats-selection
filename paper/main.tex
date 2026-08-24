@@ -200,27 +200,26 @@ universally optimal one. This is not a
 failure of our measurement --- it is a second-order planner interaction that the
 per-candidate model cannot see, and a concrete, validated fix.
 
-In summary, we contribute (i) an \emph{empirically observed sparse regime} on
-the two evaluated single-table workloads --- one dominant 2-/3-column MCV
-candidate per query --- whose linearity is a formal consequence
-(Prop.~\ref{prop:linear}), and which is what makes the problem tractable
-(\S\ref{sec:rq2}); (ii) a reformulation of extended-statistics selection as
-budgeted \emph{what-and-how-much allocation}, solvable by the resulting MILP
-(\S\ref{sec:formulation}, \S\ref{sec:milp}); (iii) the catalog-mask measurement
-protocol --- built on a \emph{measured cost model} that makes masking's
-per-candidate cost explicit and yields a \emph{tunable measurement granularity}
-(per-query vs.\ workload-wide, and intra-query candidate sub-batching) with a
-\emph{provably optimal} operating point
-(Prop.~\ref{prop:batch}, Cor.~\ref{cor:intraquery}), which together make
-the candidate $\times$ capacity space measurable
-(\S\ref{sec:measure}, \S\ref{sec:measure-runtime}); and (iv) a
-\emph{deployment-time interaction} finding:
-we identify a previously-hidden \emph{creation-order} planner choice among
-co-installed overlapping statistics that breaks per-candidate surrogate
-fidelity, characterize it exactly (\S\ref{sec:switch}), and --- via a
-\emph{prediction-preserving} global-disjointness mode or a lightweight
-post-selection validation --- restore surrogate fidelity
-(\S\ref{sec:e2e}).
+In summary, we contribute (i) a \emph{capacity-aware reformulation} of
+extended-statistics selection --- the central problem is a joint
+\emph{what-and-how-much} allocation of a storage budget across statistic
+identities \emph{and} their \texttt{statistics\_target} capacity levels,
+solvable as a budgeted MILP (\S\ref{sec:formulation}, \S\ref{sec:milp}); (ii) an
+\emph{empirically observed sparse regime} on the two evaluated single-table
+workloads --- one dominant 2-/3-column MCV candidate per query --- whose
+linearity is a formal consequence (Prop.~\ref{prop:linear}), and which is what
+makes the optimization tractable (\S\ref{sec:rq2}); (iii) a \emph{scalable
+measurement infrastructure}, the catalog-mask protocol, that turns the
+otherwise-infeasible candidate $\times$ capacity measurement into a
+\emph{feasible} prerequisite for the optimization (\S\ref{sec:measure},
+\S\ref{sec:measure-runtime}): mounting many candidates in one ANALYZE and
+isolating each by masking the others' payloads, with a \emph{measured cost
+model} that makes masking's per-candidate cost explicit and yields a
+\emph{tunable measurement granularity}; and (iv) a \emph{PostgreSQL 16
+evaluation} of the resulting selection across multiple workloads and capacity
+levels --- including planner-level validation that surfaces and repairs a
+previously-hidden \emph{creation-order} interference among co-installed
+overlapping statistics (\S\ref{sec:switch}, \S\ref{sec:e2e}).
 
 \section{Background and Related Work}
 \label{sec:back}
@@ -767,104 +766,49 @@ $\approx$1.9\,s), whereas the masking term $\mu$ is table-independent (a catalog
 queries is \emph{per-query} (each query ANALYZEs and masks only its own
 candidates) and $B{=}1$ is \emph{workload-wide}.
 
-\begin{proposition}[Optimal measurement granularity]
-\label{prop:batch}
-Model each batch by its de-duplication ratio $\rho_b{=}N_b/M_b$ (distinct
-payloads mounted per raw measurement). Under a uniform model in which the
-workload is split into equal-size batches sharing a constant ratio $\rho$, the
-cost \eqref{eq:batch-cost} is strictly convex in the batch count $B$ and is
-minimized at
+\emph{Measurement granularity.}\label{prop:batch}
+Catalog masking is not free: mounting more payloads on a table makes every
+masked measurement scan a longer catalog, so grouping the queries' candidates
+into large batches amortizes the fixed ANALYZE base of \eqref{eq:batch-cost}
+but increases its masking term $\mu M_b N_b$. Under a uniform model
+($N_b{=}\rho M$ per batch), $T(B)$ in \eqref{eq:batch-cost} is strictly convex
+and minimized at
 \begin{equation}\label{eq:batch-opt}
   B^{*} \;=\; M_{\text{tot}}\,\sqrt{\tfrac{\mu\rho}{B_0}},
   \qquad\text{i.e.}\qquad
-  m^{*} \;=\; \tfrac{M_{\text{tot}}}{B^{*}} \;=\; \sqrt{\tfrac{B_0}{\mu\rho}}
-  \ \text{meas.\ per batch},
+  m^{*} \;=\; \sqrt{\tfrac{B_0}{\mu\rho}}\ \text{meas.\ per batch},
 \end{equation}
-so the optimal batch size grows with the ANALYZE base ($\partial m^{*}/\partial
-B_0{>}0$) and shrinks as masking or sharing rises
-($\partial m^{*}/\partial\mu{<}0$, $\partial m^{*}/\partial\rho{<}0$).
-\end{proposition}
-\begin{proof}[Proof sketch]
-With equal batches, $M_{\text{tot}}{=}BM$ and $N_b{=}\rho M$ for the
-per-batch measurement count $M$. Substituting into \eqref{eq:batch-cost} gives
-$T(B){=}B\,B_0 + c\rho M_{\text{tot}} + \mu\rho M_{\text{tot}}^{2}/B +
-\epsilon M_{\text{tot}}$; the $B$-independent terms contribute a constant. The
-first two derivatives are $T'(B){=}B_0-\mu\rho
-M_{\text{tot}}^{2}/B^{2}$ and $T''(B){=}2\mu\rho
-M_{\text{tot}}^{2}/B^{3}{>}0$, so $T$ is strictly convex and $B^{*}$ follows
-from $T'(B^{*}){=}0$. Setting $m^{*}{=}M_{\text{tot}}/B^{*}$ recovers the
-closed form.
-\end{proof}
+so the optimal granularity grows with the ANALYZE base and shrinks as masking
+or sharing rises. We use this only to choose a \emph{practical}
+sub-batching granularity and to justify why we do not mount every candidate at
+once; the optimization problem of \S\ref{sec:milp} remains the statistics
+selection, not the measurement batching.
 
-The closed form pins down the two operating regimes and explains the empirically
-observed mirror in \S\ref{sec:findings}. A workload-wide ($B{=}1$) measurement
-is optimal exactly when $T(1){\le}T(B)$ for all $B{>}1$, which (dropping the
-$B$-independent terms) is $B_0\ge\mu\rho M_{\text{tot}}^{2}/B$ for every
-$B{>}1$, tightest at $B{=}2$:
-\begin{equation}\label{eq:p1vsbn}
-  B_0 \;\ge\; \frac{\mu\rho}{2}\,M_{\text{tot}}^{2}
-  \qquad\text{(workload-wide optimal).}
-\end{equation}
-On CENSUS ($\rho{=}0.624$, $M_{\text{tot}}{=}185{,}136$ over the six-level menu)
-this demands
-$B_0{\ge}\tfrac12(0.0008)(0.624)\,185{,}136^{2}\approx 8.6{\times}10^{6}$\,s
-$\approx$2{,}376\,h, far above the measured $22$\,s, so a single workload-wide build
-is decisively suboptimal; the phase-1 instead uses a \emph{sub-batched}
-protocol that keeps each ANALYZE+mask batch near the per-query minimum
-(measured in Tab.~\ref{tab:measurement}). On
-stats\_CEB\_single ($\rho{=}0.127$,
-$M_{\text{tot}}{=}3{,}696$ over the six-level menu) the same condition is
-$B_0{\ge}\approx 694$\,s,
-still above $22$\,s in the uniform model, yet the workload-wide threshold is
-the \emph{least} demanding here ($\rho$ is smaller), so the closed form
-correctly identifies workload-wide as the theoretically favored scope for this
-high-sharing workload -- while the uniform-$\rho$ model overstates how much
-$B{=}1$ dominates: the true per-batch $\rho_b$ rises sharply for the first few
-queries (those eight
-distinct combinations reappear everywhere), so $\eqref{eq:batch-cost}$ with the
-\emph{measured} $\rho_b$ (used in \S\ref{sec:findings}) correctly favors
-$B{=}1$ only mildly, leaving sub-batching within reach of the optimum. Hence
-\eqref{eq:batch-opt} is the insight of the closed form, and the
-general optimum is pinned down by evaluating \eqref{eq:batch-cost} with the
-\emph{measured} per-batch $\rho_b$ over candidate groupings -- a greedy
-partition that keeps the highest-overlap queries together realizes the
-minimum, so the closed form also yields the effective ``sharing-aware''
-batcher used in our harness (\S\ref{sec:measure}).
+The same trade-off also fixes the \emph{scope} of each build. Mounting every
+candidate on the table at once ($B{=}1$, workload-wide) is optimal only when
+sharing is so high that the masking term stays small; on CENSUS
+($\rho{=}0.624$) that would require
+$B_0{\ge}\tfrac12(0.0008)(0.624)\,185{,}136^{2}\approx 2{,}376$\,h, far above
+the measured $22$\,s, so a single workload-wide build is decisively suboptimal
+and we sub-batch instead (keeping each ANALYZE+mask batch near the per-query
+minimum, Tab.~\ref{tab:measurement}). On the high-sharing
+stats\_CEB\_single workload the closed form would favour workload-wide, but
+mounting everything still risks a large mask term, so we use the same
+sub-batched harness on both workloads for reproducibility.
 
-\begin{corollary}[Intra-query granularity: the same optimum at a finer level]
-\label{cor:intraquery}
-The scope decision applies \emph{within} a single query as well. For a query
-with $n$ candidates and $L$ levels, split its candidate set into $b$ sub-batches
-of $(n/b)$ candidates; each sub-batch is ANALYZEd and masked as one build. The
-cost is
-\[
-  T_{{q}}(b) \;=\; b\,B_0 \;+\; c\,nL \;+\; \frac{(nL)^{2}\mu}{b},
-\]
-which is strictly convex in $b$ and minimized at
-\begin{equation}\label{eq:intra-batch-opt}
-  b^{*} \;=\; nL\,\sqrt{\tfrac{\mu}{B_0}}
-  \qquad\Longleftrightarrow\qquad
-  m^{*} \;=\;
-  \underbrace{\frac{nL}{b^{*}}}_{\text{meas.\ per sub-batch}} \;=\;
-  \sqrt{\tfrac{B_0}{\mu}},
-\end{equation}
-recovering \emph{the same optimal per-batch measurement count}
-$m^{*}{=}\sqrt{B_0/\mu}$ as Prop.~\ref{prop:batch}. Hence mounting all of a
-query's candidates at once ($b{=}1$) is the \emph{coarsest} intra-query choice:
-the mask term carries the full $\mu(nL)^2$ penalty, whereas finer sub-batching
-reduces it as $\mu(nL)^2/b$ at the price of paying $B_0$ once per sub-batch.
-\end{corollary}
-
-The corollary is validated directly on the most candidate-dense CENSUS query
-(\texttt{query.335}, $n{=}455$, $L{=}1$, target 1000): measuring all 455 at once
-($b{=}1$) took $181.4$\,s (mask $159.9$\,s), splitting into $3$ sub-batches
-dropped it to $84.7$\,s (mask $57.7$\,s), and $7$ sub-batches to $63.4$\,s
-(mask $25.0$\,s) -- the mask term tracks $\approx1/b$ ($159.9\to57.7\to25.0$)
-while the ANALYZE term grows with $b$ ($21.4\to27.0\to38.4$\,s), exactly the
-two competing terms of $T_{{q}}(b)$. At $7$ sub-batches this already cuts the
-query's measurement time $2.9\times$, and because $m^{*}$ is independent of
-$n$, the same sub-batch size is reused across \emph{all} queries -- a
-query-invariant batching strategy.
+\emph{Intra-query granularity.}\label{cor:intraquery}
+The same trade-off applies \emph{within} a candidate-dense query: splitting its
+$n$ candidates (over $L$ levels) into $b$ sub-batches gives
+$T_{{q}}(b) = b\,B_0 + c\,nL + (nL)^2\mu/b$, minimized at
+$b^{*}=nL\sqrt{\mu/B_0}$, i.e.\ the same optimal per-sub-batch count
+$m^{*}=\sqrt{B_0/\mu}$ as above. We validated this directly on the most
+candidate-dense CENSUS query (\texttt{query.335}, $n{=}455$, $L{=}1$, target
+1000): measuring all 455 at once ($b{=}1$) took $181.4$\,s (mask $159.9$\,s),
+splitting into $3$ sub-batches dropped it to $84.7$\,s (mask $57.7$\,s), and
+$7$ sub-batches to $63.4$\,s (mask $25.0$\,s) --- the mask term tracks
+$\approx1/b$ ($159.9\to57.7\to25.0$) while the ANALYZE term grows with $b$
+($21.4\to27.0\to38.4$\,s), exactly the two competing terms of $T_{{q}}(b)$ ---
+a $2.9\times$ speedup at $7$ sub-batches.
 
 We verify this intra-query model end-to-end at the \emph{six-level} menu by
 measuring, for one candidate-dense query per workload, the real per-query
@@ -887,60 +831,29 @@ fixed-$B_0$ model is 69\% low on CENSUS and $3$--$10\times$ high on
 \texttt{stats\_CEB\_single}. The model's \emph{form} is thus stable across
 workloads; only the ANALYZE base must be calibrated to the table.
 
-\eqref{eq:batch-cost} exposes the real trade-off that determines the optimal
-granularity. Growing the batch (smaller $B$) amortizes the ANALYZE fixed base
-over more candidates (the standard story), but it \emph{also} mounts more
-payloads on the table, so every measurement masks a longer catalog and the mask
-term $\mu M_bN_b$ grows -- \emph{quadratically} in batch size when the batch's
-distinct payloads are close to its raw measurement count. The winner is set by
-the workload's \textbf{deduplication ratio} $\rho_b=N_b/M_b$ (distinct
-candidates encountered per raw candidate) and by $B_0$: per-query wins when the
-ANALYZE base is small or sharing is low, workload-wide wins when sharing is high
-enough that $N_b$ stays small relative to $M_b$.
-
-The two real workloads exercise the two sides of this trade-off differently
-(measured with our candidate generator, \S\ref{sec:findings}).
-\emph{stats\_CEB\_single} has only 78 distinct column combinations out of 616
-raw candidates ($\rho{=}0.13$): its queries reuse the same few combinations, so
-workload-wide is the \emph{theoretically} optimal scope (its tiny
-$M_{\text{tot}}$ keeps the mask term small even when everything is mounted at
-once), though with so much shared payload even sub-batching stays near it. \emph{CENSUS} is the mirror image: 19{,}245
-distinct of 30{,}856 ($\rho{=}0.62$), so mounting everything at once is
-expensive. For reproducibility we therefore measure \emph{both} workloads with
-the same sub-batched Protocol-M, which builds each query's candidate set in one
-ANALYZE but splits candidate-dense queries into sub-batches of $\approx$55 to
-bound the mask term ($b{=}55$ is the \emph{harness} granularity --- coarser
-than the measured per-query intra-batch optima of
-Tab.~\ref{tab:measurement}, which bounds the mask term across all queries as
-in Prop.~\ref{prop:batch}). Because the ANALYZE term dominates the per-query
-cost, Protocol-M's advantage over the per-candidate Protocol-A is best measured
+The trade-off is governed by the workload's \textbf{deduplication ratio}
+$\rho_b{=}N_b/M_b$ (distinct payloads mounted per raw measurement) and the
+ANALYZE base $B_0$. The two real workloads sit on opposite sides of it
+(measured with our candidate generator, \S\ref{sec:findings}):
+\emph{stats\_CEB\_single} has only 78 distinct combinations out of 616 raw
+candidates ($\rho{=}0.13$) so its queries reuse the same few groups, while
+\emph{CENSUS} has 19{,}245 of 30{,}856 ($\rho{=}0.62$) so mounting everything at
+once is expensive. For reproducibility we therefore measure \emph{both}
+workloads with the same sub-batched Protocol-M, which builds each query's
+candidate set in one ANALYZE but splits candidate-dense queries into sub-batches
+($\approx$55 candidates) to bound the mask term --- the \emph{harness}
+granularity, coarser than the per-query intra-batch optima of
+Tab.~\ref{tab:measurement} but simple and uniform across the workload.
+Protocol-M's advantage over the per-candidate Protocol-A is then best measured
 rather than modeled: using the \emph{measured} optimal per-query time above and
 Protocol-A's per-candidate cost ($nL$ cells $\times$ two \texttt{ANALYZE}s),
 the speedup is $\approx$283$\times$ on CENSUS \texttt{query.3} and
 $\approx$36$\times$ on \texttt{stats\_CEB\_single} \texttt{st.144} (lower
 bounds: Protocol-A's per-candidate \texttt{ANALYZE} is no more than the table's
-base). This is why our reported numbers use sub-batched Protocol-M on \emph{both}
-stats\_CEB\_single and CENSUS, and why the granularity is chosen by
-\eqref{eq:batch-cost} (through Prop.~\ref{prop:batch}) rather than by a blanket
-rule.
-
-The two workloads' measurement times play three deliberately separate roles in
-this paper. The cost model (Eq.~\ref{eq:batch-cost},
-Prop.~\ref{prop:batch}, Cor.~\ref{cor:intraquery}) establishes the \emph{form}
-of the optimal granularity --- how the optimum shifts with the ANALYZE base and
-the sharing ratio --- but not the magnitude of any single run. A
-candidate-dense \emph{single query} per workload, swept over sub-batch sizes
-(Tab.~\ref{tab:measurement}), supplies the \emph{measured} speedup over
-per-candidate Protocol-A (283$\times$/36$\times$) that we report; this is the
-reproducible quantity that supports the comparison. The full-workload runs, in
-turn, exist only to assemble the per-candidate q-error tables that the downstream
-experiments (\S\ref{sec:findings}, \S\ref{sec:rq4}) consume, so their wall-clock
-is not a quantity we report. A workload-level sweep would be the only way to
-report an \emph{optimal} workload time, but its cost would be orders of
-magnitude above the single-query sweep --- as costly as the very measurement we
-use the model and the single-query probe to avoid --- so we report the measured
-single-query speedup, a reproducible proxy of the protocol's advantage, rather
-than a workload-level time.
+base). We report this measured single-query speedup --- the reproducible
+quantity that supports the comparison; the full-workload runs exist only to
+assemble the per-candidate q-error tables that the downstream experiments
+(\S\ref{sec:findings}, \S\ref{sec:rq4}) consume.
 
 In either case the catalog-mask protocol --- not the MILP --- is the enabling
 component that makes the candidate ${\times}$ capacity space measurable, and the
