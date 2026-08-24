@@ -31,6 +31,7 @@
 | `figures/sparsity_cdf`（稀疏 regime CDF） | `scripts/analyze_sparsity.py` | `python scripts/analyze_sparsity.py --input results/phase1_ceb_single_mask_6level.json --out results/p4_sparsity.json --fig paper/figures/sparsity_cdf` |
 | `figures/e2e_predict`（E2E 预算 vs 增益散点） | `scripts/exp_e2e_scatter.py` | `python scripts/exp_e2e_scatter.py --input results/phase1_ceb_single_mask_6level.json --db stats --table posts --target 10000 --budgets 10000,40000,100000,250000 --out results/p4_e2e_scatter.json --fig paper/figures/e2e_predict` |
 | `figures/budget_quality`（预算分配质量） | `scripts/analyze_budget_metrics.py` | `python scripts/analyze_budget_metrics.py --input results/phase1_ceb_single_mask_6level.json --budgets 5000,10000,20000,40000,100000,250000,500000,1000000 --out results/p3_metrics.json --fig paper/figures/budget_quality` |
+| `figures/census_budget_quality`（CENSUS data-capped budget-quality，Fig:census_budget_quality） | `scripts/analyze_budget_metrics.py` | `python scripts/analyze_budget_metrics.py --input results/phase1_census_mcv_6level.json --budgets 10000,25000,50000,100000,250000,500000,1000000,2000000 --out results/p3_census_metrics.json --fig paper/figures/census_budget_quality` |
 | `figures/upgrade_vs_add`（容量升级 vs 新增） | `scripts/fig_upgrade_vs_add.py` | `python scripts/fig_upgrade_vs_add.py --phase1 results/phase1_ceb_single_mask_6level.json --out paper/figures/upgrade_vs_add` |
 
 ---

@@ -38,6 +38,8 @@ results/*
 !results/phase1_census_mcv_low_t10000.json
 # CENSUS 完整 6 级轴 [10,25,50,100,1000,10000] (由 merge_phase1.py 合并低/高两档)
 !results/phase1_census_mcv_6level.json
+# CENSUS 6 级 budget-quality 指标 (Fig:census_budget_quality 数据源头)
+!results/p3_census_metrics.json
 # §measure-runtime 单查询 6 级 T_q(b) 实测 (query.3 CENSUS + st.144 stats_CEB_single)
 !results/tq6_model_vs_measured.json
 !results/tq6_stats_ceb_model_vs_measured.json

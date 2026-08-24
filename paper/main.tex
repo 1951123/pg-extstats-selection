@@ -1339,6 +1339,40 @@ allocation axis, not just coverage.}
 \label{fig:budgetquality}
 \end{figure}
 
+The CENSUS workload is the \emph{data-capped} mirror of the same budget-quality
+trade-off (Fig.~\ref{fig:census_budget_quality}). Its baseline is far worse
+(mean 25.19, max 4{,}162 over 468 queries), and a tiny budget already collapses
+it: 50\,KB drives the mean from 25.19 to 1.31, the 100\,KB budget cuts the
+maximum to 6.2, and 250\,KB brings it to $\approx$3. Beyond $\approx$500\,KB
+the curve \emph{saturates}: the mean plateaus at 1.057 and stays there through
+2\,MB even as the solver keeps adding more statistics (455 to 457 stats),
+because CENSUS's
+low-cardinality combinations are already fully captured --- the remaining error
+is not repairable by any candidate in the family ($\S\ref{sec:rq1}$). The level
+mix is also telling: unlike stats\_CEB\_single, where the solver shifts to
+\emph{high} capacity as the budget grows, on CENSUS it spends overwhelmingly on
+\emph{low} capacity (L10/L25) even at large budgets --- raising capacity is
+rarely worth it once the data-capped lists are already full
+($\S\ref{sec:rq1}$). The two curves together span the full ``how much'' axis:
+on target-capped, high-cardinality \texttt{posts} statistics, capacity upgrades
+are the decisive lever; on data-capped CENSUS statistics, coverage is what
+matters and capacity is already satisfied at or below the default.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/census_budget_quality}
+\caption{Budget-quality curve (left) and capacity-level mix (right) on the
+full 468-query CENSUS workload (the data-capped mirror of
+Fig.~\ref{fig:budgetquality}). A small budget collapses the mean from 25.19 to
+below 1.1 by 250\,KB (maximum to $\approx$3), and the curve \emph{saturates}
+beyond $\approx$500\,KB: the mean stays 1.057 through 2\,MB even as more
+statistics are added, because CENSUS's low-cardinality combinations are already
+captured. The level mix stays concentrated on \emph{low} capacity (L10/L25) at
+every budget --- raising capacity is rarely beneficial on data-capped
+statistics.}
+\label{fig:census_budget_quality}
+\end{figure}
+
 \subsubsection{What-only vs.\ what+how-much.}
 The claim that capacity is a real decision axis requires isolating it: does
 free choice of \texttt{statistics\_target} beat \emph{fixed-capacity
