@@ -171,17 +171,17 @@ candidates in one ANALYZE and isolates each by masking the others'
 per-candidate cost that grows with the batch's payloads, so the protocol
 exposes a \emph{tunable measurement granularity} --- per-query when candidate
 sharing is low, workload-wide when it is high, or intra-query sub-batching in
-between. On both evaluated workloads we therefore use a \emph{sub-batched}
-catalog-mask build ($\approx$55 candidates/batch): the full six-level phase-1
-measures $\approx$42\,h of wall-clock on CENSUS across its sub-batched runs
-and $\approx$0.25\,h on stats\_CEB\_single (\S\ref{sec:measure-runtime}), and,
-comparing the \emph{measured} per-query time against the per-candidate
-Protocol-A cost, Protocol-M is $\approx$283$\times$ faster on CENSUS and
+between. On both evaluated workloads we therefore measure each query's
+candidates with the sub-batched catalog-mask protocol; comparing the
+\emph{measured} per-query time against the per-candidate Protocol-A cost,
+Protocol-M is $\approx$283$\times$ faster on CENSUS and
 $\approx$36$\times$ on stats\_CEB\_single
 (measured, lower bounds; \S\ref{sec:measure-runtime}). This
-makes the candidate $\times$ capacity space measurable;
-the resulting MILP then solves at full-workload scale in seconds
-(\S\ref{sec:rq4}). Measurement, not optimization, is the dominant bottleneck.
+makes the candidate $\times$ capacity space measurable --- the full six-level
+per-candidate q-error table each workload needs for the MILP is obtainable in a
+single pass --- and the resulting MILP then solves at full-workload scale in
+seconds (\S\ref{sec:rq4}). Measurement, not optimization, is the dominant
+bottleneck.
 
 \textbf{(D) The validation surprise: overlapping statistics interfere.}
 End-to-end deployment on real PostgreSQL shows per-candidate predictions are
@@ -914,15 +914,9 @@ ANALYZE but splits candidate-dense queries into sub-batches of $\approx$55 to
 bound the mask term ($b{=}55$ is the \emph{harness} granularity --- coarser
 than the measured per-query intra-batch optima of
 Tab.~\ref{tab:measurement}, which bounds the mask term across all queries as
-in Prop.~\ref{prop:batch}). The full
-six-level stats\_CEB\_single phase-1 completes in $\approx$0.25\,h of measured
-wall-clock (632 queries, $b{=}55$); the full
-six-level CENSUS phase-1 completes in $\approx$42\,h across its sub-batched
-runs ($\approx$21\,h for the high
-three levels \{100,1000,10000\} and $\approx$21\,h for the low three
-\{10,25,50\}, b$=55$). Because the ANALYZE term dominates the per-query cost,
-Protocol-M's advantage over the per-candidate Protocol-A is best measured rather
-than modeled: using the \emph{measured} optimal per-query time above and
+in Prop.~\ref{prop:batch}). Because the ANALYZE term dominates the per-query
+cost, Protocol-M's advantage over the per-candidate Protocol-A is best measured
+rather than modeled: using the \emph{measured} optimal per-query time above and
 Protocol-A's per-candidate cost ($nL$ cells $\times$ two \texttt{ANALYZE}s),
 the speedup is $\approx$283$\times$ on CENSUS \texttt{query.3} and
 $\approx$36$\times$ on \texttt{stats\_CEB\_single} \texttt{st.144} (lower

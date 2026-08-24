@@ -134,17 +134,22 @@
       （CENSUS 186.0→6.3s），ANALYZE 项近似随 b 线性增长——支撑 Cor.~intraquery 的两项竞争。
       这取代了旧版"纯模型曲线"（B₀/s+cL+μL²s, s*=55, 24×）表，彻底消除模型估计与实测的混淆；
       harness 用 b=55 是 workloade-wide 设置（区别于单查询最优），正文表述已解耦。
-- [x] **§measure-runtime 的 CENSUS 实际墙钟已填入**：完整 6 级 phase-1 实测 ≈42h
-      （低 3 级 21h + 高 3 级 ~21h，b=55 子批次），vs 单次全负载 workload-wide 模型（6 级
-      M_tot=185,136）≈2{,}376h，即 **>一个数量级**提速；intro 与 §measure-runtime 均已
-      从"待重跑后报告"更新为实测值。
-- [x] **§measure-runtime 的 CENSUS 实际墙钟时长已填**（见上一条完成项）。
+- [x] **§measure-runtime 的 workload 级墙钟（42h/0.25h 与 b=55）已从论文移除（有意为之）**：
+      完整 6 级 phase-1 实测 CENSUS ≈42h（低 3 级 21h + 高 3 级 ~21h）、stats_CEB ≈0.25h，
+      但 **b=55 是历史遗留的 harness 粒度**（来自 3-level→6-level 演进 + 旧错误代价模型
+      选出的 batch size），并非最优、难以解释。论文不再汇报 workload 级墙钟，只报
+      **干净的实测单查询最优**（CENSUS query.3 b=1=402s、stats_CEB st.144 b=4=22.2s）
+      与实测加速比 283×/36×；intro 改为强调"完整 6 级 per-candidate q-error 表可单趟获得"
+      而非 42h。本文件保留 b=55 与实测时长为**技术运行记录**（复现真实性）。
+- [x] **§measure-runtime 的 CENSUS 实际墙钟时长已填入**（见上一条完成项；已从论文移除，
+      仅留作复现记录）。
 - [ ] **模型 vs 实测的系统性低估，已用完整 6 级实测确认**：
       代价模型估算 L=6 CENSUS ≈22-33h，但实测完整 6 级 ≈42h（低 3 级 21h + 高 3 级 ~21h）——
       模型系统性低估 ~1.3-1.9×（归因同前：ANALYZE 实际基成本 > 22s、每子批隐式固定开销
       CREATE/DROP/restore/连接未被捕获）。**结论**：42h 实测与早期"÷0.58 校准 ≈ 38-40h"
-      的估计基本吻合。当前 §measure-runtime 只报实测 42h 和 vs 6 级模型 ≈2{,}376h 对比
-      （皆不依赖模型校准因子），故未把校准因子硬编码进正文；如需可在此补一句定性校准说明。
+      的估计基本吻合。论文不再汇报 42h（见上一条完成项），但此低估结论仍然成立——
+      它正是驱动改进模型（per-dataset Bf）的关键依据，已在 §measure-runtime 用
+      单查询 T_q(b) 实测验证（CENSUS/ stats_CEB held-out ≤3%）。
 - [ ] **Protocol-A 对比也是 ANALYZE-only、系统性低估 Protocol-A**（强化 Protocol-M 动机）：
       `exp_catalog_mask_scale.py` 中 Protocol-A 定义为 $N(2B_0 + \text{EXPLAIN})$，
       **只含 ANALYZE，忽略每候选的 CREATE/DROP STATISTICS DDL 开销**。对 CENSUS
