@@ -12,6 +12,9 @@ benchmarks/Census/data/us+census+data+1990.zip
 
 # Python 虚拟环境 / 缓存 / 实验输出
 .venv/
+
+# 临时分析脚本 (前缀 tmp_ 的本地草稿, 不纳入 git)
+scripts/tmp_*
 __pycache__/
 *.pyc
 
@@ -33,6 +36,8 @@ results/*
 !results/phase1_census_mcv_low.json
 # CENSUS 正式重跑 (single-col-10000) 最终数据
 !results/phase1_census_mcv_low_t10000.json
+# CENSUS 完整 6 级轴 [10,25,50,100,1000,10000] (由 merge_phase1.py 合并低/高两档)
+!results/phase1_census_mcv_6level.json
 # stats_CEB mcv 测量与复现
 !results/phase1_stats_ceb_mcv.json
 !results/phase1_stats_ceb_mcv_r3.json

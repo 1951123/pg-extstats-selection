@@ -41,8 +41,8 @@
 |---|---|
 | 稀疏 regime：每查询至多一个统计量（中心发现） | `phase1_ceb_single_mask_6level.json`（CDF 峰值） |
 | RQ1 容量轴：91.8% 候选 q-error 与 target 无关；73.3% 完全塌陷；4.4% 改善（{100,1000,10000}） | `phase1_census_mcv_multi.json`（CENSUS 30,856 候选） |
-| RQ1 容量轴扩展菜单 {10,25,50,100,1000,10000}（两向决策轴） | `phase1_ceb_single_mask_6level.json`（stats_CEB_single 6 级）+ `phase1_census_mcv_multi.json`（{100,1000,10000}） |
-| CENSUS 低档容量再暴露（~30% 敏感 / 22% 改善，正式数字以重跑为准） | `phase1_census_mcv_low_t10000.json`（**正式重跑，完成后以它为准**）；旧值 `phase1_census_mcv_low.json`（single-col-50 历史） |
+| RQ1 容量轴扩展菜单 {10,25,50,100,1000,10000}（两向决策轴） | `phase1_ceb_single_mask_6level.json`（stats_CEB_single 6 级）+ `phase1_census_mcv_6level.json`（**CENSUS 完整 6 级，由 low/multi 合并**） |
+| CENSUS 低档容量再暴露（~29% 敏感 / ~7% 改善≥20%，完整 6 级核算） | `phase1_census_mcv_6level.json`（**合并终值**）；溯源文件 `phase1_census_mcv_multi.json`（{100,1000,10000}）+ `phase1_census_mcv_low_t10000.json`（{10,25,50}）；旧值 `phase1_census_mcv_low.json`（single-col-50 历史） |
 | §5.1 测量成本模型（ANALYZE base ~22s @t10000，T(N)=base+0.334N） | `probe_census_fine_capacity.log` / `probe_census_analyze_scale.py` 输出 |
 | stats_CEB mcv 多变量（multi）效果 | `phase1_stats_ceb_mcv.json`、`phase1_stats_ceb_mcv_r3.json`（复现） |
 
@@ -55,7 +55,8 @@
 | `results/phase1_ceb_single_mask_6level.json` | 860K | **三张论文图的数据源头** + RQ1 容量轴 {10..10000} 完整。取代 `full_multi` |
 | `results/phase1_census_mcv_multi.json` | ~21M | CENSUS {100,1000,10000} 正式基线（30,856 候选），single-col-10000。**总耗时约 21h**（中断过一次：`phase1_census_mcv_multi.log` 开头 `[resume] loaded 140 done queries`，其 `53857s` 仅含续跑段 328 查询；第一段 140 查询 ~6.2h 无独立日志，为按 ~160s/q 估算） |
 | `results/phase1_census_mcv_low.json` | ~20M | CENSUS 低档探测（single-col-50，历史参考） |
-| `results/phase1_census_mcv_low_t10000.json` | （运行中） | **CENSUS 正式重跑**（single-col-10000 + {10,25,50}），完成后更新终值 |
+| `results/phase1_census_mcv_low_t10000.json` | ~21M | **CENSUS 正式重跑完成**（single-col-10000 + {10,25,50}）：完整 468 查询，实测墙钟 75{,}512s ≈ 21.0h（`phase1_census_low_t10000.log`，无中断） |
+| `results/phase1_census_mcv_6level.json` | ~41M | **CENSUS 完整 6 级轴 {10,25,50,100,1000,10000}**（468 查询，30,856 候选，每候选 6 档全测量）——由 `scripts/merge_phase1.py` 合并 low/multi 两档，逐位一致（qid 顺序、候选集完全一致，无缺失档）。**实测总墙钟 ≈42h**（低 3 级 21h + 高 3 级 ~21h）。下游 RQ1 / budget 分析以它为数据源头 |
 | `results/phase1_stats_ceb_mcv.json` | 452K | stats_CEB mcv 测量 |
 | `results/phase1_stats_ceb_mcv_r3.json` | 736K | stats_CEB mcv 复现 |
 | `results/phase1_ceb_single_6level.log` | 42 行 | 6 级运行日志（配置/进度） |
@@ -89,7 +90,7 @@
     --out results/phase1_census_mcv_multi.json
   ```
 
-- **CENSUS {10,25,50} 正式重跑**（single-col-10000，运行中）：
+- **CENSUS {10,25,50} 正式重跑**（single-col-10000，已完成）：
   ```bash
   env PYTHONPATH=src nohup .venv/bin/python -u scripts/measure_phase1_subbatch.py \
     --bench census --kind mcv --arities 2,3 \
@@ -97,6 +98,15 @@
     --cands-per-batch 55 --checkpoint-every 20 --resume \
     --out results/phase1_census_mcv_low_t10000.json
   ```
+
+- **CENSUS 完整 6 级轴（合并 low/multi，可重复）**：
+  ```bash
+  .venv/bin/python -u scripts/merge_phase1.py \
+    --low results/phase1_census_mcv_low_t10000.json \
+    --high results/phase1_census_mcv_multi.json \
+    --out results/phase1_census_mcv_6level.json
+  ```
+  校验通过：468/468 查询、候选集完全一致、6 档逐位无缺失。
 
 ---
 
@@ -110,35 +120,39 @@
 
 ## 6. 待办
 
-- [ ] `phase1_census_mcv_low_t10000.json` **正式重跑完成后**：确认终值、纳入 git，并替换
-      §2.2 / RQ1 中"~30% 敏感 / 22% 改善"的**初步**数字为 single-col-10000 终值。
+- [x] `phase1_census_mcv_low_t10000.json` **正式重跑已完成**（468 查询，实测 21.0h）：已纳入 git，
+      并与 `phase1_census_mcv_multi.json` 合并为完整 6 级轴 `phase1_census_mcv_6level.json`（已纳入 git）。
+      §2.2 / RQ1 中容量数字已用完整 6 级终值更新：{100,1000,10000} 91.8% 不变 / 73.3% 塌陷；
+      {10,25,50} ~29% 敏感 / ~7% 改善≥20%。
 - [x] **`tab:measurement` 已重构为"每候选成本 vs sub-batch size"的协议代价函数采样表**
       （Protocol-A 常数 2B₀=44s vs Protocol-M 凸曲线 B₀/s+cL+μL²s，最优点 s*=55，即
       实际用的 cands-per-batch=55）。这是**纯模型曲线**（锚点 ANALYZE-at-N 数据），
       **不依赖 CENSUS 6 级运行**，故表格本身无需等重跑。
+- [x] **§measure-runtime 的 CENSUS 实际墙钟已填入**：完整 6 级 phase-1 实测 ≈42h
+      （低 3 级 21h + 高 3 级 ~21h，b=55 子批次），vs 单次全负载 workload-wide 模型 ≈594h，
+      即 **>一个数量级**提速；intro 与 §measure-runtime 均已从"待重跑后报告"更新为实测值。
 - [ ] **§measure-runtime 的 CENSUS 实际墙钟时长仍待填**：正文目前只定性说
       "orders of magnitude faster"；待 `phase1_census_mcv_low_t10000.json`
       （低 3 级）+ `phase1_census_mcv_multi.json`（高 3 级）合并成完整 6 级实测后，
       填入真实运行时长数字。
-- [ ] **模型 vs 实测的系统性低估（~1.7×）待用完整 6 级实测校准**：
-      用 §measure-runtime 的代价模型（B₀=22, c=0.35, μ=0.0008, L=3, n_subb=853,
-      M=30,856, ρ=0.624）估算 L=3 CENSUS 约 **12.3h**(ANALYZE 10.8h + mask 1.4h +
-      EXPLAIN 0.1h)，但实测（mcv_multi 3 级含中断）约 **21.2h** —— 模型低估约 **0.58×**
-      （实际 ~1.72× 于模型）。归因：① ANALYZE 实际基成本 > 模型的 22s（climate 表常驻
-      大量 real extended stats），等效 B₀≈60s；② 每子批隐式固定开销（CREATE/DROP
-      统计、restore、连接）约 37.6s/子批未被模型捕获；③ 中断段额外开销。
-      据此外推 **完整 6 级（L=6）模型估 22.1h，÷0.58 校准 ≈ 38-40h**，与估计的 40h 吻合。
-      待 `mcv_low_t10000` 跑完后用真实 6 级墙钟核验，再决定是否写进 §measure-runtime
-      作为模型校准说明。
+- [ ] **模型 vs 实测的系统性低估，已用完整 6 级实测确认**：
+      代价模型估算 L=6 CENSUS ≈22-33h，但实测完整 6 级 ≈42h（低 3 级 21h + 高 3 级 ~21h）——
+      模型系统性低估 ~1.3-1.9×（归因同前：ANALYZE 实际基成本 > 22s、每子批隐式固定开销
+      CREATE/DROP/restore/连接未被捕获）。**结论**：42h 实测与早期"÷0.58 校准 ≈ 38-40h"
+      的估计基本吻合。当前 §measure-runtime 只报实测 42h 和 vs 594h 模型对比（皆不依赖
+      模型校准因子），故未把校准因子硬编码进正文；如需可在此补一句定性校准说明。
 - [ ] **Protocol-A 对比也是 ANALYZE-only、系统性低估 Protocol-A**（强化 Protocol-M 动机）：
       `exp_catalog_mask_scale.py` 中 Protocol-A 定义为 $N(2B_0 + \text{EXPLAIN})$，
       **只含 ANALYZE，忽略每候选的 CREATE/DROP STATISTICS DDL 开销**。对 CENSUS
-      N=19,245 候选即 38,490 次 CREATE + 38,490 次 DROP + 19,245 次 EXPLAIN 未计。
-      因此即便用 40h 实测（6 级），加速比 $235h/40h \approx 5.9\times$ 仍是下界；
+      6 级下 N=30,856×6=185,136 物理统计即 185,136 次 CREATE + 185,136 次 DROP 未计。
+      仅 ANALYZE 项 Protocol-A baseline ≈2{,}263h（30,856×6 物理统计 × 2×22s），
+      实测 6 级 sub-batched ≈42h → 加速比 $2263/42 \approx 54\times$ 仍是下界；
       计入逐候选 DDL 后 Protocol-A 只会更慢、Protocol-M 优势只会更大（不对称低估：
-      只压低 Protocol-A，不压 Protocol-M）。**建议**：CENSUS 重跑完成后，另起一次
-      不冲突的小 probe 实测单次 CREATE/DROP STATISTICS 开销，以量化这个增量并决定
-      是否写进论文（当前为定性论证，未硬编码数字）。
+      只压低 Protocol-A，不压 Protocol-M）。**建议**：另起一次不冲突的小 probe 实测
+      单次 CREATE/DROP STATISTICS 开销，以量化这个增量并决定是否写进论文
+      （当前为定性论证，正文用"over an order of magnitude"，未硬编码 DDL 增量数字）。
+- [x] **`merge_phase1.py` 已实现**（方法 B）：合并 CENSUS low（{10,25,50}）与 multi
+      （{100,1000,10000}）为完整 6 级轴 `phase1_census_mcv_6level.json`（已纳入 git），
+      校验 468/468 查询、候选集一致、6 档无缺失。
 - [ ] stats_CEB_single 的 workload-wide/per-query 时长（≈0.12h / ≈1.29h）也是模型外推，
       其 6level 数据已完成（632 查询），可复核是否随 6 级化更新。
-- [ ] 若要做增量容量合并，可新增 `merge_phase1.py`（方法 B，尚未开始）。

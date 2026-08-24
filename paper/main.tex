@@ -172,9 +172,11 @@ per-candidate cost that grows with the batch's payloads, so the protocol
 exposes a \emph{tunable measurement granularity} --- per-query when candidate
 sharing is low, workload-wide when it is high, or intra-query sub-batching in
 between. On CENSUS (low sharing) we therefore use a \emph{sub-batched}
-catalog-mask build ($\approx$55 candidates/batch), cutting time by orders of
-magnitude over the all-payload build (measured wall-clock reported once the
-six-level run completes, \S\ref{sec:measure-runtime}); on stats\_CEB\_single
+catalog-mask build ($\approx$55 candidates/batch): the full six-level phase-1
+measures $\approx$42\,h of wall-clock across its sub-batched runs
+(\S\ref{sec:measure-runtime}), over an order of magnitude faster than a single
+all-payload workload-wide build (modeled $\approx$594\,h) and more still than
+per-candidate CREATE/ANALYZE; on stats\_CEB\_single
 (high sharing) \emph{workload-wide} is
 $\approx$188$\times$ faster than naive, both against per-candidate
 CREATE/ANALYZE (\S\ref{sec:measure-runtime}). This
@@ -875,12 +877,14 @@ so mounting them all is expensive and the \emph{measured} phase-1 instead uses a
 query's candidate set in one ANALYZE but splits queries with many candidates
 into sub-batches of $\approx$55 (the sub-batch size used in our runs, informed
 by the $m^{*}$ of Eq.~\ref{eq:intra-batch-opt}) to bound the mask term
-(\S\ref{sec:measure-runtime});
-this is orders of magnitude cheaper than a single all-payload workload-wide
-build, while remaining within reach of the per-candidate baseline. (Because we
-unified the capacity menu to six levels, the CENSUS phase-1 is re-measured
-across the full $\{10,\dots,10000\}$ menu; we report its measured wall-clock
-once that run completes, \S\ref{sec:measure-runtime}.) This
+(\S\ref{sec:measure-runtime}). The full
+six-level CENSUS phase-1 (\{10,\dots,10000\}) completes in $\approx$42\,h of
+measured wall-clock across its sub-batched runs ($\approx$21\,h for the high
+three levels \{100,1000,10000\} and $\approx$21\,h for the low three
+\{10,25,50\}, b$=55$), over an order of magnitude faster than the modeled
+$\approx$594\,h of a single workload-wide build --- and the two runs' per-level
+snapshots merge exactly into the full six-level axis used everywhere below
+(\S\ref{sec:measure}, \S\ref{sec:rq1}). This
 is why our reported numbers use sub-batched Protocol-M on CENSUS and
 workload-wide on stats\_CEB\_single, and why the granularity is chosen by
 \eqref{eq:batch-cost} (through Prop.~\ref{prop:batch}) rather than by a blanket
@@ -1058,8 +1062,9 @@ are collapsed on both axes --- identical q-error \emph{and} identical
 persistent size. Yet this collapse is an artifact of the coarse menu's lower
 bound: CENSUS's saturation point is \emph{below} the default target 100, so
 when we extend the menu downward to $\{10,25,50\}$, the capacity axis
-re-emerges --- across that low sub-menu, $\approx$30\% of candidates now vary
-with target and $\approx$22\% improve as capacity rises from 10 to 50. The
+re-emerges --- across that low sub-menu, $\approx$29\% of candidates now vary
+with target, and $\approx$7\% improve by ${\ge}20\%$ as capacity rises from 10
+to 50 (over the full 468-query workload, 30{,}856 candidates). The
 mechanism is the one in \S\ref{sec:mechanisms}: CENSUS's categorical columns
 are \emph{data-capped} at a very low cardinality, so their MCV lists are
 already full by target 50-100; above that no larger target stores more entries
