@@ -41,13 +41,32 @@
 | 论文中的数值 / 结论 | 数据源头 primary 工件 |
 |---|---|
 | 稀疏 regime：每查询至多一个统计量（中心发现） | `phase1_ceb_single_mask_6level.json`（CDF 峰值） |
-| RQ1 容量轴：91.8% 候选 q-error 与 target 无关；73.3% 完全塌陷；4.4% 改善（{100,1000,10000}） | `phase1_census_mcv_multi.json`（CENSUS 30,856 候选） |
+| RQ1 容量轴：91.8% 候选 q-error 与 target 无关；73.3% 完全塌陷（q-error 与 size 均相同）（{100,1000,10000}，6 级终值） | `phase1_census_mcv_6level.json`（CENSUS 30,856 候选；溯源 `phase1_census_mcv_multi.json`） |
 | RQ1 容量轴扩展菜单 {10,25,50,100,1000,10000}（两向决策轴） | `phase1_ceb_single_mask_6level.json`（stats_CEB_single 6 级）+ `phase1_census_mcv_6level.json`（**CENSUS 完整 6 级，由 low/multi 合并**） |
 | CENSUS 低档容量再暴露（~29% 敏感 / ~7% 改善≥20%，完整 6 级核算） | `phase1_census_mcv_6level.json`（**合并终值**）；溯源文件 `phase1_census_mcv_multi.json`（{100,1000,10000}）+ `phase1_census_mcv_low_t10000.json`（{10,25,50}）；旧值 `phase1_census_mcv_low.json`（single-col-50 历史） |
 | §5.1 测量成本模型（ANALYZE base ~22s @t10000，T(N)=base+0.334N） | `probe_census_fine_capacity.log` / `probe_census_analyze_scale.py` 输出 |
 | §measure-runtime 单查询 6 级 T_q(b) 实测（query.3 + st.144）——改进模型（ANALYZE=b·Bf+cp·nL）训练集 b=1,3/1,2 拟合、测试集 b=7/14/28 与 b=4/7/10 验证 ≤3%；固定 B0 模型 CENSUS 低估 69%、stats_CEB 高估 3-10× | `results/tq6_model_vs_measured.json`（CENSUS query.3, b=1,3,7,14,28）+ `results/tq6_stats_ceb_model_vs_measured.json`（st.144, b=1,2,4,7,10）；脚本 `scripts/measure_tq6.py`（实测）+ `scripts/validate_tq6.py`（train/test 验证） |
 | §measure-runtime 实测加速比（Protocol-M 最优 batch 实测 vs Protocol-A）：CENSUS ≈283×、stats_CEB ≈36×（下界） | `scripts/speedup_measured.py`（基于上面的 tq6 实测 JSON） |
 | stats_CEB mcv 多变量（multi）效果 | `phase1_stats_ceb_mcv.json`、`phase1_stats_ceb_mcv_r3.json`（复现） |
+| RQ3 tab:greedy2（MILP vs G1/G2/G3，5KB MILP=1.0270） | `results/p6_greedy_strong.json`（`--input phase1_ceb_single_mask_6level.json`，6 级重算） |
+| RQ3 tab:whathowmuch（what-only vs what+how-much） | `results/p2_what_vs_howmuch.json`（6 级重算） |
+| RQ3 tab:ablation（组件消融，5KB full=1.0270） | `results/p5_ablation_5k.json`/`p5_ablation_100k.json`（6 级重算） |
+| tab:meanrob（mean 选择稳健，Jaccard/mean 6 级） | `results/p10_mean_robustness.json`（6 级重算） |
+
+### 2b. 独立于容量菜单的专门测量（固定 L10000 / join / E2E，非 6 级菜单问题）
+
+以下实验**不从 `phase1_*_6level.json` 读取相位数据**，而是：要么**直接连数据库（`--db stats/census`，固定 `--level 10000`）实时测量**真实表（posts/climate），要么属于**独立的 join workload**。它们测的属性（单候选/子集联合 q-error、planner OID 顺序、Protocol-M 正确性、E2E 部署）**在数学上不随容量菜单 {10..10000} 的级数而改变**——只用一个固定目标 L10000，因此**不涉及"3-level vs 6-level"问题，无需因菜单升级重建**。
+
+| 论文中的数值 / 结论 | 独立数据工件 | 测量方式 |
+|---|---|---|
+| RQ2 稀疏性：top-1 coverage median 1.000、100%>0.9、93% (k=2==k=1)、18,177 subsets 枚举最优=单候选 | `exp_multi_full.json`（top-1/2/3 联合测量，`levels={10000}`）+ `p0_subset_exhaustive.json`/`p0_subset_exhaustive10.json`（`level=10000`） | 直接 `--db stats --level 10000` catalog-mask 实时测量；脚本 `exp_subset_exhaustive.py`、`analyze_sparsity_corrected.py` |
+| tab:switch（planner OID 顺序：both==A-only 到末位） | `p0_planner_switch.json`（`level=10000`，posts） | 直接 `--db stats --level 10000` EXPLAIN 探针；脚本 `exp_planner_switch.py` |
+| tab:p1（E2E 三阶段：singleton/overlap/disjoint 的 pred/ratio） | `p1_global_disjoint.json`（posts 部署）       | 真实部署 + 重测；脚本（global-disjoint MILP 消融） |
+| fig:e2epredict（411 点：149 disjoint mean ratio 1.0001 / 197 overlap mean 1.053） | `p4_e2e_scatter.json`（posts，`--target 10000`） | 直接 `--db stats --table posts --target 10000` 预算扫描部署；脚本 `exp_e2e_scatter.py` |
+| §measure-correct（singleton vs masked 逐位一致） | `p5_mask_scale.json`（`level=10000`） | 直接 `--db stats --level 10000`；脚本 `exp_catalog_mask_scale.py` |
+| RQ6 join 负对照（median 12.3 / mean 33,853 / max 4,177,428，改善仅 1.022×） | `phase1_stats_ceb_mcv.json`（`bench=stats_ceb`，146 查询） | join workload 独立测量 |
+| Table:bench job-light 行（join 负对照） | `phase1_job_light_full_cand5.json`、`phase1_job_light_cand27.json` | job-light join workload |
+| RQ1 极端选择性 CENSUS 个例（query.184 4,162→1.08 @L100 等） | `phase1_census_mcv_6level.json`（或 `phase1_census_mask_top10.json`） | 6 级相位（data-capped 个例） |
 
 ---
 
