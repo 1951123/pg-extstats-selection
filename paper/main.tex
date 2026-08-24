@@ -134,7 +134,8 @@ dimension under a shared storage budget (\S\ref{sec:back}).
 \emph{Running example.} On the high-cardinality \texttt{stats\_CEB\_single}
 workload, \texttt{posts(AnswerCount,ViewCount)} can be stored at any of the
 \emph{evaluated capacity menu} $\{10, 25, 50, 100, 1000, 10000\}$
-(\S\ref{sec:disc}): at L100 the list is too small to hold the 3-column
+(\S\ref{sec:disc}), where 100 is PostgreSQL's default
+\texttt{statistics\_target}: at L100 the list is too small to hold the 3-column
 correlation (q-error stays $\sim$4.7), while L10000 drives it to $\approx$1.0 at
 $\sim$100\,KB vs.\ $\sim$2\,KB. So
 ``should we build this statistic?'' admits no answer without ``\emph{at what
