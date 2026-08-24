@@ -129,18 +129,16 @@
       实际用的 cands-per-batch=55）。这是**纯模型曲线**（锚点 ANALYZE-at-N 数据），
       **不依赖 CENSUS 6 级运行**，故表格本身无需等重跑。
 - [x] **§measure-runtime 的 CENSUS 实际墙钟已填入**：完整 6 级 phase-1 实测 ≈42h
-      （低 3 级 21h + 高 3 级 ~21h，b=55 子批次），vs 单次全负载 workload-wide 模型 ≈594h，
-      即 **>一个数量级**提速；intro 与 §measure-runtime 均已从"待重跑后报告"更新为实测值。
-- [ ] **§measure-runtime 的 CENSUS 实际墙钟时长仍待填**：正文目前只定性说
-      "orders of magnitude faster"；待 `phase1_census_mcv_low_t10000.json`
-      （低 3 级）+ `phase1_census_mcv_multi.json`（高 3 级）合并成完整 6 级实测后，
-      填入真实运行时长数字。
+      （低 3 级 21h + 高 3 级 ~21h，b=55 子批次），vs 单次全负载 workload-wide 模型（6 级
+      M_tot=185,136）≈2{,}376h，即 **>一个数量级**提速；intro 与 §measure-runtime 均已
+      从"待重跑后报告"更新为实测值。
+- [x] **§measure-runtime 的 CENSUS 实际墙钟时长已填**（见上一条完成项）。
 - [ ] **模型 vs 实测的系统性低估，已用完整 6 级实测确认**：
       代价模型估算 L=6 CENSUS ≈22-33h，但实测完整 6 级 ≈42h（低 3 级 21h + 高 3 级 ~21h）——
       模型系统性低估 ~1.3-1.9×（归因同前：ANALYZE 实际基成本 > 22s、每子批隐式固定开销
       CREATE/DROP/restore/连接未被捕获）。**结论**：42h 实测与早期"÷0.58 校准 ≈ 38-40h"
-      的估计基本吻合。当前 §measure-runtime 只报实测 42h 和 vs 594h 模型对比（皆不依赖
-      模型校准因子），故未把校准因子硬编码进正文；如需可在此补一句定性校准说明。
+      的估计基本吻合。当前 §measure-runtime 只报实测 42h 和 vs 6 级模型 ≈2{,}376h 对比
+      （皆不依赖模型校准因子），故未把校准因子硬编码进正文；如需可在此补一句定性校准说明。
 - [ ] **Protocol-A 对比也是 ANALYZE-only、系统性低估 Protocol-A**（强化 Protocol-M 动机）：
       `exp_catalog_mask_scale.py` 中 Protocol-A 定义为 $N(2B_0 + \text{EXPLAIN})$，
       **只含 ANALYZE，忽略每候选的 CREATE/DROP STATISTICS DDL 开销**。对 CENSUS

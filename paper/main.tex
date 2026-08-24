@@ -175,7 +175,7 @@ between. On CENSUS (low sharing) we therefore use a \emph{sub-batched}
 catalog-mask build ($\approx$55 candidates/batch): the full six-level phase-1
 measures $\approx$42\,h of wall-clock across its sub-batched runs
 (\S\ref{sec:measure-runtime}), over an order of magnitude faster than a single
-all-payload workload-wide build (modeled $\approx$594\,h) and more still than
+all-payload workload-wide build (modeled $\approx$2{,}376\,h) and more still than
 per-candidate CREATE/ANALYZE; on stats\_CEB\_single
 (high sharing) \emph{workload-wide} is
 $\approx$188$\times$ faster than naive, both against per-candidate
@@ -505,10 +505,13 @@ pruned, leaving only genuine ``repairers''. Second, global deduplication means
 $n_{\text{stats}}$ is the deduplicated universe of
 $(\text{table},\text{cols},\text{level})$ rather than the per-query sum. On the
 full 468-query CENSUS workload the resulting problem is large but trivially
-solvable: the worst-case (no pruning) instance has 57{,}735 physical
-statistics, 92{,}568 options and 150{,}303 binary variables and is solved
-optimally by HiGHS in $\approx$4.7s; with pruning it shrinks to 34{,}280
-statistics / 46{,}392 options / 80{,}672 variables ($\approx$4.3s). Thus the
+solvable: the worst-case (no pruning) instance over the full six-level menu
+$\{10,\dots,10000\}$ has 115{,}470 physical
+statistics, 185{,}136 options and 300{,}606 binary variables and is solved
+optimally by HiGHS in $\approx$4.0s; with pruning it shrinks to 69{,}431
+statistics / 89{,}727 options / 159{,}158 variables ($\approx$2.8s). Even the
+coarser three-level {100,1000,10000} menu already yields 57{,}735 / 92{,}568 /
+150{,}303, so the solve stays sub-five-second either way. Thus the
 optimization is not the bottleneck at full-workload scale --- the phase-1
 \emph{measurement} is (\S\ref{sec:measure}).
 
@@ -799,14 +802,16 @@ $B{>}1$, tightest at $B{=}2$:
   B_0 \;\ge\; \frac{\mu\rho}{2}\,M_{\text{tot}}^{2}
   \qquad\text{(workload-wide optimal).}
 \end{equation}
-On CENSUS ($\rho{=}0.624$, $M_{\text{tot}}{=}92{,}568$) this demands
-$B_0{\ge}\tfrac12(0.0008)(0.624)\,92{,}568^{2}\approx 2.1{\times}10^{6}$\,s
-$\approx594$\,h, far above the measured $22$\,s, so a single workload-wide build
+On CENSUS ($\rho{=}0.624$, $M_{\text{tot}}{=}185{,}136$ over the six-level menu)
+this demands
+$B_0{\ge}\tfrac12(0.0008)(0.624)\,185{,}136^{2}\approx 8.6{\times}10^{6}$\,s
+$\approx$2{,}376\,h, far above the measured $22$\,s, so a single workload-wide build
 is decisively suboptimal; the phase-1 instead uses a \emph{sub-batched}
 protocol that keeps each ANALYZE+mask batch near the per-query minimum
 (the $b{=}55$ operating point of Tab.~\ref{tab:measurement}). On
 stats\_CEB\_single ($\rho{=}0.127$,
-$M_{\text{tot}}{=}1{,}848$) the same condition is $B_0{\ge}\approx 174$\,s,
+$M_{\text{tot}}{=}3{,}696$ over the six-level menu) the same condition is
+$B_0{\ge}\approx 694$\,s,
 still above $22$\,s in the uniform model yet the measured optimum is
 workload-wide -- the discrepancy is the model's uniform-$\rho$ approximation:
 the true per-batch $\rho_b$ rises sharply for the first few queries (those eight
@@ -882,7 +887,7 @@ six-level CENSUS phase-1 (\{10,\dots,10000\}) completes in $\approx$42\,h of
 measured wall-clock across its sub-batched runs ($\approx$21\,h for the high
 three levels \{100,1000,10000\} and $\approx$21\,h for the low three
 \{10,25,50\}, b$=55$), over an order of magnitude faster than the modeled
-$\approx$594\,h of a single workload-wide build --- and the two runs' per-level
+$\approx$2{,}376\,h of a single workload-wide build --- and the two runs' per-level
 snapshots merge exactly into the full six-level axis used everywhere below
 (\S\ref{sec:measure}, \S\ref{sec:rq1}). This
 is why our reported numbers use sub-batched Protocol-M on CENSUS and
@@ -1324,8 +1329,9 @@ component that buys the last, hardest repairs.
 \label{sec:rq4}
 
 \emph{The optimization is not the bottleneck.} On the full 468-query CENSUS
-workload the worst-case MILP (57{,}735 statistics, 150{,}303 binary variables)
-solves optimally in $\approx$4.7s and with pruning in $\approx$4.3s
+workload the worst-case MILP over the six-level menu (115{,}470 statistics,
+300{,}606 binary variables) solves optimally in $\approx$4.0s and with pruning
+in $\approx$2.8s
 (\S\ref{sec:scale}). Measurement (\S\ref{sec:measure}) dominates the pipeline,
 not the solve.
 
