@@ -508,9 +508,7 @@ solvable: the worst-case (no pruning) instance over the full six-level menu
 $\{10,\dots,10000\}$ has 115{,}470 physical
 statistics, 185{,}136 options and 300{,}606 binary variables and is solved
 optimally by HiGHS in $\approx$4.0s; with pruning it shrinks to 69{,}431
-statistics / 89{,}727 options / 159{,}158 variables ($\approx$2.8s). Even the
-coarser three-level {100,1000,10000} menu already yields 57{,}735 / 92{,}568 /
-150{,}303, so the solve stays sub-five-second either way. Thus the
+statistics / 89{,}727 options / 159{,}158 variables ($\approx$2.8s). Thus the
 optimization is not the bottleneck at full-workload scale --- the phase-1
 \emph{measurement} is (\S\ref{sec:measure}).
 
