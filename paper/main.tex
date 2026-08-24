@@ -435,17 +435,9 @@ subject to a global budget.
 
 \subsection{Variables and Objective}
 
-The MILP does not dictate planner behavior: PostgreSQL's planner, not the
-optimizer, chooses which installed statistic applies at plan time. The
-assignment $x_{is}$ is therefore a \emph{surrogate} model variable --- it
-states \emph{if} the surrogate is faithful, query $i$'s error under the
-deployed set is $e_{is}$ for the level at which $s$ is created
-(\S\ref{sec:sparse}); the E2E validation (\S\ref{sec:e2e}) is precisely the
-experiment that checks whether this surrogate assignment predicts the deployed
-planner.
-
-Binary variables are $y_s$ (create physical statistic $s$) and $x_{is}$ (query
-$i$ uses $s$ in the surrogate). By Prop.~\ref{prop:linear}, minimizing mean
+The MILP decides \emph{which physical statistics to build}; the variables are
+$y_s$ (create physical statistic $s$) and $x_{is}$ (query $i$ uses $s$ in the
+surrogate, of \S\ref{sec:sparse}). By Prop.~\ref{prop:linear}, minimizing mean
 q-error is equivalent to maximizing total improvement,
 \[
   \max \sum_{i,s}\underbrace{\big(e_i^0-e_{is}\big)}_{\Delta_{is}\ge 0}x_{is},
