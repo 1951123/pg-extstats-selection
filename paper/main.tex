@@ -167,38 +167,24 @@ takes $\sim$22s with a warm cache, and grows linearly with the number of
 statistics (\S\ref{sec:measure-runtime}). Our
 \emph{catalog-mask protocol} (\S\ref{sec:measure}) builds each batch's
 candidates in one ANALYZE and isolates each by masking the others'
-\texttt{pg\_statistic\_ext\_data} payloads. Masking itself has a measured
-per-candidate cost that grows with the batch's payloads, so the protocol
-exposes a \emph{tunable measurement granularity} --- per-query when candidate
-sharing is low, workload-wide when it is high, or intra-query sub-batching in
-between. On both evaluated workloads we therefore measure each query's
-candidates with the sub-batched catalog-mask protocol; comparing the
-\emph{measured} per-query time against the per-candidate Protocol-A cost,
-Protocol-M is $\approx$283$\times$ faster on CENSUS and
-$\approx$36$\times$ on stats\_CEB\_single
-(measured, lower bounds; \S\ref{sec:measure-runtime}). This
-makes the candidate $\times$ capacity space measurable --- the full six-level
-per-candidate q-error table each workload needs for the MILP is obtainable in a
-single pass --- and the resulting MILP then solves at full-workload scale in
-seconds (\S\ref{sec:rq4}). Measurement, not optimization, is the dominant
-bottleneck.
+\texttt{pg\_statistic\_ext\_data} payloads. This makes the candidate
+$\times$ capacity space measurable --- the full six-level per-candidate
+q-error table each workload needs for the MILP is obtainable in a single pass
+--- while reducing measurement cost over the per-candidate protocol by orders of
+magnitude (measured speedups in \S\ref{sec:measure-runtime}); the resulting
+MILP then solves at full-workload scale in seconds (\S\ref{sec:rq4}).
+Measurement, not optimization, is the dominant bottleneck.
 
 \textbf{(D) The validation surprise: overlapping statistics interfere.}
 End-to-end deployment on real PostgreSQL shows per-candidate predictions are
 accurate, but co-installed \emph{overlapping} statistics let the planner
 switch queries --- an effect we trace to \emph{creation order}
-(\S\ref{sec:switch}) --- tripling prediction error for affected queries
-(predicted mean 1.02 vs.\ measured 1.32). We therefore provide \emph{two
-deployment modes}: a conservative \emph{global-disjointness} mode that forbids
-column-overlapping co-installation and restores (empirically) near-exact
-predictability (ratio 1.000) at a quantified quality cost; and an
-\emph{unconstrained} mode that keeps nominal quality but must be followed by
-lightweight planner validation. Global disjointness is a
-\emph{prediction-preserving} deployment mode --- it restores the surrogate's
-fidelity on the measured workloads --- not claimed to be the
-universally optimal one. This is not a
-failure of our measurement --- it is a second-order planner interaction that the
-per-candidate model cannot see, and a concrete, validated fix.
+(\S\ref{sec:switch}) --- breaking prediction for affected queries. We therefore
+provide \emph{two deployment modes}: a conservative \emph{global-disjointness}
+mode that forbids column-overlapping co-installation and restores (empirically)
+near-exact predictability at a quantified quality cost ($\S\ref{sec:p1}$); and
+an \emph{unconstrained} mode that keeps nominal quality but must be followed by
+lightweight planner validation.
 
 In summary, we contribute (i) a \emph{capacity-aware reformulation} of
 extended-statistics selection --- the central problem is a joint
@@ -279,27 +265,16 @@ $$\{10, 25, 50, 100, 1000, 10000\},$$
 anchored on the PostgreSQL default (100) and extending \emph{below} it (10, 25,
 50 --- coarser but cheaper) and \emph{above} it (1000, 10000 --- finer for
 higher-cardinality combinations). We include sub-default levels deliberately: a
-DBA may legitimately \emph{lower} capacity to save storage or speed up analysis
-on data-capped combinations, so the decision axis is two-sided and the menu must
-be wide enough to expose it. On the evaluated workloads, many correlated groups
-are captured by target 50-100 (e.g. the CENSUS tail collapses from baseline
-q-error 4{,}162 to 1.08 already at target 100; \S\ref{sec:rq1}), while
-high-cardinality groups need the larger levels
-(\texttt{posts(AnswerCount,FavoriteCount,ViewCount)} moves from no improvement
-at 100, q-error 4.58, to near-exact at 10000, 1.04; \S\ref{sec:rq1}).
-The two workloads sit at opposite ends of this axis: the CENSUS \texttt{climate}
-columns are \emph{data-capped} at a very low cardinality, so over
-$\{100,1000,10000\}$ \S\ref{sec:rq1} finds \textbf{91.8\%} of candidates'
-q-error independent of the target and \textbf{73.3\%} fully collapsed, yet the
-axis is real: lowering the menu to $\{10,25,50\}$ makes $\approx$30\% of
-candidates vary with target. The high-cardinality \texttt{posts} statistics, by
-contrast, are \emph{target-capped} and gain from escalation. Both ends confirm
-that capacity is a real, per-object, two-sided decision --- at one extreme it is
-already satisfied by the data at or below the default, at the other it is the
-decisive knob --- which is why \emph{how much} must be chosen jointly with
-\emph{which} statistics. Capacity thus sets a \emph{per-query} precision floor
---- the ``how much'' dimension --- and is a genuine decision axis, which
-motivates allocating it under a shared budget.
+DBA may legitimately \emph{lower} capacity to save storage on data-capped
+combinations, so the decision axis is two-sided and the menu must be wide
+enough to expose it. The two workloads sit at opposite ends of this axis: the
+CENSUS \texttt{climate} columns are \emph{data-capped} at a very low
+cardinality, so their MCV lists are already full by target 50--100 and raising
+the target above the default changes nothing, whereas the high-cardinality
+\texttt{posts} statistics are \emph{target-capped} and gain from escalation
+(the concrete numbers are in \S\ref{sec:rq1}). Capacity thus sets a
+\emph{per-query} precision floor --- the ``how much'' dimension --- and is a
+genuine decision axis, which motivates allocating it under a shared budget.
 
 \subsection{Related Work}
 
