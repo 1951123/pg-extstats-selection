@@ -1492,7 +1492,7 @@ E2E$/_{}$predicted q-error; $1.000$ means the deployment reproduces the model's
 prediction exactly). The global-disjoint solution reproduces its prediction
 exactly (ratio 1.000) because the deployed set is pairwise column-disjoint, at
 a quantified nominal-quality cost. The systematic sweep in \S\ref{sec:e2esys}
-extends this observation to 149 disjoint query-deployment points.}
+extends this observation to 159 global-disjoint query-deployment points.}
 \label{tab:p1}
 \small
 \begin{tabular}{lccccc}
@@ -1525,29 +1525,33 @@ The two deployments above are suggestive but few. We therefore run a
 plus the whole-workload budgeted MILP at four budgets (10/40/100/250\,KB),
 each solved both \emph{with} global disjointness and \emph{without}, and measure
 E2E for every query a deployment touches. Fig.~\ref{fig:e2epredict} summarizes
-149 disjoint and 197 overlapping query-deployment points.
+234 disjoint (159 global-disjoint MILP $+$ 75 singletons) and 230 overlapping
+query-deployment points.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/e2e_predict}
-\caption{Predicted vs.\ E2E measured q-error across 411 systematic
+\caption{Predicted vs.\ E2E measured q-error across 464 systematic
 query-deployment points (log-log). Disjoint points (singletons, global-disjoint
-MILP) hug the diagonal --- 149 points, mean ratio 1.0001, worst 1.009.
-Overlapping points scatter above it --- 197 points, mean ratio 1.053, worst
+MILP) hug the diagonal --- 234 points, mean ratio 1.0000, worst 1.036.
+Overlapping points scatter above it --- 230 points, mean ratio 1.048, worst
 2.05.}
 \label{fig:e2epredict}
 \end{figure}
 
 The sweep confirms the Stage-2/3 finding is \emph{not} an artefact of a
 hand-picked deployment: disjoint deployments reproduce their predictions to
-within $1.001$ at every budget (mean $1.0001$, worst $1.009$ across 149
-points), while overlapping deployments uniformly exceed theirs --- largest
-under the tightest budget ($1.099$ at 10\,KB, where overlap is densest) and
-shrinking as the budget buys more breadth ($1.022$ at 250\,KB). This is exactly
-what a per-candidate measurement model predicts: individual statistics are
-faithful, and the residual error is a joint effect of co-installed overlapping
-statistics that disjointness removes --- and removes \emph{generally}, not just
-in the original two deployments.
+within $1.001$ at every budget (only 8 of 159 global-disjoint points exceed a
+ratio of $1.0001$; mean $1.0000$, worst $1.036$), while overlapping
+deployments, on average, exceed theirs --- the mean ratio is tightest at the
+largest budget ($1.018$ at 250\,KB) and largest under small budgets where
+overlap is densest ($1.07$--$1.08$ at 10/40\,KB). The residual is a \emph{tail}
+rather than a uniform shift: the median overlapping ratio is $1.000$, only
+$20/230$ overlapping points exceed $1.05$ --- but those can be severe (worst
+$2.05$). This is exactly what a per-candidate measurement model predicts:
+individual statistics are faithful, and the residual error is a joint effect of
+co-installed overlapping statistics that disjointness removes --- and removes
+\emph{generally}, not just in the original two deployments.
 
 \subsection{The Causal Takeaway}
 \label{sec:e2e-takeaway}
