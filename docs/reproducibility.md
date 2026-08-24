@@ -126,10 +126,14 @@
       并与 `phase1_census_mcv_multi.json` 合并为完整 6 级轴 `phase1_census_mcv_6level.json`（已纳入 git）。
       §2.2 / RQ1 中容量数字已用完整 6 级终值更新：{100,1000,10000} 91.8% 不变 / 73.3% 塌陷；
       {10,25,50} ~29% 敏感 / ~7% 改善≥20%。
-- [x] **`tab:measurement` 已重构为"每候选成本 vs sub-batch size"的协议代价函数采样表**
-      （Protocol-A 常数 2B₀=44s vs Protocol-M 凸曲线 B₀/s+cL+μL²s，最优点 s*=55，即
-      实际用的 cands-per-batch=55）。这是**纯模型曲线**（锚点 ANALYZE-at-N 数据），
-      **不依赖 CENSUS 6 级运行**，故表格本身无需等重跑。
+- [x] **`tab:measurement` 已重构为实测表**：展示 CENSUS `query.3`（84 候选项，nL=504）与
+      `stats_CEB_single` `st.144`（35 候选项，nL=210）在六个 niveau 菜单下、不同 sub-batch
+      数量 b（s=nL/b）的**实测墙钟**（total / ANALYZE / mask 分解）。数据来自
+      `results/tq6_model_vs_measured.json` 与 `results/tq6_stats_ceb_model_vs_measured.json`。
+      实测单查询最优：CENSUS b=1 (402.0s)、stats_CEB b=4 (22.2s)；mask 项随 b 增长按 ≈1/b 下降
+      （CENSUS 186.0→6.3s），ANALYZE 项近似随 b 线性增长——支撑 Cor.~intraquery 的两项竞争。
+      这取代了旧版"纯模型曲线"（B₀/s+cL+μL²s, s*=55, 24×）表，彻底消除模型估计与实测的混淆；
+      harness 用 b=55 是 workloade-wide 设置（区别于单查询最优），正文表述已解耦。
 - [x] **§measure-runtime 的 CENSUS 实际墙钟已填入**：完整 6 级 phase-1 实测 ≈42h
       （低 3 级 21h + 高 3 级 ~21h，b=55 子批次），vs 单次全负载 workload-wide 模型（6 级
       M_tot=185,136）≈2{,}376h，即 **>一个数量级**提速；intro 与 §measure-runtime 均已

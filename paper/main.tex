@@ -813,7 +813,7 @@ $B_0{\ge}\tfrac12(0.0008)(0.624)\,185{,}136^{2}\approx 8.6{\times}10^{6}$\,s
 $\approx$2{,}376\,h, far above the measured $22$\,s, so a single workload-wide build
 is decisively suboptimal; the phase-1 instead uses a \emph{sub-batched}
 protocol that keeps each ANALYZE+mask batch near the per-query minimum
-(the $b{=}55$ operating point of Tab.~\ref{tab:measurement}). On
+(measured in Tab.~\ref{tab:measurement}). On
 stats\_CEB\_single ($\rho{=}0.127$,
 $M_{\text{tot}}{=}3{,}696$ over the six-level menu) the same condition is
 $B_0{\ge}\approx 694$\,s,
@@ -909,10 +909,12 @@ $M_{\text{tot}}$ keeps the mask term small even when everything is mounted at
 once), though with so much shared payload even sub-batching stays near it. \emph{CENSUS} is the mirror image: 19{,}245
 distinct of 30{,}856 ($\rho{=}0.62$), so mounting everything at once is
 expensive. For reproducibility we therefore measure \emph{both} workloads with
-the same sub-batched Protocol-M ($b{=}55$, the sharing-aware operating point
-of Tab.~\ref{tab:measurement}), which builds each query's candidate set in one
+the same sub-batched Protocol-M, which builds each query's candidate set in one
 ANALYZE but splits candidate-dense queries into sub-batches of $\approx$55 to
-bound the mask term. The full
+bound the mask term ($b{=}55$ is the \emph{harness} granularity --- coarser
+than the measured per-query intra-batch optima of
+Tab.~\ref{tab:measurement}, which bounds the mask term across all queries as
+in Prop.~\ref{prop:batch}). The full
 six-level stats\_CEB\_single phase-1 completes in $\approx$0.25\,h of measured
 wall-clock (632 queries, $b{=}55$); the full
 six-level CENSUS phase-1 completes in $\approx$42\,h across its sub-batched
@@ -937,39 +939,43 @@ granularity analysis above turns Protocol-M from a fixed trick into a tunable
 component whose operating point is chosen by a measurable cost model.
 
 \begin{table*}[t]
-\caption{Per-candidate phase-1 measurement cost as a function of the
-\emph{sub-batch size} $s$ (number of candidates mounted per ANALYZE+mask build;
-each measured at $L{=}3$ capacity levels) on CENSUS \texttt{climate}
-(target 10000, warm cache). Protocol-A is \emph{constant} ($2B_0{=}44$\,s per
-candidate: two ANALYZEs each), while Protocol-M per candidate follows
-$C_M(s){=}\underbrace{B_0/s}_{\text{ANALYZE}}+\underbrace{cL}_{\text{per-cand}}+
-\underbrace{\mu L^2 s}_{\text{mask}}$,
-with the CENSUS \texttt{ANALYZE} base $B_0{=}22$\,s (a per-table parameter;
-see Eq.~\ref{eq:batch-cost}), $c{\approx}0.35$\,s/stat, $\mu{\approx}0.0008$\,s/payload.
-Because masking grows as $\mu L^2 s$, $C_M$ is strictly convex and bottoms at
-$s^{*}{=}\sqrt{B_0/(\mu L^2)}{=}55$ candidates/batch (equivalently
-$\sqrt{B_0/\mu}{=}164$ per-batch capability-measurements, matching
-Cor.~\ref{cor:intraquery}). This per-candidate \emph{model} optimum is the
-basis for the $\approx$55 candidates/batch used in our runs; the
-\emph{measured, whole-query} speedups versus per-candidate Protocol-A are
-reported in \S\ref{sec:measure-runtime} (283$\times$ CENSUS, 36$\times$
-stats\_CEB\_single). Larger batches make masking dominate and the speedup fade.
-Measured ANALYZE-at-$N$ anchors: 1{,}000 stats $\to$420s, 3{,}000 $\to$1{,}013s,
-6{,}000 $\to$2{,}003s, 10{,}000 $\to$3{,}507s.}
+\caption{Measured per-query phase-1 cost across sub-batch sizes, on one
+candidate-dense query per workload at the full six-level menu
+($nL{=}504$ for CENSUS \texttt{query.3}; $nL{=}210$ for \texttt{stats\_CEB\_single}
+\texttt{st.144}). $b$ is the number of sub-batches and $s{=}nL/b$ the sub-batch
+\emph{size} (candidates mounted per ANALYZE+mask build); times are real
+wall-clock. The mask column tracks $\approx1/b$ (e.g.\ CENSUS
+$186.0\to6.3$\,s as $b$ grows $1\to28$), while the ANALYZE column grows roughly
+linearly in $b$ -- the two competing terms of $T_{{q}}(b)$. The measured
+per-query optimum is $b{=}1$/$s{=}504$ on CENSUS (402.0\,s) and
+$b{=}4$/$s{=}52$ on \texttt{stats\_CEB\_single} (22.2\,s); the sub-batched
+Protocol-M time there, versus Protocol-A's per-candidate cost, gives a
+\emph{measured} speedup of $\approx$283$\times$ / $\approx$36$\times$
+(\S\ref{sec:measure-runtime}). Real \texttt{ANALYZE}-at-$N$ anchors on CENSUS:
+1{,}000 stats $\to$420s, 3{,}000 $\to$1{,}013s, 6{,}000 $\to$2{,}003s,
+10{,}000 $\to$3{,}507s.}
 \label{tab:measurement}
 \small
-\begin{tabular}{lcrr}
+\begin{tabular}{lcccc@{\hskip 6pt}lcccc}
 \toprule
-sub-batch $s$ & Proto-M $C_M(s)$ & Proto-A & speedup\\
-(candidates) & (s/candidate) & (s/candidate) & \\
+\multicolumn{5}{c}{CENSUS \texttt{query.3}\ ($nL{=}504$)} &
+\multicolumn{5}{c}{\texttt{stats\_CEB\_single} \texttt{st.144}\ ($nL{=}210$)}\\
+\cmidrule(lr){1-5}\cmidrule(lr){6-10}
+sub-batch $b$ & \emph{size} $s$ & total & ANALYZE & mask &
+sub-batch $b$ & \emph{size} $s$ & total & ANALYZE & mask\\
+(no.) & (cands) & (s) & (s) & (s) &
+(no.) & (cands) & (s) & (s) & (s)\\
 \midrule
-10  & 3.32s & 44s & 13$\times$\\
-25  & 2.11s & 44s & 21$\times$\\
-\textbf{55} & \textbf{1.85s} & 44s & \textbf{24$\times$}\\
-100 & 2.00s & 44s & 22$\times$\\
-500 & 4.76s & 44s & 9$\times$\\
-1000 & 8.41s & 44s & 5$\times$\\
-2000 & 15.7s & 44s & 3$\times$\\
+\textbf{1} & \textbf{504} & \textbf{402.0} & 210.3 & 186.0 &
+1 & 210 & 47.9 & 4.0 & 37.5\\
+3 & 168 & 496.9 & 435.9 & 57.9 &
+2 & 105 & 27.7 & 5.9 & 18.3\\
+7 & 72 & 938.2 & 910.3 & 25.4 &
+\textbf{4} & \textbf{52} & \textbf{22.2} & 10.1 & 8.9\\
+14 & 36 & 1646.0 & 1631.4 & 12.3 &
+7 & 30 & 23.3 & 15.9 & 5.1\\
+28 & 18 & 3398.9 & 3390.4 & 6.3 &
+10 & 21 & 27.3 & 22.9 & 3.4\\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -1011,7 +1017,11 @@ with the number of statistics mounted on a table, and it is why granularity
 matters: it goes as $\mu M_b N_b$ per batch (Eq.~\ref{eq:batch-cost}), so it is
 negligible in per-query mode and in high-dedup workload-wide builds, but it
 becomes the dominant term if a low-dedup workload is measured with a single
-giant build (Tab.~\ref{tab:measurement}'s last row). Tunable granularity keeps
+giant build. The mask reduction with finer sub-batching is visible directly in
+the measured sweep of Tab.~\ref{tab:measurement} (CENSUS mask
+$186.0\!\to\!6.3$\,s and ANALYZE $210.3\!\to\!3390.4$\,s as $b$ grows
+$1\!\to\!28$): sub-batching trades a shrinking mask term against a growing
+ANALYZE fixed base. Tunable granularity keeps
 it small on both workloads: sub-batched at $b{=}55$ keeps the mask term a
 small fraction of the total even on low-dedup CENSUS, and trivially so on the
 high-sharing stats\_CEB\_single
