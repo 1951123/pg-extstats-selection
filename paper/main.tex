@@ -1288,29 +1288,29 @@ so the simpler greedy is not a strawman).
 \begin{table}[t]
 \caption{MILP vs.\ the strongest greedy baseline (best of per-query benefit/byte
 G1, marginal G2, and add-or-upgrade G3) on the 632-query workload. Even this
-strong adversary loses at every budget; the advantage is largest under tight
-budgets and re-appears at 250\,KB where only the MILP can reallocate capacity.
-``best-is'' names the winning greedy.}
+strong adversary loses at every budget; the MILP advantage is largest under the
+tightest budget and under a mid-range budget (250\,KB) where only the MILP can
+reallocate capacity. ``best-is'' names the winning greedy.}
 \label{tab:greedy2}
 \small
 \begin{tabular}{lcccl}
 \toprule
 budget & MILP & best greedy & MILP adv ($\Delta$q) & best-is\\
 \midrule
-5\,\,KB    & 1.0327 & 1.0798 & 0.047 & G1\\
-10\,KB   & 1.0264 & 1.0704 & 0.044 & G1\\
-20\,KB   & 1.0237 & 1.0553 & 0.032 & G1\\
-40\,KB   & 1.0188 & 1.0376 & 0.019 & G1\\
-100\,KB  & 1.0156 & 1.0238 & 0.008 & G1\\
-250\,KB  & \textbf{1.0040} & 1.0236 & 0.020 & G1\\
-500\,KB  & \textbf{1.0014} & 1.0096 & 0.008 & G2\\
+5\,\,KB    & 1.0270 & 1.0531 & 0.026 & G1\\
+10\,KB   & 1.0247 & 1.0371 & 0.012 & G1\\
+20\,KB   & 1.0219 & 1.0360 & 0.014 & G1\\
+40\,KB   & 1.0180 & 1.0339 & 0.016 & G1\\
+100\,KB  & 1.0156 & 1.0338 & 0.018 & G1\\
+250\,KB  & \textbf{1.0040} & 1.0283 & 0.024 & G2\\
+500\,KB  & \textbf{1.0013} & 1.0114 & 0.010 & G2\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The MILP wins at every budget, and its edge never disappears: largest under
-tight budgets (0.047 at 5\,KB) and --- notably --- \emph{growing again} at
-250\,KB (0.020) because the best greedy saturates: once G1/G2 have spent their
+The MILP wins at every budget, and its edge never disappears: largest under the
+tightest budget (0.026 at 5\,KB) and --- notably --- \emph{growing again} at
+250\,KB (0.024) because the best greedy saturates: once G1/G2 have spent their
 budget on cheap L100 coverage they cannot spend the remainder on
 \emph{capacity} upgrades, whereas the MILP drives the mean from 1.0156 to
 1.0040. Only at the generous 500\,KB budget does the add-or-upgrade greedy
@@ -1397,13 +1397,13 @@ is never worse, and at generous budgets it keeps collapsing the \emph{tail}
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}
 budget & mean & max & mean & max\\
 \midrule
-5\,\,KB    & 1.0327 & 2.23 & 1.0327 & 2.23\\
-10\,KB   & 1.0264 & 2.19 & 1.0264 & 2.19\\
-20\,KB   & 1.0237 & 2.19 & 1.0243 & 2.19\\
-40\,KB   & 1.0188 & 2.19 & 1.0212 & 2.19\\
+5\,\,KB    & 1.0270 & 2.22 & 1.0327 & 2.23\\
+10\,KB   & 1.0247 & 2.19 & 1.0264 & 2.19\\
+20\,KB   & 1.0219 & 2.19 & 1.0243 & 2.19\\
+40\,KB   & 1.0180 & 2.19 & 1.0212 & 2.19\\
 100\,KB  & 1.0156 & 2.19 & 1.0158 & 2.19\\
 250\,KB  & \textbf{1.0040} & \textbf{1.45} & 1.0117 & 2.19\\
-500\,KB  & \textbf{1.0014} & \textbf{1.17} & 1.0018 & 1.26\\
+500\,KB  & \textbf{1.0013} & \textbf{1.17} & 1.0018 & 1.26\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1475,16 +1475,16 @@ and pruning cost nothing in quality.}
 configuration & 5 KB & 100 KB\\
 \midrule
 baseline (no stats) & 1.095 & 1.095\\
-full (ours)         & \textbf{1.0327} & \textbf{1.0156}\\
+full (ours)         & \textbf{1.0270} & \textbf{1.0156}\\
 -- capacity (L10000 only) & 1.0569 & 1.0233\\
--- sparse cap (multi-select) & 1.0327 & 1.0154\\
--- pruning (skip worse than base) & 1.0327 & 1.0156\\
+-- sparse cap (multi-select) & 1.0270 & 1.0151\\
+-- pruning (skip worse than base) & 1.0270 & 1.0156\\
 \bottomrule
 \end{tabular}
 \end{table}
 
 Disabling the \emph{capacity} axis (allowing only L10000) hurts at tight
-budgets (1.033 $\to$ 1.057 at 5 KB), confirming capacity allocation --- the
+budgets (1.027 $\to$ 1.057 at 5 KB), confirming capacity allocation --- the
 ``how much'' dimension --- is load-bearing (the same advantage of capacity
 awareness over every fixed what-only level, \S\ref{sec:rq3}). In contrast, the
 sparse per-query cap and the worse-than-baseline pruning are \emph{free}: they
@@ -1731,9 +1731,10 @@ exactly the cost of a bad estimate -- while the median stays 1.000. It also
 keeps the MILP linear in the $\Delta_{is}$ terms (a geometric mean,
 $\min\sum_i\log e_i$, would stay linear too while weighting \emph{relative}
 improvement). We check the mean choice empirically: solving the sparse MILP
-under the log objective and the linear objective picks overlapping-but-identical
-statistic sets (Jaccard $0.67$--$0.83$) yet yields \emph{identical} resulting
-arithmetic and geometric mean q-errors at every budget
+under the log objective and the linear objective picks overlapping-but-not-identical
+statistic sets (Jaccard $0.29$--$0.90$) yet yields \emph{nearly identical}
+resulting arithmetic and geometric mean q-errors at every budget --- differing
+only in the third--fourth decimal (e.g.\ $1.0247$ vs.\ $1.0246$ at 10\,KB)
 (Table \ref{tab:meanrob}). The deployment is robust to the mean choice, and we
 keep the arithmetic mean because it directly targets the worst queries that our
 evaluation emphasizes.
@@ -1741,9 +1742,10 @@ evaluation emphasizes.
 \begin{table}[t]
 \caption{Mean-choice robustness (full 632-query workload). Solving the sparse
 MILP under the geometric (log) and arithmetic (linear) objectives selects
-overlapping-but-not-identical statistic sets (Jaccard), yet produces identical
-resulting arithmetic and geometric mean q-errors at every budget. The
-deployment is robust to the mean choice.}
+overlapping-but-not-identical statistic sets (Jaccard $<$ 1), yet produces
+nearly identical resulting arithmetic and geometric mean q-errors at every
+budget (differing in the third--fourth decimal). The deployment is robust to
+the mean choice.}
 \label{tab:meanrob}
 \small
 \begin{tabular}{lrrrrr}
@@ -1752,11 +1754,11 @@ budget & Jaccard & \multicolumn{2}{c}{arith mean} & \multicolumn{2}{c}{geo mean}
 \cmidrule(lr){3-4}\cmidrule(lr){5-6}
       & & geo-obj & arith-obj & geo-obj & arith-obj\\
 \midrule
-10\,\,KB   & 0.667 & 1.0264 & 1.0264 & 1.0191 & 1.0191\\
-40\,KB   & 0.833 & 1.0188 & 1.0188 & 1.0137 & 1.0137\\
-100\,KB  & 0.667 & 1.0156 & 1.0156 & 1.0115 & 1.0115\\
-250\,KB  & 0.750 & 1.0040 & 1.0040 & 1.0037 & 1.0037\\
-500\,KB  & 0.806 & 1.0014 & 1.0014 & 1.0013 & 1.0013\\
+10\,\,KB   & 0.818 & 1.0247 & 1.0246 & 1.0178 & 1.0178\\
+40\,KB   & 0.286 & 1.0180 & 1.0179 & 1.0130 & 1.0133\\
+100\,KB  & 0.539 & 1.0156 & 1.0156 & 1.0114 & 1.0115\\
+250\,KB  & 0.895 & 1.0040 & 1.0040 & 1.0036 & 1.0036\\
+500\,KB  & 0.806 & 1.0013 & 1.0013 & 1.0013 & 1.0013\\
 \bottomrule
 \end{tabular}
 \end{table}

@@ -123,6 +123,18 @@
 
 ## 6. 待办
 
+- [x] **RQ3 全表已用 6 级 `phase1_ceb_single_mask_6level.json` 重建（审计发现旧 3-level 残留）**：
+      系统性重算统计发现 paper 里 RQ3 的 4 张表在 5/10/20/40KB 处仍是 3-level（旧 full_multi）数字，
+      与已 6 级的 `fig:budgetquality` 矛盾。已全部用 6 级重算更新：
+      - `tab:greedy2`（MILP vs G1/G2/G3）：5KB MILP 1.0327→**1.0270**、best-greedy 1.0798→**1.0531**、adv 0.047→**0.026**；全 budget 表值+正文更新
+      - `tab:whathowmuch`：what+how-much 列 5/10/20/40KB 更新（1.0327→1.0270 等）；what-only 列本就正确
+      - `tab:ablation`：5KB 行 full/--sparse/--prune 1.0327→**1.0270**（100KB 已正确）；正文 1.033→1.057 改为 1.027→1.057
+      - `tab:meanrob`：Jaccard 与 mean 全部更新（10KB 0.667→**0.818**, 40KB 0.833→**0.286** 等）；"identical" 改为 "nearly identical (3rd-4th decimal)"
+      重新生成的 6 级结果 JSON：`results/p6_greedy_strong.json`、`results/p2_what_vs_howmuch.json`、
+      `results/p5_ablation_{5k,100k}.json`、`results/p10_mean_robustness.json`。
+      核心论点均不变（MILP 仍胜 greedy、capacity 轴仍关键、mean 选择仍稳健），仅数值随 6 级更新。
+      未误改的正确部分：RQ2 coverage（独立 L10000 joint 实验，非容量菜单问题）、fig:budgetquality（本已 6 级）、RQ1/Table:bench/tab:measurement（已核对一致）。
+
 - [x] `phase1_census_mcv_low_t10000.json` **正式重跑已完成**（468 查询，实测 21.0h）：已纳入 git，
       并与 `phase1_census_mcv_multi.json` 合并为完整 6 级轴 `phase1_census_mcv_6level.json`（已纳入 git）。
       §2.2 / RQ1 中容量数字已用完整 6 级终值更新：{100,1000,10000} 91.8% 不变 / 73.3% 塌陷；

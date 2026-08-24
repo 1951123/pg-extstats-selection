@@ -40,6 +40,14 @@ results/*
 !results/phase1_census_mcv_6level.json
 # CENSUS 6 级 budget-quality 指标 (Fig:census_budget_quality 数据源头)
 !results/p3_census_metrics.json
+# stats_CEB 6 级 budget-quality 指标 (Fig:budgetquality 数据源头)
+!results/p3_metrics.json
+# RQ3 6级重算结果 (tab:greedy2/whathowmuch/ablation/meanrob 数据源头)
+!results/p6_greedy_strong.json
+!results/p2_what_vs_howmuch.json
+!results/p5_ablation_5k.json
+!results/p5_ablation_100k.json
+!results/p10_mean_robustness.json
 # §measure-runtime 单查询 6 级 T_q(b) 实测 (query.3 CENSUS + st.144 stats_CEB_single)
 !results/tq6_model_vs_measured.json
 !results/tq6_stats_ceb_model_vs_measured.json

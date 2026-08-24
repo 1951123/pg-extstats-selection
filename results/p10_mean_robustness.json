@@ -1,0 +1,52 @@
+[
+  {
+    "budget": 10000,
+    "n_geo": 10,
+    "n_arith": 10,
+    "jaccard": 0.8182,
+    "geo_mean_arith": 1.0247,
+    "geo_mean_geo": 1.0178,
+    "arith_mean_arith": 1.0246,
+    "arith_mean_geo": 1.0178
+  },
+  {
+    "budget": 40000,
+    "n_geo": 10,
+    "n_arith": 8,
+    "jaccard": 0.2857,
+    "geo_mean_arith": 1.018,
+    "geo_mean_geo": 1.013,
+    "arith_mean_arith": 1.0179,
+    "arith_mean_geo": 1.0133
+  },
+  {
+    "budget": 100000,
+    "n_geo": 23,
+    "n_arith": 17,
+    "jaccard": 0.5385,
+    "geo_mean_arith": 1.0156,
+    "geo_mean_geo": 1.0114,
+    "arith_mean_arith": 1.0156,
+    "arith_mean_geo": 1.0115
+  },
+  {
+    "budget": 250000,
+    "n_geo": 18,
+    "n_arith": 18,
+    "jaccard": 0.8947,
+    "geo_mean_arith": 1.004,
+    "geo_mean_geo": 1.0036,
+    "arith_mean_arith": 1.004,
+    "arith_mean_geo": 1.0036
+  },
+  {
+    "budget": 500000,
+    "n_geo": 33,
+    "n_arith": 32,
+    "jaccard": 0.8056,
+    "geo_mean_arith": 1.0013,
+    "geo_mean_geo": 1.0013,
+    "arith_mean_arith": 1.0013,
+    "arith_mean_geo": 1.0013
+  }
+]

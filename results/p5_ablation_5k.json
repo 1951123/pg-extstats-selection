@@ -1,0 +1,43 @@
+{
+ "input": "results/phase1_ceb_single_mask_6level.json",
+ "budget": 5000,
+ "baseline_mean": 1.0951,
+ "configs": [
+  {
+   "label": "full",
+   "n_stats": 6,
+   "n_phys": 345,
+   "n_opt": 1771,
+   "n_vars": 2116,
+   "solve_s": 0.118,
+   "selected_mean": 1.027034312685257
+  },
+  {
+   "label": "no-capacity",
+   "n_stats": 1,
+   "n_phys": 73,
+   "n_opt": 342,
+   "n_vars": 415,
+   "solve_s": 0.016,
+   "selected_mean": 1.0569442398935307
+  },
+  {
+   "label": "multi-select",
+   "n_stats": 6,
+   "n_phys": 345,
+   "n_opt": 1771,
+   "n_vars": 2116,
+   "solve_s": 0.325,
+   "selected_mean": 1.027034312685257
+  },
+  {
+   "label": "no-prune",
+   "n_stats": 6,
+   "n_phys": 474,
+   "n_opt": 3696,
+   "n_vars": 4170,
+   "solve_s": 0.118,
+   "selected_mean": 1.027034312685257
+  }
+ ]
+}

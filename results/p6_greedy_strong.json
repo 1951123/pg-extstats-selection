@@ -1,0 +1,214 @@
+{
+  "rows": [
+    {
+      "budget_bytes": 5000,
+      "baseline": 1.0951476664940998,
+      "milp": {
+        "mean": 1.027034312685257,
+        "n_stats": 6,
+        "used": 4962
+      },
+      "greedies": {
+        "G1 benefit/byte": {
+          "mean": 1.0530761071116361,
+          "n_stats": 15,
+          "used": 4796
+        },
+        "G2 marginal": {
+          "mean": 1.0861864662053682,
+          "n_stats": 7,
+          "used": 4925,
+          "n_adds": 7,
+          "n_upgrades": 0
+        },
+        "G3 upgrade-aware": {
+          "mean": 1.086186745408733,
+          "n_stats": 5,
+          "used": 4881,
+          "n_adds": 5,
+          "n_upgrades": 5
+        }
+      }
+    },
+    {
+      "budget_bytes": 10000,
+      "baseline": 1.0951476664940998,
+      "milp": {
+        "mean": 1.0246621740290724,
+        "n_stats": 10,
+        "used": 9865
+      },
+      "greedies": {
+        "G1 benefit/byte": {
+          "mean": 1.0371422458301223,
+          "n_stats": 30,
+          "used": 9880
+        },
+        "G2 marginal": {
+          "mean": 1.0791451920466697,
+          "n_stats": 7,
+          "used": 9801,
+          "n_adds": 7,
+          "n_upgrades": 0
+        },
+        "G3 upgrade-aware": {
+          "mean": 1.0791489141029775,
+          "n_stats": 8,
+          "used": 9933,
+          "n_adds": 8,
+          "n_upgrades": 5
+        }
+      }
+    },
+    {
+      "budget_bytes": 20000,
+      "baseline": 1.0951476664940998,
+      "milp": {
+        "mean": 1.0219067301924787,
+        "n_stats": 10,
+        "used": 19950
+      },
+      "greedies": {
+        "G1 benefit/byte": {
+          "mean": 1.035955855726545,
+          "n_stats": 46,
+          "used": 19981
+        },
+        "G2 marginal": {
+          "mean": 1.0755447717211741,
+          "n_stats": 9,
+          "used": 19803,
+          "n_adds": 9,
+          "n_upgrades": 0
+        },
+        "G3 upgrade-aware": {
+          "mean": 1.0755453842196476,
+          "n_stats": 7,
+          "used": 19731,
+          "n_adds": 7,
+          "n_upgrades": 5
+        }
+      }
+    },
+    {
+      "budget_bytes": 40000,
+      "baseline": 1.0951476664940998,
+      "milp": {
+        "mean": 1.0179584163722504,
+        "n_stats": 10,
+        "used": 39900
+      },
+      "greedies": {
+        "G1 benefit/byte": {
+          "mean": 1.0339001858109658,
+          "n_stats": 42,
+          "used": 39968
+        },
+        "G2 marginal": {
+          "mean": 1.07071558675227,
+          "n_stats": 10,
+          "used": 39693,
+          "n_adds": 10,
+          "n_upgrades": 0
+        },
+        "G3 upgrade-aware": {
+          "mean": 1.0707159621628544,
+          "n_stats": 9,
+          "used": 39991,
+          "n_adds": 9,
+          "n_upgrades": 5
+        }
+      }
+    },
+    {
+      "budget_bytes": 100000,
+      "baseline": 1.0951476664940998,
+      "milp": {
+        "mean": 1.0155839210744815,
+        "n_stats": 23,
+        "used": 99996
+      },
+      "greedies": {
+        "G1 benefit/byte": {
+          "mean": 1.0337608830677296,
+          "n_stats": 88,
+          "used": 99890
+        },
+        "G2 marginal": {
+          "mean": 1.0650884065252053,
+          "n_stats": 17,
+          "used": 99996,
+          "n_adds": 17,
+          "n_upgrades": 0
+        },
+        "G3 upgrade-aware": {
+          "mean": 1.0651579589752485,
+          "n_stats": 18,
+          "used": 99751,
+          "n_adds": 18,
+          "n_upgrades": 6
+        }
+      }
+    },
+    {
+      "budget_bytes": 250000,
+      "baseline": 1.0951476664940998,
+      "milp": {
+        "mean": 1.0039839084810833,
+        "n_stats": 18,
+        "used": 249746
+      },
+      "greedies": {
+        "G1 benefit/byte": {
+          "mean": 1.0337072104089613,
+          "n_stats": 106,
+          "used": 249520
+        },
+        "G2 marginal": {
+          "mean": 1.0282620909702909,
+          "n_stats": 19,
+          "used": 249773,
+          "n_adds": 19,
+          "n_upgrades": 0
+        },
+        "G3 upgrade-aware": {
+          "mean": 1.0282756242795865,
+          "n_stats": 13,
+          "used": 249990,
+          "n_adds": 13,
+          "n_upgrades": 7
+        }
+      }
+    },
+    {
+      "budget_bytes": 500000,
+      "baseline": 1.0951476664940998,
+      "milp": {
+        "mean": 1.0013377574149531,
+        "n_stats": 33,
+        "used": 499567
+      },
+      "greedies": {
+        "G1 benefit/byte": {
+          "mean": 1.0336822313826515,
+          "n_stats": 114,
+          "used": 499920
+        },
+        "G2 marginal": {
+          "mean": 1.0114373665863647,
+          "n_stats": 24,
+          "used": 499797,
+          "n_adds": 24,
+          "n_upgrades": 0
+        },
+        "G3 upgrade-aware": {
+          "mean": 1.011916632591285,
+          "n_stats": 20,
+          "used": 499763,
+          "n_adds": 20,
+          "n_upgrades": 9
+        }
+      }
+    }
+  ]
+}
