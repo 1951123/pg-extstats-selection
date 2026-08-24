@@ -131,14 +131,20 @@ groups; we are not aware of prior work that explicitly treats PostgreSQL's
 per-statistic \texttt{statistics\_target} as a competing resource-allocation
 dimension under a shared storage budget (\S\ref{sec:back}).
 
-\emph{Running example.} \texttt{posts(AnswerCount,ViewCount)} can be stored at
-any of the \emph{evaluated capacity menu} $\{10, 25, 50, 100, 1000, 10000\}$
+\emph{Running example.} On the high-cardinality \texttt{stats\_CEB\_single}
+workload, \texttt{posts(AnswerCount,ViewCount)} can be stored at any of the
+\emph{evaluated capacity menu} $\{10, 25, 50, 100, 1000, 10000\}$
 (\S\ref{sec:disc}): at L100 the list is too small to hold the 3-column
 correlation (q-error stays $\sim$4.7), while L10000 drives it to $\approx$1.0 at
 $\sim$100\,KB vs.\ $\sim$2\,KB. So
 ``should we build this statistic?'' admits no answer without ``\emph{at what
 capacity}?'' --- spending on \emph{adjusting} its capacity competes directly
-with spending on \emph{adding} another combination.
+with spending on \emph{adding} another combination. The wide CENSUS workload is
+the \emph{opposite} end of the same axis: its low-cardinality categorical
+columns are \emph{data-capped} (their MCV lists fill at a small target), so a
+DBA would more likely \emph{lower} capacity to save storage than raise it
+(\S\ref{sec:rq1}). Capacity is therefore a two-sided decision that must be made
+jointly with \emph{which} statistics to build.
 
 \textbf{(B) A measurable sparse regime, discovered, not assumed.} At first
 glance the problem looks like a combinatorial multi-select. Our measurements
