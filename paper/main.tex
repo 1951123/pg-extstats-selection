@@ -147,17 +147,23 @@ DBA would more likely \emph{lower} capacity to save storage than raise it
 (\S\ref{sec:rq1}). Capacity is therefore a two-sided decision that must be made
 jointly with \emph{which} statistics to build.
 
-\textbf{(B) A measurable sparse regime, discovered, not assumed.} At first
-glance the problem looks like a combinatorial multi-select. Our measurements
-show otherwise for the two evaluated single-table workloads: one well-chosen
-multivariate statistic captures nearly all improvement attainable from the
-evaluated 2-/3-column MCV candidates per query (adding a second or third helps
-~nothing; \S\ref{sec:rq2} falsifies this several ways). This was
-\textbf{discovered}, not assumed, and it has a direct consequence: restricted
-to at most one statistic per query, the objective has no interaction term and
-is \emph{exactly linear} (Prop.~\ref{prop:linear}) --- a formal property of the
+\textbf{(B) A measurable sparse regime, discovered, not assumed --- and
+bounded.} At first glance the problem looks like a combinatorial multi-select.
+Our measurements show otherwise for the two evaluated single-table workloads:
+one well-chosen multivariate statistic --- a \emph{single-statistic dominance}
+regime --- captures nearly all improvement attainable from the evaluated 2-
+/3-column MCV candidates per query (adding a second or third helps ~nothing;
+\S\ref{sec:rq2} falsifies this several ways). This was \textbf{discovered},
+not assumed, and it has a direct consequence: restricted to at most one
+statistic per query, the objective has no interaction term and is
+\emph{exactly linear} (Prop.~\ref{prop:linear}) --- a formal property of the
 \emph{surrogate} within an empirically characterized regime, whose faithfulness
-to PostgreSQL is determined by the E2E experiments (\S\ref{sec:e2e}).
+to PostgreSQL is determined by the E2E experiments (\S\ref{sec:e2e}). This
+regime is an empirical hypothesis with a mechanistic account --- a query's error
+is typically dominated by the one strongly-correlated column cluster --- and a
+deliberately probed failure boundary: it collapses on queries driven by
+several independent clusters (a controlled stress test, \S\ref{sec:rq2},
+Table~\ref{tab:sweep}; mechanism and boundary in \S\ref{sec:disc-sparsity}).
 
 \textbf{(C) The enabler: measuring the massive candidate space.} Instantiating
 this optimization requires a per-candidate, per-capacity q-error for every
@@ -1605,7 +1611,9 @@ occurs on real workloads is an open question below.
 We optimize a \emph{storage} budget (persistent bytes and estimation quality,
 \S\ref{sec:rq3}); ANALYZE maintenance cost is handled separately because
 PostgreSQL couples its sampling effort to the \emph{maximum} target on a
-relation, so we treat capacity as an allocation of persistent storage. The
+relation, so we treat capacity as an allocation of persistent storage (the
+coupling and its consequences are unpacked in \S\ref{sec:mechanisms}, and an
+ANALYZE-cost-only variant is an open question, \S\ref{sec:disc} item~2). The
 budget-quality curves in \S\ref{sec:rq3} and Fig.~\ref{fig:budgetquality} show
 that a storage budget is, in practice, spent on the ``how much'' axis.
 
