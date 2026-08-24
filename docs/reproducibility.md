@@ -152,5 +152,9 @@
 - [x] **`merge_phase1.py` 已实现**（方法 B）：合并 CENSUS low（{10,25,50}）与 multi
       （{100,1000,10000}）为完整 6 级轴 `phase1_census_mcv_6level.json`（已纳入 git），
       校验 468/468 查询、候选集一致、6 档无缺失。
-- [ ] stats_CEB_single 的 workload-wide/per-query 时长（≈0.12h / ≈1.29h）也是模型外推，
-      其 6level 数据已完成（632 查询），可复核是否随 6 级化更新。
+- [x] **stats_CEB_single 的运行时叙事已按实测修正**：原"workload-wide 最优 (~0.12h vs
+      ~1.29h per-query)"是 3 级模型外推，且与实际运行（sub-batched, b=55）不符。已改为：
+      两个 workload 均用 sub-batched Protocol-M（b=55），stats_CEB_single 6 级实测
+      ≈0.25h（632 查询, 日志 phase1_ceb_single_6level.log: 893s），CENSUS ≈42h。
+      workload-wide 仅保留为闭合式识别出的理论最优 scope，不再声称"实际用它"。
+      `≈188×`（stats_CEB sub-batched vs naive per-candidate）经实测 0.25h vs 45h 核算 ≈182× 一致。
