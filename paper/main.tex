@@ -926,6 +926,24 @@ stats\_CEB\_single and CENSUS, and why the granularity is chosen by
 \eqref{eq:batch-cost} (through Prop.~\ref{prop:batch}) rather than by a blanket
 rule.
 
+The two workloads' measurement times play three deliberately separate roles in
+this paper. The cost model (Eq.~\ref{eq:batch-cost},
+Prop.~\ref{prop:batch}, Cor.~\ref{cor:intraquery}) establishes the \emph{form}
+of the optimal granularity --- how the optimum shifts with the ANALYZE base and
+the sharing ratio --- but not the magnitude of any single run. A
+candidate-dense \emph{single query} per workload, swept over sub-batch sizes
+(Tab.~\ref{tab:measurement}), supplies the \emph{measured} speedup over
+per-candidate Protocol-A (283$\times$/36$\times$) that we report; this is the
+reproducible quantity that supports the comparison. The full-workload runs, in
+turn, exist only to assemble the per-candidate q-error tables that the downstream
+experiments (\S\ref{sec:findings}, \S\ref{sec:rq4}) consume, so their wall-clock
+is not a quantity we report. A workload-level sweep would be the only way to
+report an \emph{optimal} workload time, but its cost would be orders of
+magnitude above the single-query sweep --- as costly as the very measurement we
+use the model and the single-query probe to avoid --- so we report the measured
+single-query speedup, a reproducible proxy of the protocol's advantage, rather
+than a workload-level time.
+
 In either case the catalog-mask protocol --- not the MILP --- is the enabling
 component that makes the candidate ${\times}$ capacity space measurable, and the
 optimization (\S\ref{sec:rq4}) stays the cheap part of the pipeline; the
