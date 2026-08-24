@@ -1,0 +1,36 @@
+{
+  "qid": "query.3",
+  "levels": [
+    10,
+    25,
+    50,
+    100,
+    1000,
+    10000
+  ],
+  "n_candidates": 84,
+  "nL": 504,
+  "model_params": {
+    "B0": 22.0,
+    "c": 0.35,
+    "mu": 0.0008,
+    "eps": 0.002
+  },
+  "batches": [
+    1
+  ],
+  "rows": [
+    {
+      "b": 1,
+      "n_subbatches": 1,
+      "build": 1.2,
+      "analyze": 205.7,
+      "mask": 184.6,
+      "explain": 1.0,
+      "restore": 4.5,
+      "measured_total_s": 396.9,
+      "model_total_s": 402.6,
+      "ratio_model_measured": 1.014
+    }
+  ]
+}

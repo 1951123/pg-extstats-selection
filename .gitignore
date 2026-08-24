@@ -38,6 +38,13 @@ results/*
 !results/phase1_census_mcv_low_t10000.json
 # CENSUS 完整 6 级轴 [10,25,50,100,1000,10000] (由 merge_phase1.py 合并低/高两档)
 !results/phase1_census_mcv_6level.json
+# §measure-runtime 单查询 6 级 T_q(b) 实测 (query.3 CENSUS + st.144 stats_CEB_single)
+!results/tq6_model_vs_measured.json
+!results/tq6_stats_ceb_model_vs_measured.json
+!results/tq6_full.log
+!results/tq6_stats_ceb.log
+!results/tq6_smoke.json
+!results/tq6_smoke.log
 # stats_CEB mcv 测量与复现
 !results/phase1_stats_ceb_mcv.json
 !results/phase1_stats_ceb_mcv_r3.json

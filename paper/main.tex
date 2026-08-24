@@ -174,12 +174,11 @@ sharing is low, workload-wide when it is high, or intra-query sub-batching in
 between. On both evaluated workloads we therefore use a \emph{sub-batched}
 catalog-mask build ($\approx$55 candidates/batch): the full six-level phase-1
 measures $\approx$42\,h of wall-clock on CENSUS across its sub-batched runs
-(\S\ref{sec:measure-runtime}), over an order of magnitude faster than a single
-all-payload workload-wide build (modeled $\approx$2{,}376\,h) and more still than
-per-candidate CREATE/ANALYZE; on stats\_CEB\_single
-(high sharing) the same sub-batched build measures $\approx$0.25\,h,
-$\approx$188$\times$ faster than per-candidate
-CREATE/ANALYZE (\S\ref{sec:measure-runtime}). This
+and $\approx$0.25\,h on stats\_CEB\_single (\S\ref{sec:measure-runtime}), and,
+comparing the \emph{measured} per-query time against the per-candidate
+Protocol-A cost, Protocol-M is $\approx$283$\times$ faster on CENSUS and
+$\approx$36$\times$ on stats\_CEB\_single
+(measured, lower bounds; \S\ref{sec:measure-runtime}). This
 makes the candidate $\times$ capacity space measurable;
 the resulting MILP then solves at full-workload scale in seconds
 (\S\ref{sec:rq4}). Measurement, not optimization, is the dominant bottleneck.
@@ -757,12 +756,18 @@ measurement time is
       \;+\;\underbrace{\mu\sum_{b=1}^{B} M_b\,N_b}_{\text{mask + restore}}
       \;+\;\underbrace{\epsilon\,M_{\text{tot}}}_{\text{EXPLAIN}},
 \end{equation}
-where $B_0{=}22$\,s is the fixed ANALYZE base (warm cache), $c{\approx}0.35$\,s
-per statistic, $\mu{\approx}0.0008$\,s per payload, improving on
-the earlier constant-\textsc{epsilon} model (which treated masking as free).
-The two extremes of $B$ are exactly the two ``scopes'': $B{=}n$ queries is
-\emph{per-query} (each query ANALYZEs and masks only its own candidates) and
-$B{=}1$ is \emph{workload-wide}.
+where $B_0$ is the fixed \texttt{ANALYZE} base cost of the table (warm cache,
+measured from a single \texttt{ANALYZE} on that workload's table), $c$ is the
+per-statistic \texttt{ANALYZE} increment, $\mu{\approx}0.0008$\,s per payload,
+improving on the earlier constant-\textsc{epsilon} model (which treated masking
+as free). We calibrate the parameters \emph{per dataset}: the \texttt{ANALYZE}
+base term $B_0$ is driven by the table's size (on CENSUS \texttt{climate}
+$B{=}22$\,s \emph{empty}, $\approx$113\,s with a query's statistics mounted;
+on the small \texttt{stats\_CEB\_single} \texttt{posts} table it is
+$\approx$1.9\,s), whereas the masking term $\mu$ is table-independent (a catalog
+\emph{UPDATE}). The two extremes of $B$ are exactly the two ``scopes'': $B{=}n$
+queries is \emph{per-query} (each query ANALYZEs and masks only its own
+candidates) and $B{=}1$ is \emph{workload-wide}.
 
 \begin{proposition}[Optimal measurement granularity]
 \label{prop:batch}
@@ -863,6 +868,27 @@ query's measurement time $2.9\times$, and because $m^{*}$ is independent of
 $n$, the same sub-batch size is reused across \emph{all} queries -- a
 query-invariant batching strategy.
 
+We verify this intra-query model end-to-end at the \emph{six-level} menu by
+measuring, for one candidate-dense query per workload, the real per-query
+phase-1 time across a sweep of sub-batch sizes, and comparing against
+$T_{{q}}(b)$. On CENSUS (\texttt{query.3}, 84 candidates, $nL{=}504$) the
+measured optimum is $b{=}1$ (402.0\,s); on \texttt{stats\_CEB\_single}
+(\texttt{st.144}, 35 candidates, $nL{=}210$) it is $b{=}4$
+(22.2\,s) -- the per-query intra-batch optimum for a single query, which
+coexists with the coarser $b{=}55$ harness setting that bounds the mask term
+across the workload (Prop.~\ref{prop:batch}). Beyond confirming convexity,
+this exposes a systematic weakness of
+the fixed-$B_0$ model: its ANALYZE term $bB_0$ assumes the \emph{empty-table}
+base, which on CENSUS \emph{underestimates} the true per-batch build cost
+(113\,s vs.\ 22\,s once a query's statistics are mounted) and on the small
+\texttt{posts} table \emph{overestimates} it (1.9\,s). Fitting the ANALYZE term
+as $bB_f + c_p nL$ on the two lowest $b$ points reproduces the measured times
+on the \emph{held-out} $b{=}7,14,28$ (CENSUS) and $b{=}4,7,10$
+(\texttt{stats\_CEB\_single}) to within 3\% on both workloads, whereas the
+fixed-$B_0$ model is 69\% low on CENSUS and $3$--$10\times$ high on
+\texttt{stats\_CEB\_single}. The model's \emph{form} is thus stable across
+workloads; only the ANALYZE base must be calibrated to the table.
+
 \eqref{eq:batch-cost} exposes the real trade-off that determines the optimal
 granularity. Growing the batch (smaller $B$) amortizes the ANALYZE fixed base
 over more candidates (the standard story), but it \emph{also} mounts more
@@ -892,11 +918,14 @@ wall-clock (632 queries, $b{=}55$); the full
 six-level CENSUS phase-1 completes in $\approx$42\,h across its sub-batched
 runs ($\approx$21\,h for the high
 three levels \{100,1000,10000\} and $\approx$21\,h for the low three
-\{10,25,50\}, b$=55$), over an order of magnitude faster than the modeled
-$\approx$2{,}376\,h of a single workload-wide build --- and the two runs' per-level
-snapshots merge exactly into the full six-level axis used everywhere below
-(\S\ref{sec:measure}, \S\ref{sec:rq1}). This
-is why our reported numbers use sub-batched Protocol-M on \emph{both}
+\{10,25,50\}, b$=55$). Because the ANALYZE term dominates the per-query cost,
+Protocol-M's advantage over the per-candidate Protocol-A is best measured rather
+than modeled: using the \emph{measured} optimal per-query time above and
+Protocol-A's per-candidate cost ($nL$ cells $\times$ two \texttt{ANALYZE}s),
+the speedup is $\approx$283$\times$ on CENSUS \texttt{query.3} and
+$\approx$36$\times$ on \texttt{stats\_CEB\_single} \texttt{st.144} (lower
+bounds: Protocol-A's per-candidate \texttt{ANALYZE} is no more than the table's
+base). This is why our reported numbers use sub-batched Protocol-M on \emph{both}
 stats\_CEB\_single and CENSUS, and why the granularity is chosen by
 \eqref{eq:batch-cost} (through Prop.~\ref{prop:batch}) rather than by a blanket
 rule.
@@ -915,13 +944,17 @@ each measured at $L{=}3$ capacity levels) on CENSUS \texttt{climate}
 candidate: two ANALYZEs each), while Protocol-M per candidate follows
 $C_M(s){=}\underbrace{B_0/s}_{\text{ANALYZE}}+\underbrace{cL}_{\text{per-cand}}+
 \underbrace{\mu L^2 s}_{\text{mask}}$,
-with $B_0{=}22$\,s, $c{\approx}0.35$\,s/stat, $\mu{\approx}0.0008$\,s/payload.
+with the CENSUS \texttt{ANALYZE} base $B_0{=}22$\,s (a per-table parameter;
+see Eq.~\ref{eq:batch-cost}), $c{\approx}0.35$\,s/stat, $\mu{\approx}0.0008$\,s/payload.
 Because masking grows as $\mu L^2 s$, $C_M$ is strictly convex and bottoms at
 $s^{*}{=}\sqrt{B_0/(\mu L^2)}{=}55$ candidates/batch (equivalently
 $\sqrt{B_0/\mu}{=}164$ per-batch capability-measurements, matching
-Cor.~\ref{cor:intraquery}), where Protocol-M is $\approx$24$\times$ cheaper than
-Protocol-A; larger batches make masking dominate and the speedup fade. Measured
-ANALYZE-at-$N$ anchors: 1{,}000 stats $\to$420s, 3{,}000 $\to$1{,}013s,
+Cor.~\ref{cor:intraquery}). This per-candidate \emph{model} optimum is the
+basis for the $\approx$55 candidates/batch used in our runs; the
+\emph{measured, whole-query} speedups versus per-candidate Protocol-A are
+reported in \S\ref{sec:measure-runtime} (283$\times$ CENSUS, 36$\times$
+stats\_CEB\_single). Larger batches make masking dominate and the speedup fade.
+Measured ANALYZE-at-$N$ anchors: 1{,}000 stats $\to$420s, 3{,}000 $\to$1{,}013s,
 6{,}000 $\to$2{,}003s, 10{,}000 $\to$3{,}507s.}
 \label{tab:measurement}
 \small
@@ -954,7 +987,7 @@ sub-batch $s$ & Proto-M $C_M(s)$ & Proto-A & speedup\\
 \node[bs] (b) at (3.1,0) {candidate $\times$ capacity\\[-0.5mm]\textbf{measurement}};
 \node[bs] (c) at (6.2,0) {sparse\\[-0.5mm]MILP};
 \node[bs] (d) at (9.2,0) {\\[-0.5mm]\textbf{deploy}};
-\node[bs, exp] (b2) at (3.1,-1.9) {expensive\\[-0.5mm]($\approx$188$\times$ vs.\ naive)};
+\node[bs, exp] (b2) at (3.1,-1.9) {expensive\\[-0.5mm]($\approx$36--283$\times$ vs.\ naive)};
 \node[bs, cheap] (c2) at (6.2,-1.9) {cheap\\[-0.5mm]($<$5\,s)};
 \draw[arr] (a.east) -- (b.west);
 \draw[arr] (b.east) -- (c.west);
@@ -966,9 +999,8 @@ sub-batch $s$ & Proto-M $C_M(s)$ & Proto-A & speedup\\
 \emph{measurement} (\S\ref{sec:measure}) is the expensive step -- but the
 catalog-mask protocol makes it feasible by amortizing ANALYZE and exposing a
 tunable granularity (Tab.~\ref{tab:measurement}, \S\ref{sec:measure-runtime}),
-cutting phase-1 time by $\approx$188$\times$ on stats\_CEB\_single (sub-batched)
-and by orders of magnitude on CENSUS (sub-batched) versus per-candidate
-CREATE/ANALYZE -- whereas the sparse
+cutting phase-1 time by $\approx$36--283$\times$ on the two workloads
+(measured vs.\ per-candidate CREATE/ANALYZE) -- whereas the sparse
 MILP solves in under five seconds (\S\ref{sec:rq4}). The bottleneck is obtaining
 the data the optimization needs, not the optimization itself.}
 \label{fig:pipeline}

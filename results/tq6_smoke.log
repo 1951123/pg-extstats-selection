@@ -1,0 +1,6 @@
+nohup: ignoring input
+== query query.3: n=84 cands, L=6 -> nL=504 cells ==
+   model B0=22.0 c=0.35 mu=0.0008;  b* = nL*sqrt(mu/B0) = 3.0
+  b= 1: measure= 396.9s (build   1.2 | AN 205.7 | mask  184.6 | exp  1.0 | res  4.5)   model= 402.6s  model/meas=1.014
+
+wrote results/tq6_smoke.json

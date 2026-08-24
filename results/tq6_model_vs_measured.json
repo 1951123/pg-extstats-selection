@@ -1,0 +1,88 @@
+{
+  "qid": "query.3",
+  "levels": [
+    10,
+    25,
+    50,
+    100,
+    1000,
+    10000
+  ],
+  "n_candidates": 84,
+  "nL": 504,
+  "model_params": {
+    "B0": 22.0,
+    "c": 0.35,
+    "mu": 0.0008,
+    "eps": 0.002
+  },
+  "batches": [
+    1,
+    3,
+    7,
+    14,
+    28
+  ],
+  "rows": [
+    {
+      "b": 1,
+      "n_subbatches": 1,
+      "build": 0.8,
+      "analyze": 210.3,
+      "mask": 186.0,
+      "explain": 1.0,
+      "restore": 3.9,
+      "measured_total_s": 402.0,
+      "model_total_s": 402.6,
+      "ratio_model_measured": 1.001
+    },
+    {
+      "b": 3,
+      "n_subbatches": 3,
+      "build": 0.9,
+      "analyze": 435.9,
+      "mask": 57.9,
+      "explain": 0.7,
+      "restore": 1.6,
+      "measured_total_s": 496.9,
+      "model_total_s": 311.1,
+      "ratio_model_measured": 0.626
+    },
+    {
+      "b": 7,
+      "n_subbatches": 7,
+      "build": 0.9,
+      "analyze": 910.3,
+      "mask": 25.4,
+      "explain": 0.7,
+      "restore": 0.9,
+      "measured_total_s": 938.2,
+      "model_total_s": 360.4,
+      "ratio_model_measured": 0.384
+    },
+    {
+      "b": 14,
+      "n_subbatches": 14,
+      "build": 0.9,
+      "analyze": 1631.4,
+      "mask": 12.3,
+      "explain": 0.6,
+      "restore": 0.7,
+      "measured_total_s": 1646.0,
+      "model_total_s": 499.9,
+      "ratio_model_measured": 0.304
+    },
+    {
+      "b": 28,
+      "n_subbatches": 28,
+      "build": 0.9,
+      "analyze": 3390.4,
+      "mask": 6.3,
+      "explain": 0.6,
+      "restore": 0.6,
+      "measured_total_s": 3398.9,
+      "model_total_s": 800.7,
+      "ratio_model_measured": 0.236
+    }
+  ]
+}

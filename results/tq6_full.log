@@ -1,0 +1,10 @@
+nohup: ignoring input
+== query query.3: n=84 cands, L=6 -> nL=504 cells ==
+   model B0=22.0 c=0.35 mu=0.0008;  b* = nL*sqrt(mu/B0) = 3.0
+  b= 1: measure= 402.0s (build   0.8 | AN 210.3 | mask  186.0 | exp  1.0 | res  3.9)   model= 402.6s  model/meas=1.001
+  b= 3: measure= 496.9s (build   0.9 | AN 435.9 | mask   57.9 | exp  0.7 | res  1.6)   model= 311.1s  model/meas=0.626
+  b= 7: measure= 938.2s (build   0.9 | AN 910.3 | mask   25.4 | exp  0.7 | res  0.9)   model= 360.4s  model/meas=0.384
+  b=14: measure=1646.0s (build   0.9 | AN 1631.4 | mask   12.3 | exp  0.6 | res  0.7)   model= 499.9s  model/meas=0.304
+  b=28: measure=3398.9s (build   0.9 | AN 3390.4 | mask    6.3 | exp  0.6 | res  0.6)   model= 800.7s  model/meas=0.236
+
+wrote results/tq6_model_vs_measured.json

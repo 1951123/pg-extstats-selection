@@ -44,6 +44,8 @@
 | RQ1 容量轴扩展菜单 {10,25,50,100,1000,10000}（两向决策轴） | `phase1_ceb_single_mask_6level.json`（stats_CEB_single 6 级）+ `phase1_census_mcv_6level.json`（**CENSUS 完整 6 级，由 low/multi 合并**） |
 | CENSUS 低档容量再暴露（~29% 敏感 / ~7% 改善≥20%，完整 6 级核算） | `phase1_census_mcv_6level.json`（**合并终值**）；溯源文件 `phase1_census_mcv_multi.json`（{100,1000,10000}）+ `phase1_census_mcv_low_t10000.json`（{10,25,50}）；旧值 `phase1_census_mcv_low.json`（single-col-50 历史） |
 | §5.1 测量成本模型（ANALYZE base ~22s @t10000，T(N)=base+0.334N） | `probe_census_fine_capacity.log` / `probe_census_analyze_scale.py` 输出 |
+| §measure-runtime 单查询 6 级 T_q(b) 实测（query.3 + st.144）——改进模型（ANALYZE=b·Bf+cp·nL）训练集 b=1,3/1,2 拟合、测试集 b=7/14/28 与 b=4/7/10 验证 ≤3%；固定 B0 模型 CENSUS 低估 69%、stats_CEB 高估 3-10× | `results/tq6_model_vs_measured.json`（CENSUS query.3, b=1,3,7,14,28）+ `results/tq6_stats_ceb_model_vs_measured.json`（st.144, b=1,2,4,7,10）；脚本 `scripts/measure_tq6.py`（实测）+ `scripts/validate_tq6.py`（train/test 验证） |
+| §measure-runtime 实测加速比（Protocol-M 最优 batch 实测 vs Protocol-A）：CENSUS ≈283×、stats_CEB ≈36×（下界） | `scripts/speedup_measured.py`（基于上面的 tq6 实测 JSON） |
 | stats_CEB mcv 多变量（multi）效果 | `phase1_stats_ceb_mcv.json`、`phase1_stats_ceb_mcv_r3.json`（复现） |
 
 ---

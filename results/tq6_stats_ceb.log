@@ -1,0 +1,10 @@
+nohup: ignoring input
+== [stats_ceb_single] query st.144: n=35 cands, L=6 -> nL=210 cells, table=posts, db=stats ==
+   model B0=22.0 c=0.35 mu=0.0008;  b* = nL*sqrt(mu/B0) = 1.3
+  b= 1: measure=  47.9s (build   0.4 | AN   4.0 | mask   37.5 | exp  1.0 | res  5.0)   model= 131.2s  model/meas=2.741
+  b= 2: measure=  27.7s (build   0.4 | AN   5.9 | mask   18.3 | exp  0.4 | res  2.6)   model= 135.6s  model/meas=4.886
+  b= 4: measure=  22.2s (build   0.4 | AN  10.1 | mask    8.9 | exp  0.2 | res  2.5)   model= 170.7s  model/meas=7.690
+  b= 7: measure=  23.3s (build   0.4 | AN  15.9 | mask    5.1 | exp  0.2 | res  1.8)   model= 233.0s  model/meas=10.001
+  b=10: measure=  27.3s (build   0.4 | AN  22.9 | mask    3.4 | exp  0.2 | res  0.5)   model= 297.4s  model/meas=10.894
+
+wrote results/tq6_stats_ceb_model_vs_measured.json
