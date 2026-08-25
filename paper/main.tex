@@ -1049,7 +1049,7 @@ candidates by single q-error and measure the \emph{joint} q-error of keeping the
 top-1/2/3. On stats\_CEB\_single, adding a 2nd/3rd non-overlapping candidate
 changes nothing for $93\%$ of the 180 queries with candidates (the joint
 $k{=}2,3$ q-error equals $k{=}1$ exactly), and the largest $k{=}2$-$k{=}1$ gap
-over the whole workload is $0.027$; on the wide CENSUS
+among the repairable queries (baseline $>1.2$) is $0.027$; on the wide CENSUS
 table the two hardest queries are identical at $k{=}1,2,3$ (q.184: $1.08$ at all
 three; q.382: $1.12$). This is not an
 artefact of a small candidate space: it holds on the widest, highest-error,
@@ -1072,9 +1072,10 @@ denominator is not the single-statistic value, so this is not a tautology).
 Across the 35 queries with real repair room (baseline $>1.2$), this ratio
 against the best \emph{2-subset} has \textbf{median 1.000}, with $100\%$ of such
 queries exceeding $0.9$; against the best \emph{3-subset} it is also median
-$1.000$. Equivalently, for $93\%$ of the 180 queries with candidates the joint
-q-error at $k{=}2$ equals $k{=}1$ exactly, and the largest $k{=}2$-$k{=}1$ gap
-over the whole workload is $0.027$. By baseline regime, a single candidate
+$1.000$. Equivalent statements hold on the joint measurements directly: for
+$93\%$ of the 180 queries with candidates the joint q-error at $k{=}2$ equals
+$k{=}1$ exactly, and among the 35 repairable queries (baseline $>1.2$) the largest
+$k{=}2$-$k{=}1$ gap is $0.027$. By baseline regime, a single candidate
 reaches the estimation floor ($\le1.05$) for $94\%$ of near-baseline queries
 (base 1--1.1) and $97\%$ of the genuinely repairable queries (base 2--10, $n{=}32$).
 One dominant column cluster drives a single-table query's error, and one
@@ -1212,7 +1213,7 @@ capability greedy lacks --- not a failure of greedy column choice but of global
 On the full 632-query workload (Fig.~\ref{fig:budgetquality}), the real effect
 is \emph{tail repair}: the maximum q-error falls from 4.7 to 1.1, and on the
 ten hardest CENSUS queries baseline (mean / median / P90 / max) $=$
-$(1071.5 / 332.5 / 2542.9 / 4162.1)$ collapses to $(1.10 / 1.09 / 1.18 / 1.41)$
+$(1071.5 / 332.5 / 2542.9 / 4162.1)$ collapses to $(1.10 / 1.09 / 1.17 / 1.41)$
 --- e.g.\ a 4162 $\to$ 1.4 maximum. We optimize mean but evaluate the full
 distribution.
 
@@ -1379,8 +1380,8 @@ budgets (1.027 $\to$ 1.057 at 5 KB), confirming capacity allocation --- the
 ``how much'' dimension --- is load-bearing (the same advantage of capacity
 awareness over every fixed what-only level, \S\ref{sec:rq3}). In contrast, the
 sparse per-query cap and the worse-than-baseline pruning are \emph{free}: they
-reproduce full quality while shrinking the problem (pruning cuts 2{,}085 to
-1{,}178 variables at 100 KB). Thus the ablation separates \emph{modeling
+reproduce full quality while shrinking the problem (pruning cuts 4{,}170 to
+2{,}116 physical-statistic and assignment variables). Thus the ablation separates \emph{modeling
 assumptions} (the capacity axis; global disjointness at deployment) from
 \emph{computational conveniences} (the sparse cap; pruning): the former drive
 the quality and predictability our formulation delivers, while the latter cost
