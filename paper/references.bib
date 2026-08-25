@@ -20,158 +20,156 @@
 }
 
 % --- Core cardinality-estimation / statistics references (definite classics) ---
-@article{ioannidis2003cardinality,
-  author  = {Ioannidis, Yannis E.},
-  title   = {The History of Histograms (abridged)},
-  journal = {Proceedings of the VLDB Endowment},
-  volume  = {3},
-  number  = {1},
-  year    = {2003}
+@inproceedings{ioannidis2003history,
+  title={The history of histograms (abridged)},
+  author={Ioannidis, Yannis},
+  booktitle={Proceedings 2003 VLDB Conference},
+  pages={19--30},
+  year={2003},
+  organization={Elsevier}
 }
 
-@inproceedings{chendependencies,
-  author    = {Chen, C. M. and Roussopoulos, N.},
-  title     = {Adaptive Selectivity Estimation Using Query Feedback},
-  booktitle = {Proceedings of the ACM SIGMOD International Conference on Management of Data},
-  year      = {1994}
+@inproceedings{chen1994adaptive,
+  title={Adaptive selectivity estimation using query feedback},
+  author={Chen, Chungmin Melvin and Roussopoulos, Nick},
+  booktitle={Proceedings of the 1994 ACM SIGMOD international conference on Management of data},
+  pages={161--172},
+  year={1994}
 }
 
 % --- Index / structure selection under a budget (methodological anchor) ---
-@inproceedings{chaudhuri2000automating,
-  author    = {Chaudhuri, Surajit and Narasayya, Vivek},
-  title     = {Automating Statistics Management for Query Optimizers},
-  booktitle = {Proceedings of the International Conference on Data Engineering (ICDE)},
-  publisher = {IEEE Computer Society},
-  address   = {San Diego, CA, USA},
-  year      = {2000}
+
+@inproceedings{chaudhuri1997efficient,
+  title={An efficient, cost-driven index selection tool for Microsoft SQL server},
+  author={Chaudhuri, Surajit and Narasayya, Vivek R},
+  booktitle={VLDB},
+  volume={97},
+  pages={146--155},
+  year={1997},
+  organization={San Francisco}
 }
 
-@inproceedings{chaudhuri1997index,
-  author    = {Chaudhuri, Surajit and Narasayya, Vivek},
-  title     = {An Efficient Cost-Driven Index Selection Tool for Microsoft SQL Server},
-  booktitle = {Proceedings of the International Conference on Very Large Data Bases (VLDB)},
-  year      = {1997}
-}
-
-@inproceedings{indexselection,
-  author    = {Chaudhuri, Surajit and Narasayya, Vivek},
-  title     = {Automatic Physical Database Tuning: A Relaxation-Based Approach},
-  booktitle = {Proceedings of the ACM SIGMOD International Conference on Management of Data},
-  publisher = {ACM},
-  address   = {Baltimore, MD, USA},
-  year      = {2005}
+@inproceedings{bruno2005automatic,
+  title={Automatic physical database tuning: A relaxation-based approach},
+  author={Bruno, Nicolas and Chaudhuri, Surajit},
+  booktitle={Proceedings of the 2005 ACM SIGMOD international conference on Management of data},
+  pages={227--238},
+  year={2005}
 }
 
 % Learned cardinality estimation (stable classic reference).
-@inproceedings{kipf2019learned,
-  author    = {Kipf, Andreas and Kipf, Thomas and Radke, Benjamin and Leis, Viktor
-               and Boncz, Peter and Kemper, Alfons},
-  title     = {Learned Cardinalities: Estimating Intersections, Joins and Selections}
-               {Publicly: Learned Cardinalities},
-  booktitle = {Proceedings of the Conference on Innovative Data Systems Research (CIDR)},
-  year      = {2019}
+@article{kipf2018learned,
+  title={Learned cardinalities: Estimating correlated joins with deep learning},
+  author={Kipf, Andreas and Kipf, Thomas and Radke, Bernhard and Leis, Viktor and Boncz, Peter and Kemper, Alfons},
+  journal={arXiv preprint arXiv:1809.00677},
+  year={2018}
 }
 
 % The JOB (Join Order Benchmark) paper.
-@inproceedings{leis2015good,
-  author    = {Leis, Viktor and Gubichev, Andrey and Mirchev, Atanas and
-               Boncz, Peter and Kemper, Alfons and Neumann, Thomas},
-  title     = {How Good Are Query Optimizers, Really?},
-  booktitle = {Proceedings of the VLDB Endowment},
-  volume    = {9},
-  number    = {3},
-  pages     = {204--215},
-  year      = {2015}
+@article{leis2015good,
+  title={How good are query optimizers, really?},
+  author={Leis, Viktor and Gubichev, Andrey and Mirchev, Atanas and Boncz, Peter and Kemper, Alfons and Neumann, Thomas},
+  journal={Proceedings of the VLDB Endowment},
+  volume={9},
+  number={3},
+  pages={204--215},
+  year={2015},
+  publisher={VLDB Endowment}
 }
 
 % --- Classic query optimization / selectivity estimation (stable) ---
 @inproceedings{selinger1979access,
-  author    = {Selinger, Patricia G. and Astrahan, Morton M. and Chamberlin,
-               Donald D. and Lorie, Raymond A. and Price, Thomas G.},
-  title     = {Access Path Selection in a Relational Database Management System},
-  booktitle = {Proceedings of the ACM SIGMOD International Conference on Management of Data},
-  year      = {1979}
+  title={Access path selection in a relational database management system},
+  author={Selinger, P Griffiths and Astrahan, Morton M and Chamberlin, Donald D and Lorie, Raymond A and Price, Thomas G},
+  booktitle={Proceedings of the 1979 ACM SIGMOD international conference on Management of data},
+  pages={23--34},
+  year={1979}
 }
 
-@inproceedings{piatetsky1984accurate,
-  author    = {Piatetsky-Shapiro, Gregory and Connell, Charles},
-  title     = {Accurate Estimation of the Number of Tuples Satisfying a Condition},
-  booktitle = {Proceedings of the ACM SIGMOD International Conference on Management of Data},
-  year      = {1984}
+@article{piatetsky1984accurate,
+  title={Accurate estimation of the number of tuples satisfying a condition},
+  author={Piatetsky-Shapiro, Gregory and Connell, Charles},
+  journal={ACM Sigmod Record},
+  volume={14},
+  number={2},
+  pages={256--276},
+  year={1984},
+  publisher={ACM New York, NY, USA}
 }
 
-@inproceedings{poosala1996improved,
-  author    = {Poosala, Viswanath and Ioannidis, Yannis E. and Haas, Peter J.
-               and Shekita, Eugene J.},
-  title     = {Improved Histograms for Selectivity Estimation of Range Predicates},
-  booktitle = {Proceedings of the ACM SIGMOD International Conference on Management of Data},
-  year      = {1996}
+@article{poosala1996improved,
+  title={Improved histograms for selectivity estimation of range predicates},
+  author={Poosala, Viswanath and Haas, Peter J and Ioannidis, Yannis E and Shekita, Eugene J},
+  journal={ACM Sigmod Record},
+  volume={25},
+  number={2},
+  pages={294--305},
+  year={1996},
+  publisher={ACM New York, NY, USA}
 }
 
 @inproceedings{chaudhuri1998overview,
-  author    = {Chaudhuri, Surajit},
-  title     = {An Overview of Query Optimization in Relational Systems},
-  booktitle = {Proceedings of the ACM Symposium on Principles of Database Systems (PODS)},
-  year      = {1998}
+  title={An overview of query optimization in relational systems},
+  author={Chaudhuri, Surajit},
+  booktitle={Proceedings of the seventeenth ACM SIGACT-SIGMOD-SIGART symposium on Principles of database systems},
+  pages={34--43},
+  year={1998}
 }
 
 % --- Combined index + materialized view selection (stable) ---
 @inproceedings{agrawal2000automated,
-  author    = {Agrawal, Sanjay and Chaudhuri, Surajit and Narasayya, Vivek},
-  title     = {Automated Selection of Materialized Views and Indexes in SQL Databases},
-  booktitle = {Proceedings of the International Conference on Very Large Data Bases (VLDB)},
-  year      = {2000}
+  title={Automated selection of materialized views and indexes in SQL databases},
+  author={Agrawal, Sanjay and Chaudhuri, Surajit and Narasayya, Vivek R},
+  booktitle={VLDB},
+  volume={2000},
+  pages={496--505},
+  year={2000}
 }
 
 % --- Automatic correlation discovery / statistics configuration (added per
 %     review: most direct prior art, must be positioned) ---
 @article{chaudhuri2001automating,
-  author  = {Chaudhuri, Surajit and Narasayya, Vivek},
-  title   = {Automating Statistics Management for Query Optimizers},
-  journal = {IEEE Transactions on Knowledge and Data Engineering},
-  volume  = {13},
-  number  = {1},
-  pages   = {7--20},
-  year    = {2001},
-  doi     = {10.1109/69.908978}
+  title={Automating statistics management for query optimizers},
+  author={Chaudhuri, Surajit and Narasayya, Vivek},
+  journal={IEEE Transactions on Knowledge and Data Engineering},
+  volume={13},
+  number={1},
+  pages={7--20},
+  year={2001},
+  publisher={IEEE}
 }
 
 @inproceedings{ilyas2004cords,
-  author    = {Ilyas, Ihab F. and Markl, Volker and Haas, Peter J. and
-               Brown, Paul and Aboulnaga, Ashraf},
-  title     = {CORDS: Automatic Discovery of Correlations and Soft Functional
-               Dependencies},
-  booktitle = {Proceedings of the ACM SIGMOD International Conference on
-               Management of Data},
-  pages     = {647--658},
-  year      = {2004},
-  doi       = {10.1145/1007568.1007641}
+  title={CORDS: Automatic discovery of correlations and soft functional dependencies},
+  author={Ilyas, Ihab F and Markl, Volker and Haas, Peter and Brown, Paul and Aboulnaga, Ashraf},
+  booktitle={Proceedings of the 2004 ACM SIGMOD international conference on Management of data},
+  pages={647--658},
+  year={2004}
 }
 
-@inproceedings{haas2007dependencies,
-  author    = {Haas, Peter J. and Hueske, Fabian and Markl, Volker},
-  title     = {Detecting Attribute Dependencies from Query Feedback},
-  booktitle = {Proceedings of the 33rd International Conference on Very Large
-               Data Bases (VLDB)},
-  pages     = {830--841},
-  year      = {2007}
+@inproceedings{haas2007detecting,
+  title={Detecting attribute dependencies from query feedback},
+  author={Haas, Peter J and Hueske, Fabian and Markl, Volker},
+  booktitle={Proceedings of the 33rd international conference on Very large data bases},
+  pages={830--841},
+  year={2007}
 }
 
 % --- PostgreSQL-ecosystem statistics advisors (production prior art) ---
-@misc{edbstatsadvisor,
-  author = {{EDB}},
-  title  = {EDB Postgres Query Advisor: Statistics Advisor},
-  howpublished = {\url{https://www.enterprisedb.com/docs/pg_extensions/query_advisor/}},
-  year   = {2024},
-  note   = {Accessed 2026}
+@misc{edb_query_advisor,
+  author       = {{EnterpriseDB}},
+  title        = {EDB Query Advisor},
+  year         = {2025},
+  howpublished = {EDB Documentation},
+  url          = {https://www.enterprisedb.com/docs/pg_extensions/query_advisor/},
+  note         = {Accessed: 2026-08-25}
 }
 
-@misc{pgqualstats,
-  author = {Ferret, Julien},
-  title  = {pg\_qualstats: An extension for collecting statistics about
-            predicates},
-  howpublished = {\url{https://github.com/powa-team/pg_qualstats}},
-  year   = {2024},
-  note   = {Accessed 2026}
+@misc{pg_qualstats,
+  author  = {{PoWA Team}},
+  title   = {pg\_qualstats: An extension for collecting statistics about predicates},
+  year    = {2026},
+  url     = {https://github.com/powa-team/pg_qualstats},
+  note    = {Accessed: 2026-08-25}
 }
 \endinput

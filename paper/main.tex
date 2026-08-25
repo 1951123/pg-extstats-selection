@@ -115,7 +115,7 @@ most-common-value tuples the list stores, so a 3-column correlation that is
 invisible at a small target becomes accurate at a larger one and exact when the
 list is large enough. Automated
 statistics management is a well-studied problem (Chaudhuri and Narasayya
-\cite{chaudhuri2000automating}), but it chooses \emph{which} statistics to
+\cite{chaudhuri2001automating}), but it chooses \emph{which} statistics to
 create. Extended-statistics selection is richer: a storage budget can be spent
 either by \emph{adding} a statistic or by \emph{adjusting an existing one's}
 capacity --- upward from a low target to a higher one, or downward to a coarser
@@ -295,23 +295,23 @@ the two evaluated workloads sit on opposite ends of this axis
 \subsection{Related Work}
 
 Prior work on statistics configuration answers essentially \emph{which} column
-groups to build. Chaudhuri and Narasayya \cite{chaudhuri2000automating,
-chaudhuri2001automating} identify and prune a workload's needed statistics to a
+groups to build. Chaudhuri and Narasayya \cite{chaudhuri2001automating}
+identify and prune a workload's needed statistics to a
 small effective set; \emph{CORDS} \cite{ilyas2004cords} and \emph{Haas et al.}
-\cite{haas2007dependencies} discover correlated column groups and rank them
+\cite{haas2007detecting} discover correlated column groups and rank them
 under a catalog-space budget. Production PostgreSQL advisors --- EDB's
-Statistics Advisor \cite{edbstatsadvisor} (at most two columns, no capacity
-tuning) and \texttt{pg\_qualstats} \cite{pgqualstats} --- likewise recommend
+Statistics Advisor \cite{edb_query_advisor} (at most two columns, no capacity
+tuning) and \texttt{pg\_qualstats} \cite{pg_qualstats} --- likewise recommend
 \emph{which} statistics, not \emph{how much} capacity. The shared gap across
 this lineage is the capacity axis: none treats PostgreSQL's per-statistic
 \texttt{statistics\_target} as a competing resource dimension against a single
 shared storage budget, so none decides \emph{whether to upgrade} an
 already-chosen statistic from L100 to L1000 to L10000 (``budget allocation''
 rather than ``selection''). Budget-constrained \emph{index and view selection}
-\cite{chaudhuri1997index,indexselection,agrawal2000automated} is the closest
+\cite{chaudhuri1997efficient,bruno2005automatic,agrawal2000automated} is the closest
 methodology (cost-driven candidates, MILP/greedy), but its candidates carry no
 capacity axis and the objective is not linear. Learned cardinality estimators
-\cite{kipf2019learned} are orthogonal: they \emph{change the estimator}, whereas
+\cite{kipf2018learned} are orthogonal: they \emph{change the estimator}, whereas
 we leave PostgreSQL's estimator unchanged and optimize the physical statistics
 supplied to it, validating the outcome against the \emph{real} planner (no
 synthetic model accuracy involved) \cite{chaudhuri1998overview}. Table
@@ -334,9 +334,9 @@ validates the deployed set against the real planner. \checkmark\;\,= yes,
 \midrule
 Chaudhuri \& Narasayya & \checkmark & -- & \checkmark & storage & -- & -- & --\\
 CORDS \cite{ilyas2004cords} & \checkmark & $\sim$(pair) & -- & catalog & -- & -- & --\\
-Haas et al.\ \cite{haas2007dependencies} & \checkmark & $\sim$(pair) & \checkmark & catalog & -- & -- & --\\
-EDB Statistics Advisor \cite{edbstatsadvisor} & \checkmark & $\sim$($\le$2 col) & \checkmark & weighting & $\sim$ & \checkmark & --\\
-pg\_qualstats \cite{pgqualstats} & \checkmark & -- & \checkmark & -- & -- & \checkmark & --\\
+Haas et al.\ \cite{haas2007detecting} & \checkmark & $\sim$(pair) & \checkmark & catalog & -- & -- & --\\
+EDB Statistics Advisor \cite{edb_query_advisor} & \checkmark & $\sim$($\le$2 col) & \checkmark & weighting & $\sim$ & \checkmark & --\\
+pg\_qualstats \cite{pg_qualstats} & \checkmark & -- & \checkmark & -- & -- & \checkmark & --\\
 \textbf{This work} & \checkmark & MCV & \checkmark & \textbf{storage} & \checkmark & \checkmark & \checkmark\\
 \bottomrule
 \end{tabular}
@@ -390,7 +390,7 @@ $e_{is}$. Even \emph{measuring} all subsets is infeasible, let alone optimizing
 over them.
 
 A standard workaround is the multiplicative approximation in log space
-\cite{ioannidis2003cardinality},
+\cite{ioannidis2003history},
 \[
   \log e_i(T_i)\;\approx\;\log e_i^0 + \sum_{s\in T_i}\log\!\Big(\tfrac{e_{is}}{e_i^0}\Big),
 \]
@@ -927,7 +927,7 @@ lists the ``job-light'' join sub-plans of the same IMDB schema: we do not use
 the original 113-query JOB \cite{leis2015good}, because its queries are
 MIN/MAX aggregates that return a single row and carry no meaningful whole-query
 cardinality, whereas job-light's `SELECT COUNT(*)` join sub-plans are the
-standard cardinality-estimation form \cite{kipf2019learned}.) \emph{Synthetic:}
+standard cardinality-estimation form \cite{kipf2018learned}.) \emph{Synthetic:}
 constructed tables used only to stress specific mechanisms (\S\ref{sec:rq2},
 \S\ref{sec:e2e}). Candidates are the 2- and 3-column subsets
 of each query's selection predicates. We restrict to 2/3-column subsets because
