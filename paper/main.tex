@@ -1622,6 +1622,14 @@ PostgreSQL couples sampling effort to the \emph{maximum} target on a relation
 Fig.~\ref{fig:budgetquality} show that the budget is, in practice, spent on the
 ``how much'' axis.
 
+A DBA often values the \emph{maintenance} burden of statistics over their
+persistent size, and here the sparse regime helps directly: because each query
+needs at most one dominant statistic (\S\ref{sec:rq2}), the selected set is
+\emph{small} (a handful of statistics at practical budgets, Table
+\ref{tab:greedy2}), so both the number of objects to create and the ANALYZE
+volume to refresh them stay low --- maintenance cost is reduced by construction,
+not by tuning the per-statistic target.
+
 \emph{Why arithmetic mean q-error.} q-error is bounded below by 1 with a heavy
 upper tail, so the arithmetic mean rewards repairing the worst queries --
 exactly the cost of a bad estimate -- while the median stays 1.000. It also
