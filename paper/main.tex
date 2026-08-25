@@ -490,7 +490,12 @@ optimization is not the bottleneck at full-workload scale --- the phase-1
 Our MILP needs a per-candidate, per-capacity q-error $e_{is}$ and size $c_s$
 for every option that survives pruning. This section turns the measurement
 from an afterthought into a first-class systems component: it is, in fact, the
-pipeline's true bottleneck (\S\ref{sec:rq4}).
+pipeline's true bottleneck (\S\ref{sec:rq4}). We take $c_s$ as the on-disk byte
+size of the candidate's MCV payload --- the serialized list in the
+\texttt{stxmcv} column of its \texttt{pg\_statistic\_ext\_data} row, read with
+\texttt{pg\_column\_size} --- so a coarser capacity is simply a smaller
+serialized list, and a list large enough to be stored out-of-line (TOAST) is
+counted by the same call.
 
 \subsection{Naive Measurement Is Infeasible on Wide Tables}
 \label{sec:measure-naive}
