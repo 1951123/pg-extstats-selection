@@ -1,27 +1,28 @@
 #!/usr/bin/env bash
 ###############################################################################
-# init_census.sh — 幂等地在 PostgreSQL 中创建 USCensus1990 数据库
+# init_census.sh -- idempotently create the USCensus1990 database in PostgreSQL
 #
-# Census 1990 数据集 (USCensus1990.data.txt):
-#   - 单表基准: 所有查询都是 SELECT COUNT(*) FROM climate WHERE ...
-#   - 数据为简单的逗号分隔整数 CSV, 首行为属性名(header), 共 69 列
-#   - 无空字段, 无内嵌引号/反斜杠, 可直接 COPY 导入
+# Census 1990 dataset (USCensus1990.data.txt):
+#   - Single-table benchmark: all queries are SELECT COUNT(*) FROM climate WHERE ...
+#   - Data is a simple comma-separated integer CSV, first row = attribute names
+#     (header), 69 columns total
+#   - No empty fields, no embedded quotes/backslashes, ready for COPY import
 #
-# 功能:
-#   1. 创建数据库 (默认 census), 已存在则复用
-#   2. 依据数据 header 自动生成 climate 表 (全部 integer 列)
-#   3. 导入 USCensus1990.data.txt
-#   4. 运行 ANALYZE 收集统计信息
+# Function:
+#   1. Create the database (default 'census'); reuse if it already exists
+#   2. Generate the 'climate' table from the data header (all integer columns)
+#   3. Load USCensus1990.data.txt
+#   4. Run ANALYZE to collect statistics
 #
-# 幂等性:
-#   - 默认: 若 climate 表已有数据则跳过导入。
-#   - FORCE=1: DROP DATABASE 并完整重建、重新导入。
+# Idempotency:
+#   - Default: skip import if the climate table already has data.
+#   - FORCE=1: DROP DATABASE and fully rebuild + re-import.
 #
-# 用法:
+# Usage:
 #   ./benchmarks/init_census.sh [--force] [--db NAME] ...
-#   环境变量: PGHOST / PGPORT / PGUSER / PGPASSWORD / DB_NAME
+#   Env: PGHOST / PGPORT / PGUSER / PGPASSWORD / DB_NAME
 #
-# 例子:
+# Examples:
 #   PGPASSWORD=postgres ./benchmarks/init_census.sh
 #   PGPASSWORD=postgres FORCE=1 ./benchmarks/init_census.sh
 ###############################################################################
@@ -30,7 +31,7 @@ set -euo pipefail
 export PGAPPNAME="init_census"
 
 # ---------------------------------------------------------------------------
-# 默认配置
+# Default configuration
 # ---------------------------------------------------------------------------
 DB_NAME="${DB_NAME:-census}"
 PGHOST="${PGHOST:-localhost}"
@@ -43,28 +44,28 @@ CENSUS_DIR="${BENCH_ROOT}/benchmarks/Census"
 DATA_DIR="${CENSUS_DIR}/data"
 DATA_FILE="${DATA_DIR}/USCensus1990.data.txt"
 
-# 目标表名 (与 benchmarks/Census/queries/query.sql 中的查询一致)
+# Target table name (consistent with the queries in benchmarks/Census/queries/query.sql)
 TABLE_NAME="climate"
 
 FORCE=0
 
 # ---------------------------------------------------------------------------
-# 解析命令行参数
+# Parse command-line arguments
 # ---------------------------------------------------------------------------
 usage() {
   cat <<EOF
-用法: $0 [--force] [--db NAME] [--pguser USER] [--pghost HOST] [--pgport PORT]
+Usage: $0 [--force] [--db NAME] [--pguser USER] [--pghost HOST] [--pgport PORT]
 
-选项:
-  --force        强制重建: DROP DATABASE 并完整重新导入
-  --db NAME      数据库名 (默认: census)
-  --pguser USER  PostgreSQL 用户名 (默认: postgres)
-  --pghost HOST  PostgreSQL 主机 (默认: localhost)
-  --pgport PORT  PostgreSQL 端口 (默认: 5432)
-  -h, --help     显示本帮助
+Options:
+  --force        Force rebuild: DROP DATABASE and full re-import
+  --db NAME      Database name (default: census)
+  --pguser USER  PostgreSQL user (default: postgres)
+  --pghost HOST  PostgreSQL host (default: localhost)
+  --pgport PORT  PostgreSQL port (default: 5432)
+  -h, --help     Show this help
 
-环境变量: PGHOST, PGPORT, PGUSER, PGPASSWORD, DB_NAME
-示例:
+Env: PGHOST, PGPORT, PGUSER, PGPASSWORD, DB_NAME
+Example:
   PGPASSWORD=postgres ./benchmarks/init_census.sh
 EOF
 }
@@ -77,7 +78,7 @@ while [[ $# -gt 0 ]]; do
     --pghost) PGHOST="${2:-}"; shift 2 ;;
     --pgport) PGPORT="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "未知参数: $1" >&2; usage >&2; exit 1 ;;
+    *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
 done
 
@@ -87,34 +88,35 @@ psql_main() { psql -X -v ON_ERROR_STOP=1 -P pager=off "$@"; }
 psql_db()   { psql -X -v ON_ERROR_STOP=1 -P pager=off -d "${DB_NAME}" "$@"; }
 
 # ---------------------------------------------------------------------------
-# 前置检查
+# Preconditions
 # ---------------------------------------------------------------------------
 if ! command -v psql >/dev/null 2>&1; then
-  echo "错误: 未找到 psql, 请先安装 PostgreSQL 客户端。" >&2
+  echo "Error: psql not found; install the PostgreSQL client first." >&2
   exit 1
 fi
 if [[ ! -f "${DATA_FILE}" ]]; then
-  echo "错误: 找不到数据文件: ${DATA_FILE}" >&2
+  echo "Error: data file not found: ${DATA_FILE}" >&2
   exit 1
 fi
 
-echo "==> PostgreSQL 连接: ${PGUSER}@${PGHOST}:${PGPORT}"
-echo "==> 目标数据库: ${DB_NAME}   FORCE=${FORCE}"
-echo "==> 数据文件: ${DATA_FILE}"
+echo "==> PostgreSQL connection: ${PGUSER}@${PGHOST}:${PGPORT}"
+echo "==> Target database: ${DB_NAME}   FORCE=${FORCE}"
+echo "==> Data file: ${DATA_FILE}"
 
 if ! psql_main -d postgres -tAc "SELECT 1" >/dev/null 2>&1; then
-  echo "错误: 无法连接到 PostgreSQL 服务器 (${PGUSER}@${PGHOST}:${PGPORT})." >&2
+  echo "Error: cannot connect to PostgreSQL server (${PGUSER}@${PGHOST}:${PGPORT})." >&2
   exit 1
 fi
-echo "==> 服务器连接成功"
+echo "==> Server connection OK"
 
 # ---------------------------------------------------------------------------
-# 辅助函数
+# Helper functions
 # ---------------------------------------------------------------------------
 db_exists() { psql_main -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; }
 
 table_rows() {
-  # 表不存在返回空; 存在返回行数 (分两步, 避免对不存在表执行 count 报错)。
+  # Return empty if table does not exist; else return the row count
+  # (in two steps to avoid a count error on a non-existent table).
   if [[ "$(psql_db -tAc "SELECT to_regclass('public.${TABLE_NAME}') IS NOT NULL")" != "t" ]]; then
     echo ""
     return
@@ -122,45 +124,46 @@ table_rows() {
   psql_db -tAc "SELECT count(*) FROM ${TABLE_NAME}" | tr -d '[:space:]'
 }
 
-# 依据数据 header 生成 CREATE TABLE 语句
+# Generate the CREATE TABLE statement from the data header
 gen_create_sql() {
-  # 取出 header 第一行, 逗号分隔; 每列转为合法小写标识符 + integer
+  # Take the first (header) line, comma-separated; map each column to a valid
+  # lowercase identifier + integer
   local header cols=""
   header="$(head -1 "${DATA_FILE}")"
-  # awk: 把每个列名清理为合法标识符 (仅字母数字下划线), 全部小写
+  # awk: clean each column name to a valid identifier (alphanumeric/underscore), lowercase
   cols="$(printf '%s' "$header" | awk -F, '{for(i=1;i<=NF;i++){c=$i; gsub(/[^A-Za-z0-9_]/,"",c); if(i>1)printf ","; printf "\"%s\" integer", tolower(c)}}')"
   printf 'DROP TABLE IF EXISTS %s;\nCREATE TABLE %s (%s);\n' "${TABLE_NAME}" "${TABLE_NAME}" "${cols}"
 }
 
 # ---------------------------------------------------------------------------
-# Step 0: 数据库存在性
+# Step 0: database existence
 # ---------------------------------------------------------------------------
 if [[ "$FORCE" == "1" ]]; then
-  echo "==> [FORCE] 删除并重建数据库 '${DB_NAME}' ..."
+  echo "==> [FORCE] dropping and rebuilding database '${DB_NAME}' ..."
   psql_main -d postgres -c "DROP DATABASE IF EXISTS \"${DB_NAME}\" WITH (FORCE);"
   createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "${DB_NAME}"
 elif ! db_exists; then
-  echo "==> 数据库 '${DB_NAME}' 不存在, 创建中 ..."
+  echo "==> Database '${DB_NAME}' does not exist; creating ..."
   createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "${DB_NAME}"
 else
-  echo "==> 数据库 '${DB_NAME}' 已存在, 复用。"
+  echo "==> Database '${DB_NAME}' already exists; reusing."
 fi
 
 # ---------------------------------------------------------------------------
-# Step 1: 建表 (依据 header 动态生成, 幂等)
+# Step 1: create table (generated from header, idempotent)
 # ---------------------------------------------------------------------------
 rows="$(table_rows)"
 if [[ -n "$rows" && "$rows" != "0" ]]; then
-  echo "==> 表 '${TABLE_NAME}' 已有数据 (${rows} 行), 跳过建表与导入。"
+  echo "==> Table '${TABLE_NAME}' already has data (${rows} rows); skipping table creation and import."
 else
-  echo "==> 依据数据 header 创建表 '${TABLE_NAME}' ..."
-  gen_create_sql | psql_db -q || { echo "错误: 建表失败。" >&2; exit 1; }
+  echo "==> Creating table '${TABLE_NAME}' from data header ..."
+  gen_create_sql | psql_db -q || { echo "Error: table creation failed." >&2; exit 1; }
 
   # ---------------------------------------------------------------------------
-  # Step 2: 导入 CSV 数据
-  #   CSV 带 header, 全部整数, 无引号/反斜杠/空字段, 标准 COPY.
+  # Step 2: import CSV data
+  #   CSV has a header, all integers, no quotes/backslashes/empty fields, standard COPY.
   # ---------------------------------------------------------------------------
-  echo "==> 导入数据: ${DATA_FILE##*/} (约 245 万行) ..."
+  echo "==> Loading data: ${DATA_FILE##*/} (~2.45M rows) ..."
   psql_db -q <<SQL
 \copy ${TABLE_NAME} from '${DATA_FILE}' WITH (FORMAT csv, HEADER true);
 SQL
@@ -169,11 +172,11 @@ fi
 # ---------------------------------------------------------------------------
 # Step 3: ANALYZE
 # ---------------------------------------------------------------------------
-echo "==> 运行 ANALYZE ..."
+echo "==> Running ANALYZE ..."
 psql_db -c "ANALYZE ${TABLE_NAME};" >/dev/null
 
 echo
-echo "===> 完成! 数据库 '${DB_NAME}' 已就绪。"
+echo "===> Done! Database '${DB_NAME}' is ready."
 n="$(table_rows)"
-echo "     表 '${TABLE_NAME}' 共 ${n} 行。"
-echo "     连接: psql -h ${PGHOST} -p ${PGPORT} -U ${PGUSER} -d ${DB_NAME}"
+echo "     Table '${TABLE_NAME}' has ${n} rows."
+echo "     Connect: psql -h ${PGHOST} -p ${PGPORT} -U ${PGUSER} -d ${DB_NAME}"

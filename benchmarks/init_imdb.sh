@@ -1,32 +1,34 @@
 #!/usr/bin/env bash
 ###############################################################################
-# init_imdb.sh — 幂等地在 PostgreSQL 中创建 JOB (Join Order Benchmark) / IMDB 数据库
+# init_imdb.sh -- idempotently create the JOB (Join Order Benchmark) / IMDB
+#                database in PostgreSQL
 #
-# 参考: https://zhuanlan.zhihu.com/p/637260071
-#   IMDB 数据 CSV 采用 `\`(反斜杠) 转义字段内的引号, 因此 COPY 需指定
-#   `escape as '\'`, 而非 PostgreSQL 默认的 `""` 双引号转义。
+# Reference: https://zhuanlan.zhihu.com/p/637260071
+#   The IMDB data CSVs escape quoted fields with `\` (backslash), so COPY must
+#   specify `escape as '\'` instead of PostgreSQL's default `""` escape.
 #
-# 功能:
-#   1. 创建数据库 (默认 imdb, 与知乎示例一致), 已存在则复用
-#   2. 应用 schema
-#   3. 用官方 COPY 参数导入 JOB 数据 (benchmarks/JOB/data/*.csv)
-#   4. 创建查询所需索引 (benchmarks/JOB/fkindexes.sql)
-#   5. 运行 ANALYZE 收集统计信息
+# Function:
+#   1. Create the database (default 'imdb'), reuse if it already exists
+#   2. Apply the schema
+#   3. Load JOB data with the official COPY parameters (benchmarks/JOB/data/*.csv)
+#   4. Create query-required indexes (benchmarks/JOB/fkindexes.sql)
+#   5. Run ANALYZE to collect statistics
 #
-# 幂等性:
-#   - 默认模式: 若数据库已存在且所有表均已有数据, 直接跳过导入(无事可做)。
-#     若部分表未导入, 则只导入缺失的表并补齐后续步骤。
-#   - FORCE=1 模式: DROP DATABASE 并完整重建、重新导入全部数据。
+# Idempotency:
+#   - Default mode: if the database exists and all tables already have data,
+#     skip the import entirely (nothing to do). If some tables are missing,
+#     import only those and fill in the remaining steps.
+#   - FORCE=1 mode: DROP DATABASE and fully rebuild + re-import everything.
 #
-# 用法:
+# Usage:
 #   ./benchmarks/init_imdb.sh [--force] [--db NAME] ...
 #
-# 常用环境变量 (与 psql 一致):
+# Common env vars (consistent with psql):
 #   PGHOST / PGPORT / PGUSER / PGPASSWORD / DB_NAME
 #
-# 例子:
-#   ./benchmarks/init_imdb.sh                                  # 幂等导入
-#   FORCE=1 ./benchmarks/init_imdb.sh                          # 强制重建
+# Examples:
+#   ./benchmarks/init_imdb.sh                                   # idempotent import
+#   FORCE=1 ./benchmarks/init_imdb.sh                           # force rebuild
 #   PGHOST=10.0.0.5 PGPORT=5433 PGPASSWORD=secret ./benchmarks/init_imdb.sh
 ###############################################################################
 
@@ -34,7 +36,7 @@ set -euo pipefail
 export PGAPPNAME="init_imdb"
 
 # ---------------------------------------------------------------------------
-# 默认配置 (可被环境变量 / 命令行参数覆盖)
+# Default configuration (overridable by env vars / CLI args)
 # ---------------------------------------------------------------------------
 DB_NAME="${DB_NAME:-imdb}"
 PGHOST="${PGHOST:-localhost}"
@@ -42,46 +44,46 @@ PGPORT="${PGPORT:-5432}"
 PGUSER="${PGUSER:-postgres}"
 PGPASSWORD="${PGPASSWORD:-}"
 
-# JOB 数据的绝对路径
+# Absolute path to the JOB data
 BENCH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 JOB_DIR="${BENCH_ROOT}/benchmarks/JOB"
-# 与数据同目录的官方 schema (schematext.sql); 也可改为仓库根下的 schema.sql
+# Official schema co-located with the data (schematext.sql); fall back to schema.sql
 SCHEMA_SQL="${JOB_DIR}/data/schematext.sql"
 SCHEMA_FALLBACK="${JOB_DIR}/schema.sql"
 FK_INDEX_SQL="${JOB_DIR}/fkindexes.sql"
 DATA_DIR="${JOB_DIR}/data"
 
-# 表 -> 对应 CSV 文件名 的映射 (顺序与知乎示例一致)
+# Table -> CSV filename mapping (order matches the reference example)
 readonly -a TABLE_NAMES=(
   aka_name aka_title cast_info char_name comp_cast_type
   company_name company_type complete_cast info_type keyword
   kind_type link_type movie_companies movie_info movie_info_idx
   movie_keyword movie_link name person_info role_type title
 )
-# 所有表名(供判断已导入) 
+# All table names (for import-completeness checks)
 readonly -a ALL_TABLES=( "${TABLE_NAMES[@]}" )
 
 FORCE=0
 
 # ---------------------------------------------------------------------------
-# 解析命令行参数
+# Parse command-line arguments
 # ---------------------------------------------------------------------------
 usage() {
   cat <<EOF
-用法: $0 [--force] [--db NAME] [--pguser USER] [--pghost HOST] [--pgport PORT]
+Usage: $0 [--force] [--db NAME] [--pguser USER] [--pghost HOST] [--pgport PORT]
 
-选项:
-  --force        强制重建: DROP DATABASE 并完整重新导入全部数据
-  --db NAME      数据库名 (默认: imdb)
-  --pguser USER  PostgreSQL 用户名 (默认: postgres)
-  --pghost HOST  PostgreSQL 主机 (默认: localhost)
-  --pgport PORT  PostgreSQL 端口 (默认: 5432)
-  -h, --help     显示本帮助
+Options:
+  --force        Force rebuild: DROP DATABASE and full re-import of all data
+  --db NAME      Database name (default: imdb)
+  --pguser USER  PostgreSQL user (default: postgres)
+  --pghost HOST  PostgreSQL host (default: localhost)
+  --pgport PORT  PostgreSQL port (default: 5432)
+  -h, --help     Show this help
 
-环境变量: PGHOST, PGPORT, PGUSER, PGPASSWORD, DB_NAME
-  PGPASSWORD 默认留空; 若需要密码请设置环境变量或使用 ~/.pgpass。
+Env: PGHOST, PGPORT, PGUSER, PGPASSWORD, DB_NAME
+  PGPASSWORD is empty by default; set it or use ~/.pgpass if a password is needed.
 
-示例:
+Example:
   PGPASSWORD=postgres ./benchmarks/init_imdb.sh
   PGPASSWORD=postgres FORCE=1 ./benchmarks/init_imdb.sh
 EOF
@@ -95,52 +97,52 @@ while [[ $# -gt 0 ]]; do
     --pghost) PGHOST="${2:-}"; shift 2 ;;
     --pgport) PGPORT="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "未知参数: $1" >&2; usage >&2; exit 1 ;;
+    *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
 done
 
 export PGHOST PGPORT PGUSER PGPASSWORD
 
-# psql 辅助: 都开启 ON_ERROR_STOP && 关闭 pager 防分页卡住
+# psql helpers: always ON_ERROR_STOP, pager off to avoid hanging on long output
 psql_main() { psql -X -v ON_ERROR_STOP=1 -P pager=off "$@"; }
 psql_db()   { psql -X -v ON_ERROR_STOP=1 -P pager=off -d "${DB_NAME}" "$@"; }
 
 # ---------------------------------------------------------------------------
-# 前置检查
+# Preconditions
 # ---------------------------------------------------------------------------
 if ! command -v psql >/dev/null 2>&1; then
-  echo "错误: 未找到 psql, 请先安装 PostgreSQL 客户端。" >&2
+  echo "Error: psql not found; install the PostgreSQL client first." >&2
   exit 1
 fi
 if [[ ! -f "${SCHEMA_SQL}" && -f "${SCHEMA_FALLBACK}" ]]; then
   SCHEMA_SQL="${SCHEMA_FALLBACK}"
 fi
 if [[ ! -f "${SCHEMA_SQL}" ]]; then
-  echo "错误: 找不到 schema 文件 (${SCHEMA_SQL} / ${SCHEMA_FALLBACK})" >&2
+  echo "Error: schema file not found (${SCHEMA_SQL} / ${SCHEMA_FALLBACK})" >&2
   exit 1
 fi
 if [[ ! -f "${FK_INDEX_SQL}" ]]; then
-  echo "错误: 找不到索引文件: ${FK_INDEX_SQL}" >&2
+  echo "Error: index file not found: ${FK_INDEX_SQL}" >&2
   exit 1
 fi
 
-echo "==> PostgreSQL 连接: ${PGUSER}@${PGHOST}:${PGPORT}"
-echo "==> 目标数据库: ${DB_NAME}   FORCE=${FORCE}"
+echo "==> PostgreSQL connection: ${PGUSER}@${PGHOST}:${PGPORT}"
+echo "==> Target database: ${DB_NAME}   FORCE=${FORCE}"
 echo "==> Schema: ${SCHEMA_SQL}"
 
 if ! psql_main -d postgres -tAc "SELECT 1" >/dev/null 2>&1; then
-  echo "错误: 无法连接到 PostgreSQL 服务器 (${PGUSER}@${PGHOST}:${PGPORT})." >&2
-  echo "       请检查 PGHOST/PGPORT/PGUSER/PGPASSWORD 是否正确。" >&2
+  echo "Error: cannot connect to PostgreSQL server (${PGUSER}@${PGHOST}:${PGPORT})." >&2
+  echo "       Please check PGHOST/PGPORT/PGUSER/PGPASSWORD." >&2
   exit 1
 fi
-echo "==> 服务器连接成功"
+echo "==> Server connection OK"
 
 # ---------------------------------------------------------------------------
-# 辅助函数
+# Helper functions
 # ---------------------------------------------------------------------------
 db_exists() { psql_main -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; }
 
-# 返回某表当前行数 (表不存在或为空则返回空)
+# Return the row count of a table (empty if the table does not exist or is empty)
 table_rows() {
   psql_db -tAc "SELECT (SELECT count(*) FROM ${1})::text
                 WHERE EXISTS (
@@ -150,7 +152,7 @@ table_rows() {
     | tr -d '[:space:]'
 }
 
-# 所有表是否均已导入数据
+# Whether all tables have been loaded
 is_fully_loaded() {
   local t n
   for t in "${ALL_TABLES[@]}"; do
@@ -161,33 +163,33 @@ is_fully_loaded() {
 }
 
 # ---------------------------------------------------------------------------
-# Step 0: 数据库存在性
+# Step 0: database existence
 # ---------------------------------------------------------------------------
 if [[ "$FORCE" == "1" ]]; then
-  echo "==> [FORCE] 删除并重建数据库 '${DB_NAME}' ..."
+  echo "==> [FORCE] dropping and rebuilding database '${DB_NAME}' ..."
   psql_main -d postgres -c "DROP DATABASE IF EXISTS \"${DB_NAME}\" WITH (FORCE);"
   createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "${DB_NAME}"
 elif ! db_exists; then
-  echo "==> 数据库 '${DB_NAME}' 不存在, 创建中 ..."
+  echo "==> Database '${DB_NAME}' does not exist; creating ..."
   createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "${DB_NAME}"
 else
-  echo "==> 数据库 '${DB_NAME}' 已存在, 复用。"
+  echo "==> Database '${DB_NAME}' already exists; reusing."
 fi
 
 # ---------------------------------------------------------------------------
-# Step 1: 应用 schema (幂等)
-#   将 "CREATE TABLE" 替换为 "CREATE TABLE IF NOT EXISTS",
-#   这样重复运行时表已存在也不报错 (幂等)。
+# Step 1: apply schema (idempotent)
+#   Replace "CREATE TABLE" with "CREATE TABLE IF NOT EXISTS" so re-running does
+#   not fail when the tables already exist.
 # ---------------------------------------------------------------------------
-echo "==> 应用 schema: ${SCHEMA_SQL}"
-# 生成临时幂等化 schema: 仅把行首的 CREATE TABLE 加上 IF NOT EXISTS
+echo "==> Applying schema: ${SCHEMA_SQL}"
+# Generate a temporary idempotent schema: only add IF NOT EXISTS to leading CREATE TABLE
 TMP_SCHEMA="$(mktemp)"
 sed -E 's/^CREATE TABLE /CREATE TABLE IF NOT EXISTS /I' "${SCHEMA_SQL}" > "${TMP_SCHEMA}"
-psql_db -q -f "${TMP_SCHEMA}" || { echo "错误: schema 应用失败。" >&2; rm -f "${TMP_SCHEMA}"; exit 1; }
+psql_db -q -f "${TMP_SCHEMA}" || { echo "Error: schema application failed." >&2; rm -f "${TMP_SCHEMA}"; exit 1; }
 rm -f "${TMP_SCHEMA}"
 
 # ---------------------------------------------------------------------------
-# Step 2: 导入 CSV 数据 (默认只导入缺失的表; FORCE 时无缺失)
+# Step 2: load CSV data (default: only missing tables; FORCE means none missing)
 # ---------------------------------------------------------------------------
 missing=()
 for t in "${ALL_TABLES[@]}"; do
@@ -196,18 +198,18 @@ for t in "${ALL_TABLES[@]}"; do
 done
 
 if [[ "${#missing[@]}" -eq 0 ]]; then
-  echo "==> 所有表均已导入数据, 跳过数据导入。"
+  echo "==> All tables already loaded; skipping data import."
 else
-  echo "==> 待导入的表 (${#missing[@]} 个): ${missing[*]}"
+  echo "==> Tables to load (${#missing[@]}): ${missing[*]}"
   for t in "${missing[@]}"; do
     csv="${DATA_DIR}/${t}.csv"
     if [[ ! -f "$csv" ]]; then
-      echo "    警告: 找不到数据文件 ${csv}, 跳过表 ${t}" >&2
+      echo "    Warning: data file not found ${csv}; skipping table ${t}" >&2
       continue
     fi
-    echo "    ── 导入表 '${t}' 自 ${t}.csv"
-    # 官方 COPY 参数: delimiter ',' , csv, quote '"', escape '\'
-    # (IMDB CSV 用反斜杠转义字段内引号, 不能用 PostgreSQL 默认的 "" 转义)
+    echo "    -- loading table '${t}' from ${t}.csv"
+    # Official COPY parameters: delimiter ',', csv, quote '"', escape '\'
+    # (IMDB CSV escapes in-field quotes with backslash, not PostgreSQL's default "")
     psql_db -q <<SQL
 \copy ${t} from '${csv}' with delimiter as ',' csv quote '"' escape as '\\';
 SQL
@@ -215,27 +217,21 @@ SQL
 fi
 
 # ---------------------------------------------------------------------------
-# Step 3: 创建索引 (幂等)
-#   将 "create index" 替换为 "create index if not exists",
-#   重复运行时不因索引已存在而报错。
+# Step 3: create indexes (idempotent)
+#   Replace "create index" with "create index if not exists" so re-running does
+#   not fail because the indexes already exist.
 # ---------------------------------------------------------------------------
-echo "==> 创建/校验索引: ${FK_INDEX_SQL}"
+echo "==> Creating/verifying indexes: ${FK_INDEX_SQL}"
 TMP_FK="$(mktemp)"
 sed -E 's/^create index /create index if not exists /I' "${FK_INDEX_SQL}" > "${TMP_FK}"
-psql_db -q -f "${TMP_FK}" || { echo "错误: 索引创建失败。" >&2; rm -f "${TMP_FK}"; exit 1; }
+psql_db -q -f "${TMP_FK}" || { echo "Error: index creation failed." >&2; rm -f "${TMP_FK}"; exit 1; }
 rm -f "${TMP_FK}"
 
 # ---------------------------------------------------------------------------
 # Step 4: ANALYZE
 # ---------------------------------------------------------------------------
-echo "==> 运行 ANALYZE ..."
+echo "==> Running ANALYZE ..."
 psql_db -c "ANALYZE;" >/dev/null
 
 echo
-echo "===> 完成! 数据库 '${DB_NAME}' 已就绪。"
-if is_fully_loaded; then
-  echo "     所有 ${#ALL_TABLES[@]} 张表均已导入完整数据。"
-else
-  echo "     警告: 仍有表未导入数据, 请检查上面的日志。" >&2
-fi
-echo "     连接: psql -h ${PGHOST} -p ${PGPORT} -U ${PGUSER} -d ${DB_NAME}"
+echo "===> Done! Database '${DB_NAME}' is ready."

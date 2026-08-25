@@ -1,31 +1,34 @@
 #!/usr/bin/env bash
 ###############################################################################
-# init_stats_ceb.sh — 幂等地在 PostgreSQL 中创建 stats_CEB (Cardinality
-#                     Estimation Benchmark on StackExchange data) 数据库
+# init_stats_ceb.sh -- idempotently create the stats_CEB (Cardinality
+#                     Estimation Benchmark on StackExchange data) database
 #
-# stats_CEB 数据: StackExchange 的 posts/users/votes/badges/comments/
-#                  postHistory/postLinks/tags, 用于基数估计(join order)测试。
+# stats_CEB data: StackExchange posts/users/votes/badges/comments/
+#                 postHistory/postLinks/tags, for cardinality-estimation
+#                 (join order) testing.
 #
-# 与 JOB (init_imdb.sh) 的差异:
-#   - CSV 带 header 行, COPY 需指定 HEADER true (JOB 的 CSV 无 header)
-#   - CSV 无内嵌引号/反斜杠, 无需 escape '\' 处理, 用标准 CSV COPY 即可
+# Difference vs. JOB (init_imdb.sh):
+#   - CSV has a header row; COPY must specify HEADER true (JOB's CSV has no header)
+#   - CSV has no embedded quotes/backslashes; no escape '\' handling needed, a
+#     standard CSV COPY suffices
 #
-# 功能:
-#   1. 创建数据库 (默认 stats), 已存在则复用
-#   2. 应用 schema (benchmarks/stats_CEB/data/stats.sql)
-#   3. 导入 8 张表的 CSV 数据
-#   4. (可选) 建索引 (默认关闭, 遵循基准"无二级索引"惯例, 保证 join order 测试公平)
-#   5. 运行 ANALYZE 收集统计信息
+# Function:
+#   1. Create the database (default 'stats'), reuse if it already exists
+#   2. Apply the schema (benchmarks/stats_CEB/data/stats.sql)
+#   3. Load the 8 tables' CSV data
+#   4. (Optional) Build indexes (default off, following the benchmark's
+#      "no secondary indexes" convention to keep join-order tests fair)
+#   5. Run ANALYZE to collect statistics
 #
-# 幂等性:
-#   - 默认: 若所有表均已有数据则跳过导入; 部分缺失只补缺失。
-#   - FORCE=1: DROP DATABASE 并完整重建。
+# Idempotency:
+#   - Default: skip import if all tables already have data; load only missing ones.
+#   - FORCE=1: DROP DATABASE and fully rebuild.
 #
-# 用法:
+# Usage:
 #   ./benchmarks/init_stats_ceb.sh [--force] [--db NAME] ...
-#   环境变量: PGHOST / PGPORT / PGUSER / PGPASSWORD / DB_NAME
+#   Env: PGHOST / PGPORT / PGUSER / PGPASSWORD / DB_NAME
 #
-# 例子:
+# Examples:
 #   PGPASSWORD=postgres ./benchmarks/init_stats_ceb.sh
 #   PGPASSWORD=postgres FORCE=1 ./benchmarks/init_stats_ceb.sh
 ###############################################################################
@@ -34,7 +37,7 @@ set -euo pipefail
 export PGAPPNAME="init_stats_ceb"
 
 # ---------------------------------------------------------------------------
-# 默认配置 (可被环境变量 / 命令行参数覆盖)
+# Default configuration (overridable by env vars / CLI args)
 # ---------------------------------------------------------------------------
 DB_NAME="${DB_NAME:-stats}"
 PGHOST="${PGHOST:-localhost}"
@@ -47,10 +50,11 @@ CEB_DIR="${BENCH_ROOT}/benchmarks/stats_CEB"
 SCHEMA_SQL="${CEB_DIR}/data/stats.sql"
 DATA_DIR="${CEB_DIR}/data"
 
-# 是否创建二级索引 (0=不建, 1=建)。默认不建以符合基准"无二级索引"惯例。
+# Whether to create secondary indexes (0=no, 1=yes). Off by default, following
+# the benchmark's "no secondary index" convention.
 BUILD_INDEX="${BUILD_INDEX:-0}"
 
-# 8 张表的导入顺序 (无依赖, 顺序任意)
+# Import order of the 8 tables (no dependencies; order arbitrary)
 readonly -a ALL_TABLES=(
   users posts postLinks postHistory comments votes badges tags
 )
@@ -58,24 +62,25 @@ readonly -a ALL_TABLES=(
 FORCE=0
 
 # ---------------------------------------------------------------------------
-# 解析命令行参数
+# Parse command-line arguments
 # ---------------------------------------------------------------------------
 usage() {
   cat <<EOF
-用法: $0 [--force] [--build-index] [--db NAME] [--pguser USER] \
+Usage: $0 [--force] [--build-index] [--db NAME] [--pguser USER] \
 [--pghost HOST] [--pgport PORT]
 
-选项:
-  --force        强制重建: DROP DATABASE 并完整重新导入全部数据
-  --build-index  创建二级索引(供更快跑查询; 默认不建以符合基准惯例)
-  --db NAME      数据库名 (默认: stats)
-  --pguser USER  PostgreSQL 用户名 (默认: postgres)
-  --pghost HOST  PostgreSQL 主机 (默认: localhost)
-  --pgport PORT  PostgreSQL 端口 (默认: 5432)
-  -h, --help     显示本帮助
+Options:
+  --force        Force rebuild: DROP DATABASE and full re-import of all data
+  --build-index  Create secondary indexes (for faster queries; default off to
+                 follow the benchmark's no-secondary-index convention)
+  --db NAME      Database name (default: stats)
+  --pguser USER  PostgreSQL user (default: postgres)
+  --pghost HOST  PostgreSQL host (default: localhost)
+  --pgport PORT  PostgreSQL port (default: 5432)
+  -h, --help     Show this help
 
-环境变量: PGHOST, PGPORT, PGUSER, PGPASSWORD, DB_NAME, BUILD_INDEX
-示例:
+Env: PGHOST, PGPORT, PGUSER, PGPASSWORD, DB_NAME, BUILD_INDEX
+Example:
   PGPASSWORD=postgres ./benchmarks/init_stats_ceb.sh
   PGPASSWORD=postgres FORCE=1 ./benchmarks/init_stats_ceb.sh
 EOF
@@ -90,7 +95,7 @@ while [[ $# -gt 0 ]]; do
     --pghost) PGHOST="${2:-}"; shift 2 ;;
     --pgport) PGPORT="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "未知参数: $1" >&2; usage >&2; exit 1 ;;
+    *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
 done
 
@@ -100,33 +105,33 @@ psql_main() { psql -X -v ON_ERROR_STOP=1 -P pager=off "$@"; }
 psql_db()   { psql -X -v ON_ERROR_STOP=1 -P pager=off -d "${DB_NAME}" "$@"; }
 
 # ---------------------------------------------------------------------------
-# 前置检查
+# Preconditions
 # ---------------------------------------------------------------------------
 if ! command -v psql >/dev/null 2>&1; then
-  echo "错误: 未找到 psql, 请先安装 PostgreSQL 客户端。" >&2
+  echo "Error: psql not found; install the PostgreSQL client first." >&2
   exit 1
 fi
 if [[ ! -f "${SCHEMA_SQL}" ]]; then
-  echo "错误: 找不到 schema 文件: ${SCHEMA_SQL}" >&2
+  echo "Error: schema file not found: ${SCHEMA_SQL}" >&2
   exit 1
 fi
 
-echo "==> PostgreSQL 连接: ${PGUSER}@${PGHOST}:${PGPORT}"
-echo "==> 目标数据库: ${DB_NAME}   FORCE=${FORCE}   BUILD_INDEX=${BUILD_INDEX}"
+echo "==> PostgreSQL connection: ${PGUSER}@${PGHOST}:${PGPORT}"
+echo "==> Target database: ${DB_NAME}   FORCE=${FORCE}   BUILD_INDEX=${BUILD_INDEX}"
 echo "==> Schema: ${SCHEMA_SQL}"
 
 if ! psql_main -d postgres -tAc "SELECT 1" >/dev/null 2>&1; then
-  echo "错误: 无法连接到 PostgreSQL 服务器 (${PGUSER}@${PGHOST}:${PGPORT})." >&2
+  echo "Error: cannot connect to PostgreSQL server (${PGUSER}@${PGHOST}:${PGPORT})." >&2
   exit 1
 fi
-echo "==> 服务器连接成功"
+echo "==> Server connection OK"
 
 # ---------------------------------------------------------------------------
-# 辅助函数
+# Helper functions
 # ---------------------------------------------------------------------------
 db_exists() { psql_main -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; }
 
-# 返回某表当前行数 (表不存在或为空则返回空)
+# Return the row count of a table (empty if the table does not exist or is empty)
 table_rows() {
   psql_db -tAc "SELECT (SELECT count(*) FROM ${1})::text
                 WHERE EXISTS (
@@ -146,33 +151,33 @@ is_fully_loaded() {
 }
 
 # ---------------------------------------------------------------------------
-# Step 0: 数据库存在性
+# Step 0: database existence
 # ---------------------------------------------------------------------------
 if [[ "$FORCE" == "1" ]]; then
-  echo "==> [FORCE] 删除并重建数据库 '${DB_NAME}' ..."
+  echo "==> [FORCE] dropping and rebuilding database '${DB_NAME}' ..."
   psql_main -d postgres -c "DROP DATABASE IF EXISTS \"${DB_NAME}\" WITH (FORCE);"
   createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "${DB_NAME}"
 elif ! db_exists; then
-  echo "==> 数据库 '${DB_NAME}' 不存在, 创建中 ..."
+  echo "==> Database '${DB_NAME}' does not exist; creating ..."
   createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "${DB_NAME}"
 else
-  echo "==> 数据库 '${DB_NAME}' 已存在, 复用。"
+  echo "==> Database '${DB_NAME}' already exists; reusing."
 fi
 
 # ---------------------------------------------------------------------------
-# Step 1: 应用 schema (幂等)
-#   将 "CREATE TABLE" 替换为 "CREATE TABLE IF NOT EXISTS"
+# Step 1: apply schema (idempotent)
+#   Replace "CREATE TABLE" with "CREATE TABLE IF NOT EXISTS"
 # ---------------------------------------------------------------------------
-echo "==> 应用 schema: ${SCHEMA_SQL}"
+echo "==> Applying schema: ${SCHEMA_SQL}"
 TMP_SCHEMA="$(mktemp)"
 sed -E 's/^CREATE TABLE /CREATE TABLE IF NOT EXISTS /I' "${SCHEMA_SQL}" > "${TMP_SCHEMA}"
-psql_db -q -f "${TMP_SCHEMA}" || { echo "错误: schema 应用失败。" >&2; rm -f "${TMP_SCHEMA}"; exit 1; }
+psql_db -q -f "${TMP_SCHEMA}" || { echo "Error: schema application failed." >&2; rm -f "${TMP_SCHEMA}"; exit 1; }
 rm -f "${TMP_SCHEMA}"
 
 # ---------------------------------------------------------------------------
-# Step 2: 导入 CSV 数据
-#   CSV 带 header, 用 HEADER true; 空字段为 NULL (NULL '').
-#   无内嵌引号/反斜杠, 直接用标准 FORMAT csv.
+# Step 2: load CSV data
+#   CSV has a header; use HEADER true; empty fields -> NULL (NULL '').
+#   No embedded quotes/backslashes, standard FORMAT csv.
 # ---------------------------------------------------------------------------
 missing=()
 for t in "${ALL_TABLES[@]}"; do
@@ -181,17 +186,17 @@ for t in "${ALL_TABLES[@]}"; do
 done
 
 if [[ "${#missing[@]}" -eq 0 ]]; then
-  echo "==> 所有表均已导入数据, 跳过数据导入。"
+  echo "==> All tables already loaded; skipping data import."
 else
-  echo "==> 待导入的表 (${#missing[@]} 个): ${missing[*]}"
+  echo "==> Tables to load (${#missing[@]}): ${missing[*]}"
   for t in "${missing[@]}"; do
     csv="${DATA_DIR}/${t}.csv"
     if [[ ! -f "$csv" ]]; then
-      echo "    警告: 找不到数据文件 ${csv}, 跳过表 ${t}" >&2
+      echo "    Warning: data file not found ${csv}; skipping table ${t}" >&2
       continue
     fi
-    echo "    ── 导入表 '${t}' 自 ${t}.csv"
-    # CSV 带 header 行, 自动跳过; 空字段 -> NULL
+    echo "    -- loading table '${t}' from ${t}.csv"
+    # CSV has a header row (auto-skipped); empty fields -> NULL
     psql_db -q <<SQL
 \copy ${t} from '${csv}' WITH (FORMAT csv, HEADER true, NULL '');
 SQL
@@ -199,12 +204,13 @@ SQL
 fi
 
 # ---------------------------------------------------------------------------
-# Step 3: (可选) 创建二级索引
-#   默认关闭。启用后为 join 列建索引以加速查询;
-#   注意: 这会影响 join order 基准的公平性, 谨慎使用。
+# Step 3: (optional) create secondary indexes
+#   Off by default. When enabled, build indexes on join columns to speed up
+#   queries; note this may affect the fairness of join-order benchmarks, use
+#   with care.
 # ---------------------------------------------------------------------------
 if [[ "${BUILD_INDEX}" == "1" ]]; then
-  echo "==> 创建二级索引 ..."
+  echo "==> Creating secondary indexes ..."
   psql_db -q <<'SQL'
 CREATE INDEX IF NOT EXISTS idx_comments_userid   ON comments  (UserId);
 CREATE INDEX IF NOT EXISTS idx_comments_postid   ON comments  (PostId);
@@ -223,14 +229,8 @@ fi
 # ---------------------------------------------------------------------------
 # Step 4: ANALYZE
 # ---------------------------------------------------------------------------
-echo "==> 运行 ANALYZE ..."
+echo "==> Running ANALYZE ..."
 psql_db -c "ANALYZE;" >/dev/null
 
 echo
-echo "===> 完成! 数据库 '${DB_NAME}' 已就绪。"
-if is_fully_loaded; then
-  echo "     所有 ${#ALL_TABLES[@]} 张表均已导入完整数据。"
-else
-  echo "     警告: 仍有表未导入数据, 请检查上面的日志。" >&2
-fi
-echo "     连接: psql -h ${PGHOST} -p ${PGPORT} -U ${PGUSER} -d ${DB_NAME}"
+echo "===> Done! Database '${DB_NAME}' is ready."

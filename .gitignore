@@ -1,78 +1,80 @@
-# 忽略各基准的原始数据文件 (CSV/tgz), 但不忽略 schema 等 SQL 源文件
+# Ignore raw benchmark data files (CSV/tgz); do not ignore SQL schema sources
 benchmarks/*/data/*.csv
 benchmarks/*/data/*.tgz
 benchmarks/*/data/*.tar
 benchmarks/*/data/*.gz
 !benchmarks/*/data/*.sql
 
-# Census 1990 大数据文件 (保留 .txt 文档, 只忽略这些超大原始数据)
+# Census 1990 large data files (keep .txt docs; ignore only the very large raw data)
 benchmarks/Census/data/USCensus1990.data.txt
 benchmarks/Census/data/USCensus1990raw.data.txt
 benchmarks/Census/data/us+census+data+1990.zip
 
-# Python 虚拟环境 / 缓存 / 实验输出
+# Python virtual env / caches / experiment output
 .venv/
 
-# 临时分析脚本 (前缀 tmp_ 的本地草稿, 不纳入 git)
+# Temporary analysis scripts (tmp_ prefix local drafts, not tracked)
 scripts/tmp_*
 __pycache__/
 *.pyc
 
-# 实验输出: 默认忽略 results/ 下所有文件, 但白名单纳入"论文 primary 工件"
-# (论文图表/数值直接依赖、重跑成本高、无法从脚本再生的测量数据)。
-# 详见 docs/reproducibility.md 的"数值 ↔ 源 JSON ↔ 复现脚本"清单。
+# Experiment output: results/ ignored by default, but 'paper primary artifacts'
+# are whitelisted below (directly depended on by figures/numbers, expensive to
+# rerun, measured data not regenerable from scripts). See the manifest in
+# docs/reproducibility.md (number <-> source JSON <-> reproduction script).
 output/
 experiments/
 
-# ---- 论文 primary 工件 (必须纳入 git, 保证图表与数值可复现) ----
-# 其余 results/ 下文件保持忽略 (smoke / 临时探测 / 可再生中间量)
-# 注: 否定(!)模式尾部不要加 '# 注释' — 会破坏 gitignore 对该规则的解析
+# ---- paper primary artifacts (must be tracked; figures/numbers reproducible) ----
+# Everything else under results/ stays ignored (smoke / temporary probes / regenerable intermediates)
+# NOTE: do NOT put a trailing '# comment' on a negation (!) line -- it breaks
+# gitignore parsing and the file silently stays ignored.
 results/*
-# 三个论文图的数据源头 + RQ1 容量轴 {10..10000} 完整 (取代旧的 full_multi)
+# Data source for the paper's figures + full RQ1 capacity axis {10..10000} (replaces old full_multi)
 !results/phase1_ceb_single_mask_6level.json
-# CENSUS {100,1000,10000} 约 21h 正式基线 (30,856 候选, 含一次中断后续跑)
+# CENSUS {100,1000,10000} ~21h official baseline (30,856 candidates, incl. one resume after interruption)
 !results/phase1_census_mcv_multi.json
-# CENSUS 低档探测 (single-col-50, 历史参考)
+# CENSUS low-level probe (single-col-50, historical)
 !results/phase1_census_mcv_low.json
-# CENSUS 正式重跑 (single-col-10000) 最终数据
+# CENSUS official rerun (single-col-10000) final data
 !results/phase1_census_mcv_low_t10000.json
-# CENSUS 完整 6 级轴 [10,25,50,100,1000,10000] (由 merge_phase1.py 合并低/高两档)
+# CENSUS full six-level axis [10,25,50,100,1000,10000] (merged low/high by merge_phase1.py)
 !results/phase1_census_mcv_6level.json
-# CENSUS 6 级 budget-quality 指标 (Fig:census_budget_quality 数据源头)
+# CENSUS six-level budget-quality metrics (Fig:census_budget_quality data source)
 !results/p3_census_metrics.json
-# stats_CEB 6 级 budget-quality 指标 (Fig:budgetquality 数据源头)
+# stats_CEB six-level budget-quality metrics (Fig:budgetquality data source)
 !results/p3_metrics.json
-# RQ3 6级重算结果 (tab:greedy2/whathowmuch/ablation/meanrob 数据源头)
+# RQ3 six-level recomputed results (tab:greedy2/whathowmuch/ablation/meanrob sources)
 !results/p6_greedy_strong.json
 !results/p2_what_vs_howmuch.json
 !results/p5_ablation_5k.json
 !results/p5_ablation_100k.json
 !results/p10_mean_robustness.json
-# §measure-runtime 单查询 6 级 T_q(b) 实测 (query.3 CENSUS + st.144 stats_CEB_single)
+# sec:measure-runtime single-query six-level T_q(b) measurements (query.3 CENSUS + st.144 stats_CEB_single)
 !results/tq6_model_vs_measured.json
 !results/tq6_stats_ceb_model_vs_measured.json
 !results/tq6_full.log
 !results/tq6_stats_ceb.log
 !results/tq6_smoke.json
 !results/tq6_smoke.log
-# stats_CEB mcv 测量与复现
+# stats_CEB mcv measurement & reproduction
 !results/phase1_stats_ceb_mcv.json
 !results/phase1_stats_ceb_mcv_r3.json
-# 各 phase1 正式运行的测量日志 (记录完整配置/进度, 可审计性)
+# Official phase-1 run logs (config/progress, auditability)
 !results/phase1_ceb_single_6level.log
 !results/phase1_census_low.log
 !results/phase1_census_low_t10000.log
 !results/phase1_census_mcv_multi.log
 !results/probe_census_fine_capacity.log
 
-# 上游 End-to-End-CardEst-Benchmark 嵌套仓库（仅作数据/参考来源，不纳入本仓库）
+# Upstream End-to-End-CardEst-Benchmark nested repo (data/reference source only, not tracked)
 End-to-End-CardEst-Benchmark/
 
-# PostgreSQL 16.14 源码包与解压目录（本地源码参考，不纳入本仓库）
+# PostgreSQL 16.14 source tarball & extracted dir (local source reference, not tracked)
 postgresql-16.14.tar.bz2
 postgresql-16.14/
 
-# VLDB 论文 LaTeX 构建产物（保留 .tex/.bib/.cls/.bst/outline，忽略编译产物）
+# VLDB paper LaTeX build artifacts (keep .tex/.bib/.cls/.bst; ignore build outputs)
 paper/*.pdf
 paper/*.aux
 paper/*.bbl
@@ -82,5 +84,5 @@ paper/*.out
 paper/comment.cut
 paper/*.synctex.gz
 
-# 官方 VLDB 模板下载包（源 zip 归档，不纳入版本库；模板文件已解压到 paper/
+# Official VLDB template download zip (source archive, not tracked; template files extracted into paper/)
 Official_VLDB_Template.zip
