@@ -49,11 +49,13 @@ We observe that PostgreSQL \texttt{CREATE STATISTICS} selection is not just
 \texttt{statistics\_target}). We re-frame it as \emph{capacity-aware
 selection}: under a storage budget, should we spend on adding a statistic or
 on upgrading an existing one to a higher-capacity target? Our central finding is
-an \emph{empirically observed sparse regime}: across the two single-table
+\emph{one-stat sufficiency}: for an individual query, at most one well-chosen
+multi-variate statistic captures nearly all attainable estimation improvement,
+regardless of how large the candidate pool is. Across the two single-table
 workloads we evaluate (stats\_CEB\_single and the wide 69-column CENSUS
 benchmark), one well-chosen 2-/3-column MCV candidate captures
 nearly all improvement attainable from the evaluated candidate family
-per query. Exploiting this regime --- by restricting each
+per query. Exploiting this property --- by restricting each
 query to a single statistic --- makes the surrogate objective
 \emph{exactly linear} and the budgeted MILP solvable in seconds at
 full-workload scale. A catalog-mask protocol makes the enormous candidate $\times$ capacity
@@ -130,21 +132,27 @@ DBA would more likely \emph{lower} capacity to save storage than raise it
 (\S\ref{sec:rq1}). Capacity is therefore a two-sided decision that must be made
 jointly with \emph{which} statistics to build.
 
-\textbf{(B) A measurable sparse regime, discovered, not assumed --- and
-bounded.} At first glance the problem looks like a combinatorial multi-select.
-Our measurements show otherwise for the two evaluated single-table workloads:
-one well-chosen multivariate statistic --- a \emph{single-statistic dominance}
-regime --- captures nearly all improvement attainable from the evaluated 2-
-/3-column MCV candidates per query (adding a second or third helps ~nothing;
-\S\ref{sec:rq2} falsifies this several ways). This was \textbf{discovered},
+\textbf{(B) One-stat sufficiency: a per-query property, discovered not
+assumed --- and bounded.} At first glance the problem looks like a
+combinatorial multi-select. Our measurements show otherwise for the two
+evaluated single-table workloads: for an individual query, at most one
+well-chosen multi-variate statistic captures nearly all improvement attainable
+from the evaluated 2-/3-column MCV candidates (adding a second or third helps
+~nothing; \S\ref{sec:rq2} falsifies this several ways). Concretely, a single
+statistic already captures $\ge$0.9 of the best achievable multi-statistic
+gain for \emph{every} query with repair room, with a coverage median of 1.000
+(\S\ref{sec:rq2}). This \emph{one-stat
+sufficiency} is a \emph{per-query} property, distinct from general sparsity of
+the candidate space: the global pool of candidate statistics is large, yet each
+query needs only one of them (\S\ref{sec:rq2}). It was \textbf{discovered},
 not assumed, and it has a direct consequence: restricted to at most one
 statistic per query, the objective has no interaction term and is
 \emph{exactly linear} (Prop.~\ref{prop:linear}) --- a formal property of the
 \emph{surrogate} within an empirically characterized regime, whose faithfulness
 to PostgreSQL is determined by the E2E experiments (\S\ref{sec:e2e}). This
-regime is an empirical hypothesis with a mechanistic account --- a query's error
-is typically dominated by the one strongly-correlated column cluster --- and a
-deliberately probed failure boundary: it collapses on queries driven by
+property is an empirical hypothesis with a mechanistic account --- a query's
+error is typically dominated by the one strongly-correlated column cluster ---
+and a deliberately probed failure boundary: it collapses on queries driven by
 several independent clusters (a controlled stress test, \S\ref{sec:rq2},
 Table~\ref{tab:sweep}; mechanism and boundary in \S\ref{sec:disc-sparsity}).
 
@@ -180,8 +188,8 @@ extended-statistics selection --- the central problem is a joint
 \emph{what-and-how-much} allocation of a storage budget across statistic
 identities \emph{and} their \texttt{statistics\_target} capacity levels,
 solvable as a budgeted MILP (\S\ref{sec:formulation}, \S\ref{sec:milp}); (ii) an
-\emph{empirically observed sparse regime} on the two evaluated single-table
-workloads --- one dominant 2-/3-column MCV candidate per query --- whose
+\emph{empirically observed one-stat sufficiency} on the two evaluated single-table
+workloads --- at most one 2-/3-column MCV candidate per query --- whose
 linearity is a formal consequence (Prop.~\ref{prop:linear}), and which is what
 makes the optimization tractable (\S\ref{sec:rq2}); (iii) a \emph{scalable
 measurement infrastructure}, the catalog-mask protocol, that turns the
@@ -1017,7 +1025,7 @@ likewise grows with target and with the number of installed statistics,
 \subsection{RQ2: Is One Statistic per Query Sufficient?}
 \label{sec:rq2}
 
-We do not test whether one-statistic-per-query sparsity holds \emph{by
+We do not test whether one-stat sufficiency holds \emph{by
 construction}; we test whether it survives progressively stronger attempts to
 falsify it: (1) real-workload top-$k$ joint measurement, (2) exhaustive
 enumeration of arbitrary subsets, (3) wider 4-/5-column candidates, (4) a
@@ -1036,7 +1044,7 @@ artefact of a small candidate space: it holds on the widest, highest-error,
 most-candidate-dense workload in our study.
 
 This is not just anecdotal. The \emph{distribution} over the whole 632-query
-workload makes it precise. The natural sparsity
+workload makes it precise. The natural one-stat-sufficiency
 question is \emph{non-circular}: how much of the improvement of the measured
 \emph{best $k$-subset} does a single statistic already capture? We define the
 top-1 coverage ratio against the measured joint q-error of the best $k$
@@ -1081,15 +1089,16 @@ workloads.
 
 \textbf{Step 3: candidate-width sensitivity.}
 A reviewer-driven check is whether the 2/3-column candidate restriction itself
-manufactures sparsity. We relax the width on the hardest CENSUS queries (where
+manufactures one-stat sufficiency. We relax the width on the hardest CENSUS
+queries (where
 2/3-column candidates leave the largest residual) and re-measure the best
 single-candidate q-error with 4- and 5-column MCVs admitted (mask protocol,
 identical to \S\ref{sec:measure}): query.62 drops $1.406\to1.023$, query.295
 $1.099\to1.014$, query.382 $1.119\to1.020$.
 
-Two observations. First, \emph{sparsity is robust to width}: in every case the
-best solution is still a \emph{single} statistic (query.62's best at 5 columns
-is one 5-column MCV), never a combination ---
+Two observations. First, \emph{one-stat sufficiency is robust to width}: in
+every case the best solution is still a \emph{single} statistic (query.62's best
+at 5 columns is one 5-column MCV), never a combination ---
 so the one-statistic-per-query structure that makes the objective linear
 survives width relaxation. Second, \emph{the 2/3-column scope is a real
 limitation}: on hard queries where 3 columns leave residual error, a single
@@ -1102,8 +1111,9 @@ next step. On the evaluated single-table workloads over \texttt{posts}, the
 2/3-column candidates already reach $\approx$1.0 everywhere, so the width effect
 is confined to the harder CENSUS tail.
 
-\textbf{Step 4: a controlled many-cluster stress test --- where sparsity fails.}
-The sparse regime is not universal, so we build a controlled \emph{failure
+\textbf{Step 4: a controlled many-cluster stress test --- where one-stat
+sufficiency fails.}
+One-stat sufficiency is not universal, so we build a controlled \emph{failure
 test} matching the mechanistic hypothesis (\S\ref{sec:disc-sparsity}): on a
 synthetic table we vary the number $K$ of \emph{mutually independent},
 perfectly-correlated column clusters a query filters on, and measure the
@@ -1112,18 +1122,18 @@ top-1 vs.\ top-$K$ coverage ratio
   \operatorname{cov}_K = \frac{e^0 - e(\{s_1\})}{e^0 - e(\{s_1,\dots,s_K\})},
 \]
 the fraction of the best $K$-statistic improvement a \emph{single} best
-statistic captures. Sparsity holds exactly only for $K{=}1$ (one 3-column MCV
-captures the whole error and a second changes nothing) and \emph{decays} with
-$K$ (Table \ref{tab:sweep}): $\operatorname{cov}_K$ is $1.000$ at $K{=}1$,
+statistic captures. One-stat sufficiency holds exactly only for $K{=}1$ (one
+3-column MCV captures the whole error and a second changes nothing) and
+\emph{decays} with $K$ (Table \ref{tab:sweep}): $\operatorname{cov}_K$ is $1.000$ at $K{=}1$,
 drops to $0.90$ at $K{=}2$, and collapses to $\approx 0$ once three or more
 independent clusters coexist --- the monotone failure regime where the
 multi-select model (\S\ref{sec:multi}) is required.
 
 \begin{table}[t]
-\caption{Controlled sparsity decay. As a query is driven by $K$ mutually
-independent correlated clusters, the single best statistic captures a shrinking
-fraction ($\operatorname{cov}_K$) of the improvement of the best $K$-statistic
-set. Sparsity holds ($1.000$) only for $K{=}1$; it fails once $K\ge 3$.}
+\caption{Controlled one-stat-sufficiency decay. As a query is driven by $K$
+mutually independent correlated clusters, the single best statistic captures a
+shrinking fraction ($\operatorname{cov}_K$) of the improvement of the best $K$-statistic
+set. One-stat sufficiency holds ($1.000$) only for $K{=}1$; it fails once $K\ge 3$.}
 \label{tab:sweep}
 \small
 \begin{tabular}{lcccc}
@@ -1584,12 +1594,12 @@ controllable many-cluster synthetic sweeps (\S\ref{sec:rq2}, Table~\ref{tab:swee
 probe the one orthogonal dimension where the sparse assumption itself breaks.
 Coverage is by design, not by convenience.
 
-\subsection{Why Does Sparsity Occur? A Mechanistic Hypothesis}
+\subsection{Why Does One-Stat Sufficiency Occur? A Mechanistic Hypothesis}
 \label{sec:disc-sparsity}
 
-The sparse finding admits a mechanistic account that both \emph{explains} it
-and pins down where it should fail. A single-table selection query's error is
-typically dominated by \emph{one} correlated column cluster: its restriction
+The one-stat-sufficiency finding admits a mechanistic account that both
+\emph{explains} it and pins down where it should fail. A single-table selection
+query's error is typically dominated by \emph{one} correlated column cluster: its restriction
 clause is a conjunction of predicates whose selectivity error is largest where
 columns are most strongly correlated (where independence fails hardest), and the
 planner's default estimate is about as wrong as the worst such sub-clause. A
@@ -1604,11 +1614,12 @@ This is consistent with every observation we report: $k{=}2,3$ add nothing
 \emph{upgrading} the dominant statistic matters more than adding others (RQ3);
 and the sparse cap costs no quality in the ablation (\S\ref{sec:ablation}). It
 also predicts the boundary of our claim. Workloads where a query is genuinely
-driven by \emph{several} independent correlated clusters violate sparsity and
-warrant the multi-select model ($\S\ref{sec:formulation}$); our controlled
-stress test (\S\ref{sec:rq2}, Table \ref{tab:sweep}) confirms this directly --
+driven by \emph{several} independent correlated clusters violate one-stat
+sufficiency and warrant the multi-select model ($\S\ref{sec:formulation}$); our
+controlled stress test (\S\ref{sec:rq2}, Table \ref{tab:sweep}) confirms this
+ directly --
 a query over two independent clusters goes from top-1 $=$ 100 to top-2 $=$ 1.00,
-and sparsity collapses once $K\ge 3$. Characterising how often that regime
+and one-stat sufficiency collapses once $K\ge 3$. Characterising how often that regime
 occurs on real workloads is an open question below.
 
 \subsection{What Is Being Optimized}
@@ -1623,8 +1634,8 @@ Fig.~\ref{fig:budgetquality} show that the budget is, in practice, spent on the
 ``how much'' axis.
 
 A DBA often values the \emph{maintenance} burden of statistics over their
-persistent size, and here the sparse regime helps directly: because each query
-needs at most one dominant statistic (\S\ref{sec:rq2}), the selected set is
+persistent size, and here one-stat sufficiency helps directly: because each
+query needs at most one dominant statistic (\S\ref{sec:rq2}), the selected set is
 \emph{small} (a handful of statistics at practical budgets, Table
 \ref{tab:greedy2}), so both the number of objects to create and the ANALYZE
 volume to refresh them stay low --- maintenance cost is reduced by construction,
@@ -1729,10 +1740,10 @@ replaces the storage-only budget with an end-to-end maintenance budget.
 (3) \emph{Upgrade vs.\ add}: our data show a smooth capacity-only curve on
 stats\_CEB\_single and a large tail on CENSUS, but a principled
 ``upgrade-vs-add'' decision boundary --- e.g.\ a marginal-value heuristic
-(quality gained per storage unit) --- is open. (4) \emph{When does sparsity
-fail?}: identifying workloads with genuinely multiple independent correlated
-clusters (the regime needing the multi-select model) is the most important open
-question. (5) \emph{Limits}: we consider MCV statistics on single-table
+(quality gained per storage unit) --- is open. (4) \emph{When does one-stat
+sufficiency fail?}: identifying workloads with genuinely multiple independent
+correlated clusters (the regime needing the multi-select model) is the most
+important open question. (5) \emph{Limits}: we consider MCV statistics on single-table
 workloads; joins need other techniques, there is a real limit on statistics per
 relation, and our 2-/3-column candidate family understates achievable quality on
 harder CENSUS queries, where 4-/5-column candidates help --- extending candidate
@@ -1749,10 +1760,11 @@ requirements or a budget-dependent crossover point --- is open.
 
 Extended-statistics selection should be treated as a joint \emph{which} and
 \emph{how much} decision. On the two single-table workloads we evaluate
-(stats\_CEB\_single and the wide CENSUS benchmark) we observe a sparse regime
-among the evaluated 2-/3-column MCV candidates --- one dominant statistic per
-query --- which, together with capacity levels, makes the budget-constrained
-problem an exactly-linear MILP solvable in seconds at full-workload scale, via
+(stats\_CEB\_single and the wide CENSUS benchmark) we observe one-stat
+sufficiency among the evaluated 2-/3-column MCV candidates --- at most one
+dominant statistic per query --- which, together with capacity levels, makes the
+budget-constrained problem an exactly-linear MILP solvable in seconds at
+full-workload scale, via
 a catalog-mask protocol that makes per-candidate, per-capacity measurement
 feasible on wide tables. End-to-end validation shows per-candidate prediction is
 sound and isolates the residual risk to planner cross-talk among co-installed
@@ -1766,11 +1778,11 @@ is not an MILP \emph{per se}, nor a claim that extended-statistics selection is
 inherently sparse. It is the combination of three scoped findings: (i) a
 \emph{capacity-aware} reformulation --- the ``what $\times$ how much'' budget
 allocation across \texttt{statistics\_target} --- which is new and independent
-of sparsity; (ii) a \emph{measurable sparse regime}, characterized empirically
-on the two evaluated single-table workloads (with an explicit, synthetic
-demonstration of where it fails); and (iii) a \emph{scalable measurement}
-protocol that turns the candidate $\times$ capacity space into data the
-optimizer can consume. Taken together --- not any single one --- these make
+of sufficiency; (ii) a \emph{measurable one-stat sufficiency}, characterized
+empirically on the two evaluated single-table workloads (with an explicit,
+synthetic demonstration of where it fails); and (iii) a \emph{scalable
+measurement} protocol that turns the candidate $\times$ capacity space into data
+the optimizer can consume. Taken together --- not any single one --- these make
 capacity-aware extended-statistics selection \emph{optimizable and
 deployable} on the workloads we evaluate; the general (Boolean-multi-select,
 arbitrary-statistic-kind, join-dominated) version of the problem is explicitly
