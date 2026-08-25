@@ -58,9 +58,13 @@ The work rests on three findings/components:
 
 * **Census (USCensus 1990)** — a wide, 69-column single-table workload
   (data-capped statistics).
+  Source: <https://github.com/wuziniu/BayesCard/tree/master>
 * **JOB / IMDB** — join-heavy workload (negative control).
-* **stats_CEB** — the Cardinality Estimation Benchmark's single-table and join
-  workloads (target-capped statistics).
+  Source: <https://github.com/gregrahn/join-order-benchmark>
+* **stats_CEB / stats_CEB_single** — the Cardinality Estimation Benchmark's
+  single-table and join workloads (target-capped statistics);
+  **job-light** is the same benchmark's IMDB join sub-plans.
+  Source: <https://github.com/Nathaniel-Han/End-to-End-CardEst-Benchmark/tree/master>
 
 Initialize a benchmark with the corresponding `benchmarks/init_*.sh` script
 (e.g. `bash benchmarks/init_census.sh`).
