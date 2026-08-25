@@ -23,7 +23,7 @@
 
 \begin{document}
 
-\title{Choosing What and How Much: Budgeted Selection of PostgreSQL Extended Statistics}
+\title{One-Stat Sufficiency Guided Budgeted Selection of PostgreSQL Extended Statistics}
 
 % TODO: authors. Placeholders below; fill real authors before submission.
 \author{Author One}
@@ -43,29 +43,32 @@
 \email{first.last@example.com}
 
 \begin{abstract}
-We observe that PostgreSQL \texttt{CREATE STATISTICS} selection is not just
-``which column combinations'' but a joint decision of \emph{which}
-(table, columns) and \emph{how much} capacity (each statistic's
-\texttt{statistics\_target}). We re-frame it as \emph{capacity-aware
-selection}: under a storage budget, should we spend on adding a statistic or
-on upgrading an existing one to a higher-capacity target? Our central finding is
-\emph{one-stat sufficiency}: for an individual query, at most one well-chosen
-multi-variate statistic captures nearly all attainable estimation improvement,
-regardless of how large the candidate pool is. Across the two single-table
-workloads we evaluate (stats\_CEB\_single and the wide 69-column CENSUS
-benchmark), one well-chosen 2-/3-column MCV candidate captures
-nearly all improvement attainable from the evaluated candidate family
-per query. Exploiting this property --- by restricting each
-query to a single statistic --- makes the surrogate objective
-\emph{exactly linear} and the budgeted MILP solvable in seconds at
-full-workload scale. A catalog-mask protocol makes the enormous candidate $\times$ capacity
-space measurable on wide tables. End-to-end validation on PostgreSQL 16 shows
-individual candidate measurements are predictive, but reveals that co-installed
-overlapping statistics cause planner interference; we give \emph{two deployment
-modes} for this: a conservative \emph{global-disjoint} mode with near-exact
-predictability, and an unconstrained mode followed by lightweight
-planner-validation. Join-heavy workloads act as a
-negative control.
+Cardinality-estimation errors are a primary cause of degraded execution plans
+and query-performance regression in PostgreSQL. Multivariate extended
+statistics correct the column-independence assumption and fix estimation
+inaccuracy, but selecting and configuring them is largely manual, with high
+tuning cost and a steep expertise bar. Existing automated selection optimizes
+only a single dimension --- \emph{which} column combinations to build ---
+ignoring the differential allocation of per-statistic sampling capacity, so it
+cannot trade off estimation accuracy against resource cost under a tight
+budget; co-installed overlapping statistics can also interfere with the
+planner, and redundant statistics add ANALYZE maintenance overhead. We conduct
+an empirical study on large real workloads and identify a per-query property we
+call \emph{one-stat sufficiency}: for most single-table queries, one
+well-chosen multivariate statistic captures nearly all attainable
+cardinality-estimation gain, and additional statistics yield negligible
+marginal benefit while risking planner interference and extra maintenance. We
+design a \emph{catalog-mask} isolation protocol that neutralizes interference
+among co-installed statistics and quantifies each candidate's independent
+storage cost and error-repair benefit, then cast statistics tuning as a
+budgeted integer program that jointly selects \emph{which} column combinations
+(what) and \emph{which} per-statistic sampling capacity (how much). Experiments
+show that, under stringent storage budgets, our approach substantially reduces
+query Q-error, avoids redundant statistics and optimizer interference, and
+stays predictable after deployment; we also characterize the method's
+applicability boundary and analyze the mismatch between storage-cost modeling
+and real ANALYZE maintenance cost, providing empirical grounding and a
+deployable recipe for automated statistics tuning.
 \end{abstract}
 
 \maketitle
