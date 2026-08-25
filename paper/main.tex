@@ -273,14 +273,13 @@ anchored on the PostgreSQL default (100) and extending \emph{below} it (10, 25,
 higher-cardinality combinations). We include sub-default levels deliberately: a
 DBA may legitimately \emph{lower} capacity to save storage on data-capped
 combinations, so the decision axis is two-sided and the menu must be wide
-enough to expose it. The two workloads sit at opposite ends of this axis: the
-CENSUS \texttt{climate} columns are \emph{data-capped} at a very low
-cardinality, so their MCV lists are already full by target 50--100 and raising
-the target above the default changes nothing, whereas the high-cardinality
-\texttt{posts} statistics are \emph{target-capped} and gain from escalation
-(the concrete numbers are in \S\ref{sec:rq1}). Capacity thus sets a
-\emph{per-query} precision floor --- the ``how much'' dimension --- and is a
-genuine decision axis, which motivates allocating it under a shared budget.
+enough to expose it. Capacity sets a \emph{per-query} precision floor --- the
+``how much'' dimension --- and is a genuine decision axis, which motivates
+allocating it under a shared budget. Whether a given combination is best served
+by \emph{raising} or \emph{lowering} its capacity is exactly the
+data-capped vs.\ target-capped distinction we quantify in \S\ref{sec:rq1};
+the two evaluated workloads sit on opposite ends of this axis
+(\S\ref{sec:disc-coverage}).
 
 \subsection{Related Work}
 
@@ -626,12 +625,10 @@ $\approx$9\,MB) are both \emph{small} by production standards; at the
 multi-hundred-GB scale of real workloads $B_0$ is orders of magnitude larger
 and the per-candidate protocol becomes infeasible, making the catalog-mask
 approach the \emph{only} tractable measurement path rather than merely an
-optimization. Because the protocol
-relies on the layout of the system catalog, it is specific to PostgreSQL 16 and
-to \emph{MCV} statistics (\texttt{ndistinct}/\texttt{dependencies} masking is
-untested); both the catalog layout and the planner's OID-order selection
-(\S\ref{sec:switch}) are version-dependent. These are honest limits of the
-implementation, not of the model.
+optimization. Because it relies on the layout of the system catalog and the
+planner's OID-order selection (\S\ref{sec:switch}), Protocol-M is specific to
+PostgreSQL 16 and to \emph{MCV} statistics --- honest limits of the
+implementation, not of the model (\S\ref{sec:disc}, item~5).
 
 \subsection{Sampling Determinism vs.\ Statistics Target}
 \label{sec:measure-determinism}
@@ -1635,13 +1632,12 @@ occurs on real workloads is an open question below.
 \label{sec:disc-objective}
 
 We optimize a \emph{storage} budget (persistent bytes and estimation quality,
-\S\ref{sec:rq3}); ANALYZE maintenance cost is handled separately because
-PostgreSQL couples its sampling effort to the \emph{maximum} target on a
-relation, so we treat capacity as an allocation of persistent storage (the
-coupling and its consequences are unpacked in \S\ref{sec:mechanisms}, and an
-ANALYZE-cost-only variant is an open question, \S\ref{sec:disc} item~2). The
-budget-quality curves in \S\ref{sec:rq3} and Fig.~\ref{fig:budgetquality} show
-that a storage budget is, in practice, spent on the ``how much'' axis.
+\S\ref{sec:rq3}); ANALYZE maintenance cost is treated separately because
+PostgreSQL couples sampling effort to the \emph{maximum} target on a relation
+(\S\ref{sec:mechanisms}); an ANALYZE-cost-only variant is an open question
+(\S\ref{sec:disc} item~2). The budget-quality curves in \S\ref{sec:rq3} and
+Fig.~\ref{fig:budgetquality} show that the budget is, in practice, spent on the
+``how much'' axis.
 
 \emph{Why arithmetic mean q-error.} q-error is bounded below by 1 with a heavy
 upper tail, so the arithmetic mean rewards repairing the worst queries --
