@@ -639,52 +639,29 @@ contributing nothing. This is why measurements use target\,10000 (sometimes 1000
 for cross-checks): exactly reproducible, with only accuracy varying with
 capacity.
 
-\emph{Why we fixed a large single-column target.} Three independent reasons
-drive the choice of a generous per-column \texttt{statistics\_target} rather
-than PostgreSQL's default of 100. First, \emph{determinism}: as just measured,
-target 100 leaves a $1$--$2\%$ run-to-run drift that would make any
-\emph{relative} comparison of q-errors across capacity levels unreliable,
-whereas target $\ge$1000 is exactly reproducible (CV $0$). Second,
-\emph{completeness}: at low targets, high-cardinality statistics can be built
-\emph{empty} (a \texttt{NULL} payload that contributes nothing), so a small
-single-column target risks a degraded, non-credible baseline. Third,
-\emph{attribution} (\S\ref{sec:rq1}): with a maximally precise single-column
-baseline, any improvement attributed to an extended statistic is a \emph{pure}
-effect of the column correlation it captures, not of compensating for a coarse
-per-column estimate. These three requirements jointly and necessarily make the
-single-column ANALYZE \emph{expensive} on a wide table --- a single CENSUS
-ANALYZE at target\,10000 costs $\approx$22s --- which is precisely the cost that
-forces the catalog-mask protocol (\S\ref{sec:measure-naive},
-\S\ref{sec:measure-mask}). The fixed large single-column target and
-Protocol-M are therefore two halves of one design decision, not independent
-choices.
-
-\emph{The single-column target is fixed, not swept.} In principle the
-per-column statistics also carry a capacity axis: \texttt{statistics\_target}
-also caps a column histogram/MCV's resolution, so raising it is a (postponed)
-decision a DBA could in principle make. We deliberately \emph{do not} make
-single-column capacity a decision variable in this paper: PostgreSQL builds
-per-column statistics automatically (unlike extended statistics, which are
-only created on explicit \texttt{CREATE}), so the single-column target is a
-default, non-selected baseline. We instead fix it at a generous
-\texttt{statistics\_target}=10000 and focus our budgeted capacity decision
-entirely on extended statistics --- the axis whose construction is our new
-choice. Concretely, the \emph{per-column} statistics that drive the baseline
-are always measured at \texttt{statistics\_target}=10000 while only the
-\emph{extended} statistics' capacity varies over the evaluated menu
-$\{10, 25, 50, 100, 1000, 10000\}$.
-Equivalently, every
-per-candidate q-error $e_{is}$ is measured against the \emph{same}, maximally
-precise single-column baseline, so the extended statistic's capacity is the
-\emph{only} axis that changes between levels. This isolates the
-\emph{marginal} effect of the column correlation: because the single-column
-estimates are already near-exact, the improvement reported for a candidate
-comes from the correlation it captures, not from patching a coarse
-single-column estimate. Consequently most queries have no candidate at all ---
-their selection predicates are served well by the fixed single-column
-statistics, and their baseline q-error is already $\approx$1 (79\% of the 452
-no-candidate queries on stats\_CEB\_single are exactly $1.0$; the remaining
-21\% are $\le 1.1$).
+\emph{Why a fixed large single-column target.} We deliberately fix the
+per-column \texttt{statistics\_target} at 10000 rather than PostgreSQL's
+default of 100, for three reasons. First, \emph{determinism}: as just measured,
+target 100 leaves a $1$--$2\%$ run-to-run drift that would make \emph{relative}
+q-error comparisons across capacity levels unreliable, whereas target $\ge$1000
+is exactly reproducible (CV $0$). Second, \emph{completeness}: at low targets,
+high-cardinality statistics can be built \emph{empty} (a \texttt{NULL} payload),
+risking a degraded baseline. Third, \emph{attribution}: with a maximally precise
+single-column baseline, any improvement attributed to an extended statistic is
+a \emph{pure} effect of the correlation it captures, not of patching a coarse
+per-column estimate. All per-candidate q-errors $e_{is}$ are measured against
+this \emph{same} baseline, so the extended statistic's capacity is the \emph{only}
+axis that changes between levels. These requirements necessarily make the
+single-column ANALYZE \emph{expensive} on a wide table (a CENSUS ANALYZE at
+target\,10000 costs $\approx$22s), which is precisely what forces the
+catalog-mask protocol (\S\ref{sec:measure-naive},
+\S\ref{sec:measure-mask}) --- the large fixed target and Protocol-M are two
+halves of one design decision. (PostgreSQL builds per-column statistics
+automatically, so its capacity is a non-selected baseline; we do not make it a
+decision variable.) Consequently most queries have no candidate at all --- their
+predicates are served by the fixed single-column statistics, with baseline
+q-error already $\approx$1 (79\% of the 452 no-candidate queries on
+stats\_CEB\_single are exactly $1.0$; the rest are $\le 1.1$).
 
 \subsection{Runtime: A Tunable Measurement-Granularity Cost Model}
 \label{sec:measure-runtime}
@@ -1316,31 +1293,22 @@ not the solve.
 \subsection{RQ5: Does Prediction Survive Real PostgreSQL Execution?}
 \label{sec:rq5}
 
-We split this into two parts (detailed in \S\ref{sec:e2e}).
-\emph{(a) Are individual candidate measurements predictive?} Yes --- building a
-single selected statistic alone reproduces its mask-measured q-error exactly.
-\emph{(b) Are co-installed overlapping statistics independent?} No --- when
-several overlapping MCVs coexist, the planner can switch a query to a
-suboptimal overlapping statistic. This second-order interaction is the one
-place where the sparse model's prediction and the real system diverge, and it is
-removed by the global-disjointness constraint (\S\ref{sec:p1}).
+\emph{(a) Are individual candidate measurements predictive?} Yes --- a single
+deployed statistic reproduces its mask-measured q-error exactly. \emph{(b) Are
+co-installed overlapping statistics independent?} No --- overlapping MCVs let
+the planner switch to a suboptimal one, the one place the surrogate model and
+the real system diverge (removed by global disjointness). Both are validated
+end-to-end in \S\ref{sec:e2e}.
 
 \subsection{RQ6: Does It Help Where Extended Statistics Cannot?}
 \label{sec:rq6}
 
-\textbf{No meaningful benefit --- as a measured sanity check.} On the join-heavy
-\texttt{stats\_CEB} workload (146 join queries, \S\ref{sec:findings}), we run
-the same phase-1 mask measurement (\S\ref{sec:measure}) over every query's
-single-table candidates and observe the effect of deploying the best candidate
-on the \emph{whole-query} q-error. The baseline is already dominated by joins:
-median whole-query q-error 12.3 (mean 33{,}853, max 4{,}177{,}428), with 111 of
-146 queries having a single-table candidate. Deploying the best candidate
-improves the whole-query q-error by a median of only $1.022\times$ (mean
-$1.28\times$, max $4.44\times$) --- essentially no improvement, even though the
-candidate fixes the single-relation part exactly. The residual error lives in
-cross-table join selectivity, which a single-relation MCV cannot repair
-(\S\ref{sec:mechanisms}). This is the expected null result for the negative
-control: the method does not optimize for coverage's sake.
+\textbf{No --- a measured negative control.} On the join-heavy \texttt{stats\_CEB}
+workload (146 join queries), deploying each query's best single-table candidate
+improves whole-query q-error by a median of only $1.022\times$; the residual
+error lives in cross-table join selectivity, which a single-relation MCV cannot
+repair (\S\ref{sec:mechanisms}). This is the expected null result: the method
+does not optimize for coverage's sake.
 
 \subsection{Ablation: Are the Components Necessary?}
 \label{sec:ablation}
