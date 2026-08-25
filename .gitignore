@@ -80,4 +80,4 @@ paper/*.blg
 paper/*.log
 paper/*.out
 paper/comment.cut
-paper/*.synctex.gz
+paper/*.synctex.gzOfficial_VLDB_Template.zip
