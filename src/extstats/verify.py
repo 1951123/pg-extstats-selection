@@ -1,4 +1,4 @@
-"""Phase-2 verifier (方案 2): actually create a chosen set of extended
+"""Phase-2 verifier (Option 2): actually create a chosen set of extended
 statistics and measure the TRUE mean q-error on PostgreSQL.
 
 For a given set of statistics to build (table, columns, capacity, kind) this

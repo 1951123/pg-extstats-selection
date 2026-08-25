@@ -1,39 +1,71 @@
-# extstats — PostgreSQL Extended Statistics Research Toolkit
+# pg-extstats-selection
 
-研究 PostgreSQL 16 扩展统计（`CREATE STATISTICS`）对基数估计的影响，
-覆盖三个基准：**Census**、**JOB/IMDB**、**stats_CEB**。
+Budgeted, capacity-aware selection of PostgreSQL extended statistics.
 
-## 背景
+This repository contains the full research toolkit for the paper
+**_One-Stat Sufficiency Guided Budgeted Selection of PostgreSQL Extended
+Statistics_**: source code, reproducibility scripts, and the primary measured
+data artifacts.
 
-PostgreSQL 的 extended statistics 仅对**基表多列选择谓词**
-（`WHERE col1 <op> const AND col2 <op> const ...`）生效，**不支持连接谓词**
-（`a.id = b.id`）。本工具据此从每个查询中按基表提取出现在选择谓词里的列，
-生成候选扩展统计。
+## Overview
 
-## 目录结构
+PostgreSQL's query optimizer assumes columns are independent; when columns are
+correlated this can misestimate cardinalities by orders of magnitude.
+*Extended statistics* (`CREATE STATISTICS`) capture multivariate correlation,
+but deciding *which* column combinations to build and *how precisely* (each
+statistic's `statistics_target`) is left to the DBA. This project automates
+that choice as a *budgeted allocation* problem.
+
+The work rests on three findings/components:
+
+1. **One-stat sufficiency.** On real single-table workloads, most queries need
+   only *one* well-chosen multivariate statistic to capture nearly all
+   attainable estimation gain; additional statistics yield negligible marginal
+   benefit while risking planner interference.
+2. **Catalog-mask measurement (Protocol-M).** A scalable protocol that builds
+   many candidate statistics in one `ANALYZE` and isolates each by masking the
+   others' payloads in `pg_statistic_ext_data`, making per-candidate,
+   per-capacity measurement feasible on wide tables.
+3. **Budgeted integer program.** Jointly selects *which* column combinations
+   (what) and *which* per-statistic sampling capacity (how much) under a shared
+   storage budget; validated end-to-end on PostgreSQL 16, including the
+   discovery and mitigation of planner interference among co-installed
+   overlapping statistics.
+
+## Repository layout
 
 ```
-extended-stats-optim/
-├── benchmarks/            # 三个基准 (init 脚本 / schema / 查询)
-├── src/extstats/          # Python 源码包
-│   ├── config.py          # 路径、DB 连接、候选统计参数
-│   ├── db.py              # psycopg 连接与执行工具
-│   ├── predicates.py      # sqlglot 提取每基表的选择谓词列
-│   ├── candidates.py      # 由谓词列生成候选列组合 (2..3列, 全局去重)
-│   ├── stats.py           # 生成/执行 CREATE STATISTICS DDL
-│   ├── measure.py         # 协议 A (逐候选 CREATE+ANALYZE+EXPLAIN)
-│   ├── measure_mask.py    # 协议 M (一次 ANALYZE + catalog 掩码逐候选测量)
-│   ├── optimize.py        # 多选 ILP (含容量档决策)
-│   └── parsers/           # 各查询格式的解析器 (census/job/stats_ceb/single)
-├── docs/                  # 理论研究文档 (见 extended-statistics-selection.md)
-├── scripts/               # CLI 入口
-└── results/               # 实验输出 (git 忽略)
+├── benchmarks/            # Three benchmarks (init scripts / schema / queries)
+├── src/extstats/          # Python source package
+│   ├── config.py          # Paths, DB connection, candidate-stat parameter
+│   ├── db.py              # psycopg connection & execution helpers
+│   ├── predicates.py      # sqlglot: extract per-table selection-predicate columns
+│   ├── candidates.py      # generate candidate column combos (2..3 cols, globally dedup)
+│   ├── stats.py           # generate/execute CREATE STATISTICS DDL
+│   ├── measure.py         # Protocol-A (per-candidate CREATE+ANALYZE+EXPLAIN)
+│   ├── measure_mask.py    # Protocol-M (one ANALYZE + catalog-mask measurement)
+│   ├── optimize.py        # multi-select MILP (incl. capacity-level decisions)
+│   ├── verify.py          # phase-2 verifier: build a chosen set, measure true q-error
+│   └── parsers/           # query parsers (census/job/stats_ceb/single)
+├── docs/                  # documentation
+│   ├── extended-statistics-selection.md   # theory, findings, capacity decisions
+│   └── reproducibility.md                # number ↔ artifact ↔ script manifest
+├── scripts/               # CLI entry points & reproducibility scripts
+└── results/               # experiment output (mostly git-ignored)
 ```
 
-> 理论形式化、实证发现与容量档(statistics_target)决策的完整说明见
-> [`docs/extended-statistics-selection.md`](docs/extended-statistics-selection.md)。
+## Benchmarks
 
-## 安装
+* **Census (USCensus 1990)** — a wide, 69-column single-table workload
+  (data-capped statistics).
+* **JOB / IMDB** — join-heavy workload (negative control).
+* **stats_CEB** — the Cardinality Estimation Benchmark's single-table and join
+  workloads (target-capped statistics).
+
+Initialize a benchmark with the corresponding `benchmarks/init_*.sh` script
+(e.g. `bash benchmarks/init_census.sh`).
+
+## Installation
 
 ```bash
 python3 -m venv .venv
@@ -41,28 +73,37 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## 用法
+Requires a running PostgreSQL (tested on PostgreSQL 16.14) and the benchmark
+databases loaded via the `init_*.sh` scripts.
 
-激活虚拟环境后：
+## Usage
+
+With the virtual environment active:
 
 ```bash
-# 1) 干运行：打印所有候选统计的 DDL，不改数据库
+# 1) Dry run: print all candidate-statistic DDL without touching the DB
 python scripts/generate_candidates.py --dry-run
 
-# 2) 只对 census 基准真正建统计
+# 2) Actually build statistics for a single benchmark
 python scripts/generate_candidates.py --bench census
 
-# 3) 全部基准 + 自定义连接
+# 3) Custom connection
 python scripts/generate_candidates.py --bench all \
     --pguser postgres --dbname imdb
 
-# 4) 只生成两列组合 / 只建 mcv
+# 4) Restrict to 2-column combinations / MCV kind only
 python scripts/generate_candidates.py --arities 2 --kinds mcv
 ```
 
-见 `python scripts/generate_candidates.py --help`。
+See `python scripts/generate_candidates.py --help` for all options.
 
-## 环境变量
+### Reproducing the paper's figures and tables
 
-- `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` — 数据库连接
-  （与 `benchmarks/init_*.sh` 约定一致）
+See [`docs/reproducibility.md`](docs/reproducibility.md), which maps every
+number and figure in the paper to its data source (`results/*.json`, whitelisted
+in `.gitignore`) and the exact command that regenerates it.
+
+## Environment variables
+
+* `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` — database connection
+  (consistent with the `benchmarks/init_*.sh` conventions).
