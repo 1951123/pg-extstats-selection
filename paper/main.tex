@@ -58,32 +58,31 @@
 \email{yfsun@stu.zuel.edu.cn}
 
 \begin{abstract}
-Cardinality-estimation errors are a primary cause of degraded execution plans
-and query-performance regression in PostgreSQL. Multivariate extended
-statistics correct the column-independence assumption and fix estimation
-inaccuracy, but selecting and configuring them is largely manual, with high
-tuning cost and a steep expertise bar. Existing automated selection optimizes
-only a single dimension --- \emph{which} column combinations to build ---
-ignoring the differential allocation of per-statistic sampling capacity, so it
-cannot trade off estimation accuracy against resource cost under a tight
-budget; co-installed overlapping statistics can also interfere with the
-planner, and redundant statistics add ANALYZE maintenance overhead. We conduct
-an empirical study on large real workloads and identify a per-query property we
-call \emph{one-stat sufficiency}: for most single-table queries, one
-well-chosen multivariate statistic captures nearly all attainable
-cardinality-estimation gain, and additional statistics yield negligible
-marginal benefit while risking planner interference and extra maintenance. We
-design a \emph{catalog-mask} isolation protocol that neutralizes interference
-among co-installed statistics and quantifies each candidate's independent
-storage cost and error-repair benefit, then cast statistics tuning as a
-budgeted integer program that jointly selects \emph{which} column combinations
-(what) and \emph{which} per-statistic sampling capacity (how much). Experiments
-show that, under stringent storage budgets, our approach substantially reduces
-query Q-error, avoids redundant statistics and optimizer interference, and
-stays predictable after deployment; we also characterize the method's
-applicability boundary and analyze the mismatch between storage-cost modeling
-and real ANALYZE maintenance cost, providing empirical grounding and a
-deployable recipe for automated statistics tuning.
+Cardinality estimation errors are the main cause of suboptimal execution
+plans and performance degradation in PostgreSQL. Multivariate extended
+statistics mitigate bias stemming from the column-independence assumption but
+demand heavy manual tuning. Existing statistics advisors only select column
+combinations (the what dimension), ignoring differentiated sampling-capacity
+allocation (the how-much dimension), and cannot balance estimation accuracy
+and resource usage under limited storage budgets. Overlapping statistics
+further introduce severe planner interference and extra ANALYZE maintenance
+costs.
+Through extensive workload-driven evaluation, we identify a fundamental
+per-query property termed one-stat sufficiency: most single-table queries gain
+nearly all possible cardinality improvements from at most one well-chosen
+multivariate statistic. Additional statistics bring negligible marginal
+benefits yet worsen planner interference and maintenance overhead.
+Motivated by this observation, we propose Catalog-Mask, an isolation protocol
+that eliminates cross-statistic interference to measure each candidate's
+independent storage cost and error-reduction gain. We model statistic tuning as
+a budget-constrained integer-programming problem to jointly optimize
+column-combination selection and per-statistic sampling-capacity assignment.
+Our experiments demonstrate that our method significantly reduces Q-error
+under tight storage budgets while avoiding redundant statistics and planner
+interference. We further characterize applicability boundaries and analyze the
+mismatch between storage-based budgeting and real-world ANALYZE overhead,
+offering empirical support and a practical tuning paradigm for PostgreSQL
+extended statistics.
 \end{abstract}
 
 \maketitle
