@@ -1581,6 +1581,23 @@ preserves nominal quality but, as we verify empirically across budgets
 \section{Discussion and Open Questions}
 \label{sec:disc}
 
+\subsection{Coverage by Design}
+\label{sec:disc-coverage}
+
+The two evaluated workloads are not an arbitrary sample; they are the two
+endpoints of the very axis this paper is about. The central decision is
+\emph{capacity} --- how precisely to store a chosen statistic. On that axis,
+\texttt{stats\_CEB\_single}'s high-cardinality, target-capped statistics sit
+at the \emph{ceiling} (raising the target is what buys accuracy), while
+CENSUS's low-cardinality, data-capped columns sit at the \emph{floor} (their
+MCV lists fill at a small target, so the useful move is often to \emph{lower}
+capacity). Every real deployment of extended statistics lies between these two
+extremes; establishing the method at both ends therefore bounds its behaviour
+over the entire capacity axis, not just at two convenient points. The
+controllable many-cluster synthetic sweeps (\S\ref{sec:rq2}, Table~\ref{tab:sweep})
+probe the one orthogonal dimension where the sparse assumption itself breaks.
+Coverage is by design, not by convenience.
+
 \subsection{Why Does Sparsity Occur? A Mechanistic Hypothesis}
 \label{sec:disc-sparsity}
 
@@ -1726,7 +1743,13 @@ question. (5) \emph{Limits}: we consider MCV statistics on single-table
 workloads; joins need other techniques, there is a real limit on statistics per
 relation, and our 2-/3-column candidate family understates achievable quality on
 harder CENSUS queries, where 4-/5-column candidates help --- extending candidate
-generation to higher arity is future work.
+generation to higher arity is future work. (6) \emph{Deployment-mode
+selection}: our new end-to-end comparison (Table~\ref{tab:optionB}) shows
+Option-A (global disjointness) and Option-B (repair) carve a real
+trade-off --- Option-A guarantees predictability at a quality cost, Option-B
+keeps quality but not the guarantee. A principled rule for choosing a mode per
+deployment --- e.g.\ from the workload's quality-versus-reproducibility
+requirements or a budget-dependent crossover point --- is open.
 
 \section{Conclusion}
 \label{sec:concl}
