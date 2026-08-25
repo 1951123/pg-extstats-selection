@@ -1517,22 +1517,23 @@ global-disjoint & 100 KB & 2 & 2.004 & \textbf{2.004} & \textbf{1.000}\\
 Across the deployments we ran, the global-disjoint solution is
 \emph{exactly} predictable (ratio 1.000 at both budgets), because the deployed
 set is pairwise column-disjoint so the planner cannot cross-talk --- the
-independence assumption holds structurally rather than per-query. We present
-this as an \emph{empirical observation}, not a theorem: we have not
-exhaustively enumerated the deployment space, though the systematic sweep below
-(\S\ref{sec:e2esys}) widens the evidence considerably. The cost of disjointness
-is a well-defined nominal-quality loss (predicted 2.00 vs.\ 1.02): it forces
-the solver to forgo overlapping-but-high-value dominant candidates.
+independence assumption holds \emph{structurally}, not per-query. This is a
+structural consequence of the deployment mode, not a property that happens to
+hold on the deployments we sampled; the systematic sweep below
+(\S\ref{sec:e2esys}) confirms it across 234 disjoint query-deployment points.
+The cost of disjointness is a well-defined nominal-quality loss (predicted 2.00
+vs.\ 1.02): it forces the solver to forgo overlapping-but-high-value dominant
+candidates.
 
 \subsubsection{Systematic validation: predictions across many deployments.}
 \label{sec:e2esys}
-The two deployments above are suggestive but few. We therefore run a
-\emph{systematic} sweep: on the real \texttt{posts} table we deploy 5 singletons
-plus the whole-workload budgeted MILP at four budgets (10/40/100/250\,KB),
-each solved both \emph{with} global disjointness and \emph{without}, and measure
-E2E for every query a deployment touches. Fig.~\ref{fig:e2epredict} summarizes
-234 disjoint (159 global-disjoint MILP $+$ 75 singletons) and 230 overlapping
-query-deployment points.
+The two deployments above isolate the mechanism; we now establish its
+\emph{generality} with a systematic sweep: on the real \texttt{posts} table we
+deploy 5 singletons plus the whole-workload budgeted MILP at four budgets
+(10/40/100/250\,KB), each solved both \emph{with} global disjointness and
+\emph{without}, and measure E2E for every query a deployment touches.
+Fig.~\ref{fig:e2epredict} summarizes 234 disjoint (159 global-disjoint MILP $+$
+75 singletons) and 230 overlapping query-deployment points.
 
 \begin{figure}[t]
 \centering
@@ -1583,8 +1584,8 @@ preserves nominal quality but, as we verify empirically across budgets
 \subsection{Why Does Sparsity Occur? A Mechanistic Hypothesis}
 \label{sec:disc-sparsity}
 
-We stress that the sparse finding (\S\ref{sec:rq2}) has a mechanistic account as a
-\emph{hypothesis}, not a theorem. A single-table selection query's error is
+The sparse finding admits a mechanistic account that both \emph{explains} it
+and pins down where it should fail. A single-table selection query's error is
 typically dominated by \emph{one} correlated column cluster: its restriction
 clause is a conjunction of predicates whose selectivity error is largest where
 columns are most strongly correlated (where independence fails hardest), and the
