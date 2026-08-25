@@ -80,4 +80,7 @@ paper/*.blg
 paper/*.log
 paper/*.out
 paper/comment.cut
-paper/*.synctex.gzOfficial_VLDB_Template.zip
+paper/*.synctex.gz
+
+# 官方 VLDB 模板下载包（源 zip 归档，不纳入版本库；模板文件已解压到 paper/
+Official_VLDB_Template.zip
