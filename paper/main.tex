@@ -363,22 +363,21 @@ with no interaction term, so the surrogate workload objective is linear in the
 selection variables.
 \end{proposition}
 \begin{proof}[Proof sketch]
-For a fixed query $i$, the assigned set $T_i$ is either empty or a singleton
-$\{s\}$. In the former case the surrogate error is $e_i^0$; in the latter,
-$e_{is}$. Since at most one $x_{is}$ equals $1$, no two statistics co-occur and
-there is no joint term. This is a statement about the \emph{model}; whether the
+For a fixed query $i$, $T_i$ is either empty (surrogate error $e_i^0$) or a
+singleton $\{s\}$ (surrogate error $e_{is}$); since at most one $x_{is}$
+equals $1$, no two statistics co-occur, so no joint term arises and the
+objective is linear. This is a statement about the \emph{model}; whether the
 real planner reproduces $e_{is}$ for the chosen $s$ is a separate, empirical
 question answered by the E2E validation (\S\ref{sec:e2e}).
 \end{proof}
 
-The log-space approximation used for multi-select is therefore unnecessary for
-the sparse surrogate; we solve the linear form exactly. This is the sense in
-which the integer program promised in the introduction (\S\ref{sec:intro})
-specializes here: because one-stat sufficiency removes the interaction term, the
-general integer program degenerates to an \emph{exactly linear} MILP under the
-singleton-effect restriction, and \S\ref{sec:p1} then determines when that
-surrogate remains faithful to PostgreSQL's actual statistic selection after
-deployment. We call this the \emph{capacity-aware} selection problem: because
+The log-space approximation is therefore unnecessary for the sparse surrogate;
+we solve the linear form exactly. This is the sense in which the integer program
+promised in the introduction (\S\ref{sec:intro}) specializes here: one-stat
+sufficiency removes the interaction term, so the general program degenerates to
+an \emph{exactly linear} MILP under the singleton-effect restriction, and
+\S\ref{sec:p1} then determines when that surrogate stays faithful to
+PostgreSQL's actual selection after deployment. We call this the \emph{capacity-aware} selection problem: because
 each capacity level is a distinct physical statistic, choosing \emph{which}
 level of a combination to build is expressed by selecting the corresponding
 $y_{(table,cols,level)}$, subject to a global budget.
@@ -475,21 +474,13 @@ sampling effort (\cite{pgstats}). It is a \emph{cap}, not a requirement: a
 column-combination with fewer frequent tuples than the cap is fully captured at
 any larger target, so raising the target helps only while the list is
 \emph{target-capped} (still filling) rather than \emph{data-capped} (bounded by
-the data's own cardinality). We therefore model capacity as a small menu of
-levels spanning both directions of this axis,
-$$\{10, 25, 50, 100, 1000, 10000\},$$
-anchored on the PostgreSQL default (100) and extending \emph{below} it (10, 25,
-50 --- coarser but cheaper) and \emph{above} it (1000, 10000 --- finer for
-higher-cardinality combinations). We include sub-default levels deliberately: a
-DBA may legitimately \emph{lower} capacity to save storage on data-capped
-combinations, so the decision axis is two-sided and the menu must be wide
-enough to expose it. Capacity sets a \emph{per-query} precision floor --- the
-``how much'' dimension --- and is a genuine decision axis, which motivates
-allocating it under a shared budget. Whether a given combination is best served
-by \emph{raising} or \emph{lowering} its capacity is exactly the
-data-capped vs.\ target-capped distinction we quantify in \S\ref{sec:rq1};
-the two evaluated workloads sit on opposite ends of this axis
-(\S\ref{sec:measure-runtime}).
+the data's own cardinality). Capacity is therefore a two-sided allocation axis
+--- \emph{raising} it resolves target-capped combinations, \emph{lowering} it
+saves storage on data-capped ones --- which is why \emph{how much} must be
+decided jointly with \emph{which} statistics under a shared budget
+(\S\ref{sec:rq1}). We model capacity as a menu of levels spanning both
+directions of this axis, anchored on the default 100 and extending below and
+above it (the exact menu is in \S\ref{sec:findings}).
 
 \subsection{Naive Measurement Is Infeasible on Wide Tables}
 \label{sec:measure-naive}
@@ -594,56 +585,35 @@ siblings' payloads. The two agree to the last digit every time --- e.g.\
 by the planner, this confirms Protocol-M is an \emph{exact} isolation of each
 candidate's effect -- not an approximation.
 
-\textbf{Pragmatics and safety.} Protocol-M writes
-\texttt{pg\_}\allowbreak\texttt{statistic\_}\allowbreak\texttt{ext\_data}
-directly, so it requires superuser and must
-run in a dedicated, disposable database cluster (or with autovacuum and
-concurrent writes suspended) to avoid contaminating a production system. Two
-system facts make the manipulation safe and correct in practice:
-(i) \emph{No stale catalog state} --- every UPDATE triggers standard cache
-invalidation, and we re-issue a fresh \texttt{EXPLAIN} per candidate, so we
-never reuse an estimate computed from a pre-update cache; and
-(ii) \emph{update-in-place, not rewrite} --- NULLing a payload does not re-run
-ANALYZE, so masking cost is independent of table \emph{size} (row count); it is,
-however, linear in the number of payloads mounted on the table, which is why
-measurement granularity matters (\S\ref{sec:measure-runtime}).
-
-\emph{Protocol-M's advantage grows with table size.} The masking step's
-independence of row count is what makes the protocol scalable: the ANALYZE
-cost $T(N)=B_0+cN$ of \S\ref{sec:measure-naive} has a base term $B_0$
-proportional to table size, which the classical per-candidate protocol pays
-$2N$ times but Protocol-M pays once, so the saving is
-$(2N-1)\,B_0$ --- a \emph{monotone increasing function of dataset scale}.
-Our two benchmarks are both \emph{small} by production standards;
-at multi-hundred-GB scale the per-candidate protocol becomes infeasible and
-Catalog-Mask the \emph{only} tractable path. Because it relies on the system
-catalog layout and the planner's OID-order selection (\S\ref{sec:switch}),
-Protocol-M is specific to PostgreSQL 16 and to \emph{MCV} statistics --- honest
-limits of the implementation, not of the model (\S\ref{sec:disc-objective}).
+\textbf{Pragmatics and scope.} Protocol-M writes the system catalog directly,
+so the manipulation runs in a dedicated, disposable cluster (or with autovacuum
+and concurrent writes suspended); standard cache invalidation keeps every
+\texttt{EXPLAIN} fresh, and NULLing a payload does not re-run ANALYZE, so
+masking cost is independent of table size (full safeguards in the artifact).
+Two limits are honest implementation constraints rather than model choices:
+Protocol-M relies on the system-catalog layout and the planner's OID-order
+selection (\S\ref{sec:switch}), so it is specific to PostgreSQL 16 and to
+\emph{MCV} statistics (\S\ref{sec:disc-objective}). Its advantage grows with
+dataset scale --- the classical per-candidate ANALYZE pays the table's fixed
+base cost twice per candidate, Protocol-M pays it once per batch
+(\S\ref{sec:measure-runtime}) --- so at multi-hundred-GB scale Catalog-Mask
+becomes the \emph{only} tractable path (\S\ref{sec:measure-naive}).
 
 \subsection{Measurement Cost and Granularity}
 \label{sec:measure-runtime}
 
 \emph{Deterministic single-column baseline.}\label{sec:measure-determinism}
 Because \texttt{ANALYZE} is sampling-based, we fix the per-column
-\texttt{statistics\_target} at 10000 rather than PostgreSQL's default of 100,
-for three reasons: \emph{determinism} (target 100 leaves a $1$--$2\%$ run-to-run
-drift that would make \emph{relative} q-error comparisons unreliable, whereas
-target $\ge$1000 is exactly reproducible, CV $0$); \emph{completeness} (at low
-targets high-cardinality statistics can be built \emph{empty}, a \texttt{NULL}
-payload --- e.g.\ the single-MCV estimate of st.144 rises from 4{,}405 at
-target\,1000 to the correct $\approx$12{,}391 at target\,10000 --- risking a
-degraded baseline); and \emph{attribution} (with a maximally precise
-single-column baseline, any improvement from an extended statistic is a
-\emph{pure} effect of the correlation it captures, not of patching a coarse
-per-column estimate). All per-candidate q-errors $e_{is}$ are measured against
+\texttt{statistics\_target} at 10000 rather than PostgreSQL's default of 100:
+it removes run-to-run drift (reproducible, CV~$0$), avoids \emph{empty}
+high-capacity payloads that would degrade the baseline, and attributes any
+extended-statistic gain purely to correlation rather than to patching a coarse
+per-column estimate. All per-candidate q-errors $e_{is}$ are measured against
 this \emph{same} baseline, so capacity is the only axis that changes between
-levels. This makes the single-column ANALYZE \emph{expensive} on a wide table (a
-CENSUS ANALYZE at target\,10000 costs $\approx$22\,s), precisely what forces the
+levels. This makes a wide-table single-column ANALYZE \emph{expensive} (a CENSUS
+ANALYZE at target\,10000 costs $\approx$22\,s), precisely what forces the
 catalog-mask protocol (\S\ref{sec:measure-naive}, \S\ref{sec:measure-mask}) ---
-the large fixed target and Protocol-M are two halves of one design decision;
-consequently most queries have no candidate, their predicates served by the
-fixed single-column statistics with baseline q-error already near 1.
+the large fixed target and Protocol-M are two halves of one design decision.
 
 \emph{Protocol-M is a large-sample oracle, not a deployment emulator.}
 Fixing the single-column baseline at a generous target means every capacity
@@ -658,60 +628,23 @@ deployment reproduces it exactly; we assess deployment fidelity in
 real deployment need not raise any single-column target.
 
 \emph{Batch granularity.}
-Masking is not free: it rewrites the system
-catalog. Per (candidate, level) the measurement loop is
-\[
-  \underbrace{\text{mask all but one payload}}_{\text{UPDATE }\times\,N}\;\to\;
-  \underbrace{\text{EXPLAIN}}_{\approx 0.002\text{s}}\;\to\;
-  \underbrace{\text{restore all payloads}}_{\text{UPDATE }\times\,N}.
-\]
-We measured each component on CENSUS \texttt{climate} (Tab.~\ref{tab:measurement}):
-the mask and restore are \emph{linear in the table's payload count}
-($\approx0.0008$\,s / $\approx0.00003$\,s per payload), while the EXPLAIN is a
-constant $\approx0.002$\,s. So one masked measurement costs
-$\epsilon(N)\approx0.0008\,N$\,s --- masking is \emph{not} constant: it grows
-with the number of statistics mounted during that measurement, a property of
-the measurement \emph{granularity}, not of Protocol-M per se.
-
-Group the queries' candidates into $B$ batches; batch $b$ mounts $N_b$ distinct
-(candidate$\,{\times}\,$level) objects, ANALYZEs once, and measures $M_b$ cells
-by masking against the $N_b$ payloads. The total time is
-\begin{equation}\label{eq:batch-cost}
-  T(B) \;=\;\underbrace{\sum_{b=1}^{B}\big(B_0 + c\,N_b\big)}_{\text{one ANALYZE per batch}}
-      \;+\;\underbrace{\mu\sum_{b=1}^{B} M_b\,N_b}_{\text{mask + restore}}
-      \;+\;\underbrace{\epsilon\,M_{\text{tot}}}_{\text{EXPLAIN}},
-\end{equation}
-where $B_0$ is the table's warm-cache \texttt{ANALYZE} base (per dataset: on
-CENSUS $B{=}22$\,s \emph{empty} and $\approx$113\,s with a query's statistics
-mounted; on the small \texttt{posts} table $\approx$1.9\,s), $c$ the per-statistic
-\texttt{ANALYZE} increment, and $\mu{\approx}0.0008$\,s per payload. The two
-extremes are per-query ($B{=}n$) and workload-wide ($B{=}1$).
-
-\emph{Measurement granularity.}\label{prop:batch}
-Because mounting more payloads makes every masked measurement scan a longer
-catalog, grouping into large batches amortizes the fixed ANALYZE base but
-increases the masking term. Under a uniform model ($N_b{=}\rho M$) $T(B)$ is
-strictly convex and minimized at
-\begin{equation}\label{eq:batch-opt}
-  B^{*} \;=\; M_{\text{tot}}\,\sqrt{\tfrac{\mu\rho}{B_0}},
-  \qquad\text{i.e.}\qquad
-  m^{*} \;=\; \sqrt{\tfrac{B_0}{\mu\rho}}\ \text{meas.\ per batch},
-\end{equation}
-so the optimal granularity \emph{grows} with the ANALYZE base and \emph{shrinks}
-as masking or sharing rises; a workload-wide build is optimal only under very
-high sharing, so on CENSUS we sub-batch instead, splitting candidate-dense
-queries into $\approx$55-candidate sub-batches (Tab.~\ref{tab:measurement}). The
-same $m^{*}=\sqrt{B_0/\mu}$ optimum applies \emph{within} a query; on the most
-candidate-dense CENSUS query (\texttt{query.335}, $n{=}455$) sub-batching into
-$7$ pieces reduces measurement from $181.4$\,s to $63.4$\,s ($2.9\times$).
-Against Protocol-A's per-candidate cost, the measured speedup is
-$\approx$283$\times$ on CENSUS and $\approx$36$\times$ on
-\texttt{stats\_CEB\_single} (lower bounds, since Protocol-A's per-candidate
-\texttt{ANALYZE} is no more than the table's base). Thus Catalog-Mask --- not
-the MILP --- is the enabling component that makes the candidate $\times$
-capacity space measurable, and the granularity analysis turns it from a fixed
-trick into a tunable component whose operating point is chosen by a measurable
-cost model.
+Masking rewrites the catalog, so a masked measurement is \emph{not} constant:
+its cost grows with the number of payloads mounted during that measurement, a
+property of the measurement \emph{granularity} rather than of Protocol-M per se.
+Grouping candidates into batches therefore amortizes the fixed per-batch ANALYZE
+base but lengthens each mask, so the total is convex in batch size with a
+workload-dependent optimum (Tab.~\ref{tab:measurement}); a closed-form optimum
+and the full timing model are deferred to the artifact. The optimum grows with
+the ANALYZE base and shrinks as masking or sharing rises, so a workload-wide
+build is optimal only under very high sharing; on CENSUS we sub-batch instead,
+splitting candidate-dense queries into $\approx$55-candidate sub-batches. On the
+most candidate-dense CENSUS query (\texttt{query.335}, $n{=}455$) sub-batching
+cuts measurement from $181.4$\,s to $63.4$\,s ($2.9\times$). Against
+Protocol-A's per-candidate cost the measured speedup is $\approx$283$\times$ on
+CENSUS and $\approx$36$\times$ on \texttt{stats\_CEB\_single} (lower bounds,
+since Protocol-A's per-candidate \texttt{ANALYZE} is no more than the table's
+base). Thus Catalog-Mask --- not the MILP --- is the enabling component that
+makes the candidate $\times$ capacity space measurable.
 
 \begin{table*}[t]
 \caption{Measurement cost under sub-batch size $b$ on one candidate-dense query
@@ -1208,17 +1141,14 @@ validation (\S\ref{sec:disc-fix}).
 
 A single-table selection query's error is typically dominated by \emph{one}
 correlated column cluster: its restriction is a conjunction of predicates whose
-selectivity error is largest where independence fails hardest, and a single MCV
-over that dominant cluster removes the largest error source while residual
-errors in weakly-correlated predicates contribute little. Hence \emph{one}
-well-chosen statistic captures nearly all attainable improvement --- consistent
-with $k{=}2,3$ adding nothing (\S\ref{sec:rq2}), capacity upgrades mattering
-more than additions (\S\ref{sec:rq3}), and the sparse cap costing no quality in
-the ablation (\S\ref{sec:ablation}). It also predicts the boundary: workloads
-genuinely driven by \emph{several} independent clusters violate one-stat sufficiency and
-warrant the multi-select model (\S\ref{sec:formulation}), confirmed by our
-stress test (Table \ref{tab:sweep}); characterising how often that regime
-occurs is an open question below.
+selectivity error is largest where independence fails hardest, so a single MCV
+over that dominant cluster removes the dominant error source while
+weakly-correlated residuals contribute little. This mechanistically explains
+one-stat sufficiency and its boundary: workloads genuinely driven by
+\emph{several} independent clusters violate it and warrant the multi-select
+model (\S\ref{sec:formulation}), as our stress test confirms
+(Table \ref{tab:sweep}); characterising how often that regime occurs is an open
+question below.
 
 \subsection{What Is Being Optimized}
 \label{sec:disc-objective}
