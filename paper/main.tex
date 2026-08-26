@@ -948,9 +948,10 @@ tightest budget (0.026 at 5\,KB) and --- notably --- \emph{growing again} at
 budget on cheap L100 coverage they cannot spend the remainder on
 \emph{capacity} upgrades, whereas the MILP drives the mean from 1.0156 to
 1.0040. Only at the generous 500\,KB budget does the add-or-upgrade greedy
-close part of the gap (G3, 4 upgrades). Capacity allocation is exactly the
-capability greedy lacks --- not a failure of greedy column choice but of global
-\emph{budget reallocation} (the ``how much'' axis; \S\ref{sec:rq3}).
+close part of the gap (G3, 4 upgrades). The key difference is global capacity
+reallocation under a shared budget: although G3 can upgrade an already-deployed
+statistic, it cannot coordinate such upgrades across competing candidates
+(the ``how much'' axis; \S\ref{sec:rq3}).
 
 On the full 632-query workload (Fig.~\ref{fig:budgetquality}), the real effect
 is \emph{tail repair}: the maximum q-error falls from 4.7 to 1.1, and on the
