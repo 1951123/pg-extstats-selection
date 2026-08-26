@@ -110,65 +110,74 @@ Inaccurate cardinality estimates frequently produce sub-optimal execution plans
 and severely degrade query performance. A major source of estimation error
 originates from the ubiquitous column-independence assumption, which ignores
 real-world attribute correlations within tables. PostgreSQL provides
-multivariate extended statistics, including multi-column MCV, n-distinct, and
-functional-dependency statistics, to mitigate such bias. Unfortunately, these
+multivariate extended statistics including multi-column MCV, n-distinct, and
+functional-dependency statistics to mitigate such bias. Unfortunately, these
 statistics require manual identification of correlated column-sets and careful
 configuration, imposing heavy tuning burdens on database administrators.
 
 Prior physical-design tools and statistic-recommendation systems automate the
-selection of promising column combinations from query workloads
-\cite{chaudhuri2001automating,ilyas2004cords}. Nevertheless, existing solutions
-suffer from two fundamental limitations. First, they only address the ``what''
-dimension --- deciding which column-sets should form statistics. Sampling
-capacity, which controls the estimation quality and storage footprint of each
+selection of promising column combinations from query
+workloads~\cite{chaudhuri1998autoadmin,kraft2004cords}. Nevertheless, existing
+solutions suffer from two fundamental limitations. First, they only address the
+``what'' dimension: deciding which column-sets should form statistics. Sampling
+capacity, which controls estimation quality and storage footprint for each
 individual statistic, is treated as a global fixed parameter and never
 optimized per candidate. This ``what-only'' strategy cannot realize fine-grained
-resource trade-offs under constrained storage budgets:
-\[
-  \underbrace{\text{which }(\text{table},\text{columns})}_{\text{what}}
-  \;\times\;
-  \underbrace{\text{which }\texttt{statistics\_target}}_{\text{how much}}.
-\]
-Second, co-deployed overlapping multivariate statistics introduce negative
-planner interference, which distorts cardinality estimates and degrades overall
-effectiveness. Without an isolation measurement mechanism, existing work can
-only observe aggregated end-to-end quality and cannot quantify the independent
-benefit of each candidate statistic; interference and redundancy remain hidden
-from optimization formulations.
+resource trade-offs under constrained storage budgets. Second, co-deployed
+overlapping multivariate statistics introduce negative planner interference,
+which distorts cardinality estimates and degrades overall effectiveness.
+Without an isolation measurement mechanism, existing work can only observe
+aggregated end-to-end quality and cannot quantify the independent benefit of
+each candidate statistic. Consequently, interference and redundancy remain
+hidden from optimization formulations.
 
-\emph{Running example.} On the high-cardinality \texttt{posts} table, the
-statistic \texttt{posts(AnswerCount,}\allowbreak\texttt{FavoriteCount,}\allowbreak\texttt{ViewCount)} can be stored at
-any level of the capacity menu $\capmenu$ \cite{pgstats}:
-at the default target 100 the list is too small to hold the 3-column
-correlation (q-error stays $\sim$4.7), while at 10000 it drives the error to
-$\approx$1.0. So ``should we build this statistic?'' admits no answer without
-``\emph{at what capacity}?'' --- spending on \emph{adjusting} its capacity
-competes directly with spending on \emph{adding} another combination, so
-capacity is a genuine two-sided decision that must be made jointly with which
-statistics to build.
+Motivated by this gap, we conduct extensive workload-driven evaluations and
+identify an empirical property we term \emph{one-stat sufficiency}. For most
+single-table queries, nearly all achievable cardinality-estimation improvement
+can be obtained by deploying at most one well-chosen multivariate statistic.
+Additional statistics yield negligible marginal gains while amplifying planner
+interference and ANALYZE maintenance overhead. This finding reshapes our
+understanding of extended-statistics tuning: effective tuning favors
+\emph{compact, precise} statistic deployment rather than blindly accumulating
+as many statistics as possible.
 
-Measuring the independent benefit of each candidate statistic becomes essential
+Measuring independent benefit for each candidate statistic becomes essential
 given the above observation, yet simultaneous deployment causes coupled
-interference. We propose \emph{Catalog-Mask}, an isolation protocol that
-eliminates cross-statistic interference and reliably quantifies the independent
-storage cost and error-reduction gain of each candidate column-set. Using these
-cost-benefit measurements, we formulate statistic tuning as a
-budget-constrained integer program that jointly optimizes two dimensions ---
-column-combination selection (what) and per-statistic sampling-capacity
-assignment (how-much) --- maximizing overall estimation quality under a given
-storage budget.
+interference. To tackle this measurement bottleneck, we propose
+\emph{Catalog-Mask}, an isolation protocol that eliminates cross-statistic
+interference and reliably quantifies the independent storage cost and
+error-reduction gain for each candidate column-set. Using the cost-benefit
+measurements collected via Catalog-Mask, we formulate statistic tuning as a
+budget-constrained integer-programming problem. Our model jointly optimizes two
+dimensions: column-combination selection (what) and per-statistic
+sampling-capacity assignment (how-much), producing deployments that maximize
+overall estimation quality under given storage budgets.
+
+We conduct comprehensive experiments across multiple real and synthetic
+workloads. The results demonstrate that our approach substantially reduces
+Q-error and suppresses redundant, interfering statistics under tight storage
+budgets. We explicitly acknowledge an important modeling assumption: our
+optimizer uses storage consumption as the budget metric, which exhibits
+inherent mismatch against real-world ANALYZE maintenance overhead. We further
+characterize applicability boundaries for our technique to avoid over-claiming
+its practical scope.
 
 This paper makes the following contributions:
-\textbf{(1)} We discover and quantitatively validate the one-stat-sufficiency
-property over real-world workloads; our end-to-end evaluation further
-highlights the negative planner-interference effect introduced by co-deployed
-overlapping multivariate statistics. \textbf{(2)} We design Catalog-Mask, an
-isolation protocol that enables reliable measurement of the independent
-cost-benefit of each candidate statistic, resolving the coupled-measurement
-bottleneck. \textbf{(3)} We present a joint what-and-how-much integer-programming
-formulation that simultaneously selects column-sets and assigns differentiated
-sampling capacity for PostgreSQL multivariate statistics. \textbf{(4)} We evaluate the approach end-to-end, quantify the
-storage--maintenance mismatch, and characterize its practical scope.
+\begin{enumerate}
+\item We discover and quantitatively validate the one-stat-sufficiency property
+over real-world workloads. Our end-to-end evaluation further highlights the
+negative planner-interference effect introduced by co-deployed overlapping
+multivariate statistics.
+\item We design Catalog-Mask, an isolation protocol that enables reliable
+measurement of independent cost-benefit for each candidate statistic, resolving
+the coupled-measurement bottleneck.
+\item We present a joint what-and-how-much integer-programming formulation,
+which simultaneously selects column-sets and assigns differentiated sampling
+capacity for PostgreSQL multivariate statistics.
+\item We perform extensive end-to-end evaluation, analyze the mismatch between
+storage-based budgeting and real ANALYZE maintenance cost, and provide
+practical tuning insights for PostgreSQL extended statistics.
+\end{enumerate}
 
 \section{Background and Related Work}
 \label{sec:back}
