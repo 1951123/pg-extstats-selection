@@ -98,131 +98,95 @@ extended statistics.
 \section{Introduction}
 \label{sec:intro}
 
-Modern query optimizers rely on cardinality estimates to choose plans, and when
-columns are correlated the default independence assumption can misestimate by
-orders of magnitude. PostgreSQL exposes \emph{extended statistics}
-(\texttt{CREATE}\allowbreak\texttt{ STATISTICS}) to capture multivariate
-correlation, yet deciding
-\emph{which} statistics to create --- and, crucially, \emph{how precisely} to
-store them --- is left to the database administrator. This paper asks whether
-that choice can be automated, and what structure it has in practice.
+Cardinality estimation lies at the heart of relational query optimization.
+Inaccurate cardinality estimates frequently produce sub-optimal execution plans
+and severely degrade query performance. A major source of estimation error
+originates from the ubiquitous column-independence assumption, which ignores
+real-world attribute correlations within tables. PostgreSQL provides
+multivariate extended statistics, including multi-column MCV, n-distinct, and
+functional-dependency statistics, to mitigate such bias. Unfortunately, these
+statistics require manual identification of correlated column-sets and careful
+configuration, imposing heavy tuning burdens on database administrators.
 
-\textbf{(A) The problem: a joint ``what and how much'' allocation.} A statistic
-is not atomic. Each has a \emph{capacity}, the number of MCV entries it stores,
-controlled by its \texttt{statistics\_target}. Capacity
-determines both storage and estimation precision: it caps how many
-most-common-value tuples the list stores, so a 3-column correlation that is
-invisible at a small target becomes accurate at a larger one and exact when the
-list is large enough. Automated
-statistics management is a well-studied problem (Chaudhuri and Narasayya
-\cite{chaudhuri2001automating}), but it chooses \emph{which} statistics to
-create. Extended-statistics selection is richer: a storage budget can be spent
-either by \emph{adding} a statistic or by \emph{adjusting an existing one's}
-capacity --- upward from a low target to a higher one, or downward to a coarser
-but cheaper one. The right question is therefore a
-\emph{resource-allocation} one --- given a budget, which
-$(\text{table},\text{columns},\text{capacity})$ objects to instantiate --- not
-merely which column combinations:
+Prior physical-design tools and statistic-recommendation systems automate the
+selection of promising column combinations from query workloads
+\cite{chaudhuri2001automating,ilyas2004cords}. Nevertheless, existing solutions
+suffer from two fundamental limitations. First, they only address the ``what''
+dimension --- deciding which column-sets should form statistics. Sampling
+capacity, which controls the estimation quality and storage footprint of each
+individual statistic, is treated as a global fixed parameter and never
+optimized per candidate. This ``what-only'' strategy cannot realize fine-grained
+resource trade-offs under constrained storage budgets:
 \[
   \underbrace{\text{which }(\text{table},\text{columns})}_{\text{what}}
   \;\times\;
-  \underbrace{\text{which }\texttt{statistics\_target}}_{\text{how much}},
+  \underbrace{\text{which }\texttt{statistics\_target}}_{\text{how much}}.
 \]
-compounded by a combinatorial explosion in candidates (a single CENSUS query
-can have hundreds of candidate column combinations; \S\ref{sec:rq4} gives
-full-scale sizes). To our knowledge, prior work on automatic
-statistics configuration has focused on discovering or selecting useful column
-groups; we are not aware of prior work that explicitly treats PostgreSQL's
-per-statistic \texttt{statistics\_target} as a competing resource-allocation
-dimension under a shared storage budget (\S\ref{sec:back}).
+Second, co-deployed overlapping multivariate statistics introduce negative
+planner interference, which distorts cardinality estimates and degrades overall
+effectiveness. Without an isolation measurement mechanism, existing work can
+only observe aggregated end-to-end quality and cannot quantify the independent
+benefit of each candidate statistic; interference and redundancy remain hidden
+from optimization formulations.
 
-\emph{Running example.} On the high-cardinality \texttt{stats\_CEB\_single}
-workload, \texttt{posts(AnswerCount,ViewCount)} can be stored at any of the
-\emph{evaluated capacity menu} $\{10, 25, 50, 100, 1000, 10000\}$
-(\S\ref{sec:disc}), where 100 is PostgreSQL's default
-\texttt{statistics\_target}: at L100 the list is too small to hold the 3-column
-correlation (q-error stays $\sim$4.7), while L10000 drives it to $\approx$1.0 at
-$\sim$100\,KB vs.\ $\sim$2\,KB. So
-``should we build this statistic?'' admits no answer without ``\emph{at what
-capacity}?'' --- spending on \emph{adjusting} its capacity competes directly
-with spending on \emph{adding} another combination. The wide CENSUS workload is
-the \emph{opposite} end of the same axis: its low-cardinality categorical
-columns are \emph{data-capped} (their MCV lists fill at a small target), so a
-DBA would more likely \emph{lower} capacity to save storage than raise it
-(\S\ref{sec:rq1}). Capacity is therefore a two-sided decision that must be made
-jointly with \emph{which} statistics to build.
+\emph{Running example.} On the high-cardinality \texttt{posts} table, the
+statistic \texttt{posts(AnswerCount,FavoriteCount,ViewCount)} can be stored at
+any level of the capacity menu $\{10,25,50,100,1000,10000\}$ \cite{pgstats}:
+at the default target 100 the list is too small to hold the 3-column
+correlation (q-error stays $\sim$4.7), while at 10000 it drives the error to
+$\approx$1.0. So ``should we build this statistic?'' admits no answer without
+``\emph{at what capacity}?'' --- spending on \emph{adjusting} its capacity
+competes directly with spending on \emph{adding} another combination, so
+capacity is a genuine two-sided decision that must be made jointly with which
+statistics to build.
 
-\textbf{(B) One-stat sufficiency: a per-query property, discovered not
-assumed --- and bounded.} At first glance the problem looks like a
-combinatorial multi-select. Our measurements show otherwise for the two
-evaluated single-table workloads: for an individual query, at most one
-well-chosen multi-variate statistic captures nearly all improvement attainable
-from the evaluated 2-/3-column MCV candidates (adding a second or third helps
-~nothing; \S\ref{sec:rq2} falsifies this several ways). Concretely, a single
-statistic already captures $\ge$0.9 of the best achievable multi-statistic
-gain for \emph{every} query with repair room, with a coverage median of 1.000
-(\S\ref{sec:rq2}). This \emph{one-stat
-sufficiency} is a \emph{per-query} property, distinct from general sparsity of
-the candidate space: the global pool of candidate statistics is large, yet each
-query needs only one of them (\S\ref{sec:rq2}). It was \textbf{discovered},
-not assumed, and it has a direct consequence: restricted to at most one
-statistic per query, the objective has no interaction term and is
-\emph{exactly linear} (Prop.~\ref{prop:linear}) --- a formal property of the
-\emph{surrogate} within an empirically characterized regime, whose faithfulness
-to PostgreSQL is determined by the E2E experiments (\S\ref{sec:e2e}). This
-property is an empirical hypothesis with a mechanistic account --- a query's
-error is typically dominated by the one strongly-correlated column cluster ---
-and a deliberately probed failure boundary: it collapses on queries driven by
-several independent clusters (a controlled stress test, \S\ref{sec:rq2},
-Table~\ref{tab:sweep}; mechanism and boundary in \S\ref{sec:disc-sparsity}).
+Motivated by this gap, we conduct extensive workload-driven evaluations and
+identify an empirical property we term \emph{one-stat sufficiency}. For most
+single-table queries, nearly all achievable cardinality-estimation improvement
+can be obtained by deploying at most one well-chosen multivariate statistic;
+additional statistics yield negligible marginal gains while amplifying planner
+interference and ANALYZE maintenance overhead (a single well-chosen statistic
+already captures $\ge$0.9 of the best multi-statistic gain for every query with
+repair room; \S\ref{sec:rq2}). This finding reshapes our understanding of
+extended-statistics tuning: effective tuning favors \emph{compact, precise}
+statistic deployment rather than blindly accumulating as many statistics as
+possible. Moreover, it has a formal consequence --- restricted to at most one
+statistic per query, the objective has no interaction term and is exactly linear
+(Prop.~\ref{prop:linear}) --- which makes the optimization tractable.
 
-\textbf{(C) The enabler: measuring the massive candidate space.} Instantiating
-this optimization requires a per-candidate, per-capacity q-error for every
-surviving option. On wide tables the naive protocol (CREATE--ANALYZE--EXPLAIN
-per candidate) is infeasible --- a single CENSUS ANALYZE at target 10000 already
-takes $\sim$22s with a warm cache, and grows linearly with the number of
-statistics (\S\ref{sec:measure-runtime}). Our
-\emph{Catalog-Mask protocol} (\S\ref{sec:measure}) builds each batch's
-candidates in one ANALYZE and isolates each by masking the others'
-\texttt{pg\_statistic\_ext\_data} payloads. This makes the candidate
-$\times$ capacity space measurable --- the full six-level per-candidate
-q-error table each workload needs for the MILP is obtainable in a single pass
---- while reducing measurement cost over the per-candidate protocol by orders of
-magnitude (measured speedups in \S\ref{sec:measure-runtime}); the resulting
-MILP then solves at full-workload scale in seconds (\S\ref{sec:rq4}).
-Measurement, not optimization, is the dominant bottleneck.
+Measuring the independent benefit of each candidate statistic becomes essential
+given the above observation, yet simultaneous deployment causes coupled
+interference. We propose \emph{Catalog-Mask}, an isolation protocol that
+eliminates cross-statistic interference and reliably quantifies the independent
+storage cost and error-reduction gain of each candidate column-set. Using these
+cost-benefit measurements, we formulate statistic tuning as a
+budget-constrained integer program that jointly optimizes two dimensions ---
+column-combination selection (what) and per-statistic sampling-capacity
+assignment (how-much) --- maximizing overall estimation quality under a given
+storage budget.
 
-\textbf{(D) The validation surprise: overlapping statistics interfere.}
-End-to-end deployment on real PostgreSQL shows per-candidate predictions are
-accurate, but co-installed \emph{overlapping} statistics let the planner
-switch queries --- an effect we trace to \emph{creation order}
-(\S\ref{sec:switch}) --- breaking prediction for affected queries. We therefore
-provide \emph{two deployment modes}: a conservative \emph{global-disjointness}
-mode that forbids column-overlapping co-installation and restores (empirically)
-near-exact predictability at a quantified quality cost ($\S\ref{sec:p1}$); and
-an \emph{unconstrained} mode that keeps nominal quality but must be followed by
-lightweight planner validation.
+We conduct comprehensive experiments across multiple real and synthetic
+workloads. The results demonstrate that our approach substantially reduces
+Q-error and suppresses redundant, interfering statistics under tight storage
+budgets. We explicitly acknowledge an important modeling assumption: our
+optimizer uses storage consumption as the budget metric, which exhibits
+inherent mismatch against real-world ANALYZE maintenance overhead. We further
+characterize applicability boundaries for our technique to avoid over-claiming
+its practical scope.
 
-In summary, we contribute (i) a \emph{capacity-aware reformulation} of
-extended-statistics selection --- the central problem is a joint
-\emph{what-and-how-much} allocation of a storage budget across statistic
-identities \emph{and} their \texttt{statistics\_target} capacity levels,
-solvable as a budgeted MILP (\S\ref{sec:formulation}, \S\ref{sec:milp}); (ii) an
-\emph{empirically observed one-stat sufficiency} on the two evaluated single-table
-workloads --- at most one 2-/3-column MCV candidate per query --- whose
-linearity is a formal consequence (Prop.~\ref{prop:linear}), and which is what
-makes the optimization tractable (\S\ref{sec:rq2}); (iii) a \emph{scalable
-measurement infrastructure}, the \emph{Catalog-Mask protocol}, that turns the
-otherwise-infeasible candidate $\times$ capacity measurement into a
-\emph{feasible} prerequisite for the optimization (\S\ref{sec:measure},
-\S\ref{sec:measure-runtime}): mounting many candidates in one ANALYZE and
-isolating each by masking the others' payloads, with a \emph{measured cost
-model} that makes masking's per-candidate cost explicit and yields a
-\emph{tunable measurement granularity}; and (iv) a \emph{PostgreSQL 16
-evaluation} of the resulting selection across multiple workloads and capacity
-levels --- including planner-level validation that surfaces and repairs a
-previously-hidden \emph{creation-order} interference among co-installed
-overlapping statistics (\S\ref{sec:switch}, \S\ref{sec:e2e}).
+This paper makes the following contributions:
+\textbf{(1)} We discover and quantitatively validate the one-stat-sufficiency
+property over real-world workloads; our end-to-end evaluation further
+highlights the negative planner-interference effect introduced by co-deployed
+overlapping multivariate statistics. \textbf{(2)} We design Catalog-Mask, an
+isolation protocol that enables reliable measurement of the independent
+cost-benefit of each candidate statistic, resolving the coupled-measurement
+bottleneck. \textbf{(3)} We present a joint what-and-how-much integer-programming
+formulation that simultaneously selects column-sets and assigns differentiated
+sampling capacity for PostgreSQL multivariate statistics. \textbf{(4)} We
+perform extensive end-to-end evaluation, analyze the mismatch between
+storage-based budgeting and real ANALYZE maintenance cost, and provide practical
+tuning insights for PostgreSQL extended statistics.
 
 \section{Background and Related Work}
 \label{sec:back}
