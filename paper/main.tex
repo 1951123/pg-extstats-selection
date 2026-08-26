@@ -1071,8 +1071,8 @@ on target-capped, high-cardinality \texttt{posts} statistics, capacity upgrades
 are the decisive lever; on data-capped CENSUS statistics, coverage is what
 matters and capacity is already satisfied at or below the default.
 
-\subsubsection{What-only vs.\ what+how-much.}
-The claim that capacity is a real decision axis requires isolating it: does
+\textbf{What-only vs.\ what+how-much.} The claim that capacity is a real
+decision axis requires isolating it: does
 free choice of \texttt{statistics\_target} beat \emph{fixed-capacity
 column-only} selection under the \emph{same} budget? We solve the sparse MILP,
 at each budget, for four variants on the full 632-query workload: the full
@@ -1268,8 +1268,8 @@ set to be pairwise column-disjoint, so the planner cannot cross-talk. Table
 E2E$/_{}$predicted q-error; $1.000$ means the deployment reproduces the model's
 prediction exactly). The global-disjoint solution reproduces its prediction
 exactly (ratio 1.000) because the deployed set is pairwise column-disjoint, at
-a quantified nominal-quality cost. The systematic sweep in \S\ref{sec:e2esys}
-extends this observation to 159 global-disjoint query-deployment points.}
+a quantified nominal-quality cost. The systematic sweep below extends this
+observation to 159 global-disjoint query-deployment points.}
 \label{tab:p1}
 \small
 \begin{tabular}{lccccc}
@@ -1288,21 +1288,16 @@ global-disjoint & 100 KB & 2 & 2.004 & \textbf{2.004} & \textbf{1.000}\\
 Across the deployments we ran, the global-disjoint solution is
 \emph{exactly} predictable (ratio 1.000 at both budgets), because the deployed
 set is pairwise column-disjoint so the planner cannot cross-talk --- the
-independence assumption holds \emph{structurally}, not per-query. This is a
-structural consequence of the deployment mode, not a property that happens to
-hold on the deployments we sampled; the systematic sweep below
-(\S\ref{sec:e2esys}) confirms it across 234 disjoint query-deployment points.
-The cost of disjointness is a well-defined nominal-quality loss (predicted 2.00
-vs.\ 1.02): it forces the solver to forgo overlapping-but-high-value dominant
+independence assumption holds \emph{structurally}, not per-query. The cost of
+disjointness is a well-defined nominal-quality loss (predicted 2.00 vs.
+1.02): it forces the solver to forgo overlapping-but-high-value dominant
 candidates.
 
-\subsubsection{Systematic validation: predictions across many deployments.}
-\label{sec:e2esys}
-The two deployments above isolate the mechanism; we now establish its
-\emph{generality} with a systematic sweep: on the real \texttt{posts} table we
-deploy 5 singletons plus the whole-workload budgeted MILP at four budgets
-(10/40/100/250\,KB), each solved both \emph{with} global disjointness and
-\emph{without}, and measure E2E for every query a deployment touches.
+\emph{Generality across many deployments.} To show this is not an artefact of a
+hand-picked deployment, on the real \texttt{posts} table we deploy 5 singletons
+plus the whole-workload budgeted MILP at four budgets (10/40/100/250\,KB), each
+solved both \emph{with} global disjointness and \emph{without}, and measure E2E
+for every query a deployment touches; \label{sec:e2esys}
 Fig.~\ref{fig:e2epredict} summarizes 234 disjoint (159 global-disjoint MILP $+$
 75 singletons) and 230 overlapping query-deployment points.
 
@@ -1334,20 +1329,18 @@ co-installed overlapping statistics that disjointness removes --- and removes
 \subsection{The Causal Takeaway}
 \label{sec:e2e-takeaway}
 
-The three stages form a clean causal chain. (i) Per-candidate measurement is
-sound, and a single deployed statistic is exactly predictable (Stage 1);
-(ii) the only place prediction diverges is under co-installed \emph{overlapping}
-statistics, where the planner's joint choice violates the per-candidate
-independence assumption (Stage 2); and (iii) enforcing pairwise column
-disjointness removes that interaction and restores ratio 1.000 (Stage 3), at a
-quantified quality cost. This does not undermine the method --- it precisely
-delimits where the sparse model holds, and provides a validated, deployable fix.
-It is the empirical ``surprise'' that turns validation into a contribution; the
-practical alternative when the quality cost of disjointness is unacceptable is
-Option B (\S\ref{sec:disc-fix}): solve without the constraint and repair the
-deployment by EXPLAIN-checking and dropping flagged interferers --- this
-preserves nominal quality but, as we verify empirically across budgets
-(Table~\ref{tab:optionB}), does not guarantee the predictability of Option~A.
+The three stages form a clean causal chain: per-candidate measurement is sound
+and a single deployed statistic is exactly predictable (Stage~1); the only
+place prediction diverges is under co-installed \emph{overlapping} statistics,
+where the planner's joint choice violates the per-candidate independence
+assumption (Stage~2); and enforcing pairwise column disjointness removes that
+interaction and restores ratio 1.000 (Stage~3), at a quantified quality cost.
+This does not undermine the method --- it precisely delimits where the sparse
+model holds and provides a validated, deployable fix. The practical alternative
+when the quality cost of disjointness is unacceptable is Option~B
+(\S\ref{sec:disc-fix}): solve without the constraint and repair by
+EXPLAIN-checking and dropping flagged interferers --- this preserves nominal
+quality but does not guarantee predictability (Table~\ref{tab:optionB}).
 
 \section{Discussion and Open Questions}
 \label{sec:disc}
