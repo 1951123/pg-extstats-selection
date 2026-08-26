@@ -874,20 +874,16 @@ bound: CENSUS's saturation point is \emph{below} the default target 100, so
 when we extend the menu downward to $\{10,25,50\}$, the capacity axis
 re-emerges --- across that low sub-menu, $\approx$29\% of candidates now vary
 with target, and $\approx$7\% improve by ${\ge}20\%$ as capacity rises from 10
-to 50 (over the full 468-query workload, 30{,}856 candidates). The
-mechanism is the one in \S\ref{sec:mechanisms}: CENSUS's categorical columns
-are \emph{data-capped} at a very low cardinality, so their MCV lists are
-already full by target 50-100; above that no larger target stores more entries
-or changes the estimate, but \emph{below} it a smaller target genuinely loses
-entries. The capacity axis is therefore real and two-sided on both workloads:
-a DBA may need to \emph{raise} it on high-cardinality combinations (the
-\texttt{posts} case) or \emph{it is already satisfied at or below the default}
-(data-capped CENSUS combinations) --- and the menu must be wide enough to tell
-these apart. Capacity sets a \emph{per-query} precision floor that competes for
-the same budget, which is precisely why \emph{how much} must be decided jointly
-with \emph{which} statistics to build (Prop.~\ref{prop:linear}). (ANALYZE cost
-likewise grows with target and with the number of installed statistics,
-\S\ref{sec:measure-runtime}.)
+to 50 (over the full 468-query workload, 30{,}856 candidates), because
+CENSUS's categorical columns are \emph{data-capped}: their MCV lists fill at a
+very low cardinality, so a smaller target genuinely loses entries while a
+larger one stores nothing new. The capacity axis is therefore real and
+two-sided on both workloads --- a DBA may need to \emph{raise} it on
+high-cardinality combinations (the \texttt{posts} case) or find it already
+satisfied below the default (data-capped CENSUS) --- which is precisely why
+\emph{how much} must be decided jointly with \emph{which} statistics
+(Prop.~\ref{prop:linear}). (ANALYZE cost likewise grows with target and with
+installed statistics, \S\ref{sec:measure-runtime}.)
 
 \subsection{RQ2: Is One Statistic per Query Sufficient?}
 \label{sec:rq2}
