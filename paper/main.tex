@@ -190,9 +190,10 @@ cost-benefit of each candidate statistic, resolving the coupled-measurement
 bottleneck. \textbf{(3)} We present a joint what-and-how-much integer-programming
 formulation that simultaneously selects column-sets and assigns differentiated
 sampling capacity for PostgreSQL multivariate statistics. \textbf{(4)} We
-perform extensive end-to-end evaluation, analyze the mismatch between
-storage-based budgeting and real ANALYZE maintenance cost, and provide practical
-tuning insights for PostgreSQL extended statistics.
+perform extensive end-to-end evaluation over real and synthetic workloads,
+characterize the mismatch between storage-based budgeting and real ANALYZE
+maintenance cost as a limitation, and provide practical tuning insights for
+PostgreSQL extended statistics.
 
 \section{Background and Related Work}
 \label{sec:back}
@@ -407,14 +408,16 @@ question answered by the E2E validation (\S\ref{sec:e2e}).
 \end{proof}
 
 The log-space approximation used for multi-select is therefore unnecessary for
-the sparse surrogate; we solve the linear form exactly. This makes the
-\emph{surrogate optimization problem} an exact MILP under the singleton-effect
-restriction; \S\ref{sec:p1} then determines when that surrogate remains faithful
-to PostgreSQL's actual statistic selection after deployment. We call this the
-\emph{capacity-aware} selection problem: because each capacity level is a
-distinct physical statistic, choosing \emph{which} level of a combination to
-build is expressed by selecting the corresponding $y_{(table,cols,level)}$,
-subject to a global budget.
+the sparse surrogate; we solve the linear form exactly. This is the sense in
+which the integer program promised in the introduction (\S\ref{sec:intro})
+specializes here: because one-stat sufficiency removes the interaction term, the
+general integer program degenerates to an \emph{exactly linear} MILP under the
+singleton-effect restriction, and \S\ref{sec:p1} then determines when that
+surrogate remains faithful to PostgreSQL's actual statistic selection after
+deployment. We call this the \emph{capacity-aware} selection problem: because
+each capacity level is a distinct physical statistic, choosing \emph{which}
+level of a combination to build is expressed by selecting the corresponding
+$y_{(table,cols,level)}$, subject to a global budget.
 
 \section{Optimization: Sparse MILP with Capacity Levels}
 \label{sec:milp}
