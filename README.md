@@ -114,8 +114,45 @@ in [`docs/reproducibility.md`](docs/reproducibility.md).
 - **job-light** (the IMDB join sub-plan workload referenced in the paper) is the
   same CEB benchmark's IMDB-derived join workload.
 
-Each benchmark is initialized idempotently with its `benchmarks/init_*.sh`
-script, e.g. `bash benchmarks/init_census.sh`.
+### Data files: what is in the repo vs. what you must download
+
+The **queries**, **schemas**, and Census **documentation** are committed to this
+repository. The **raw data payloads** (CSV / census text / tarballs) are *not*
+committed (they are large third-party files, git-ignored); you must download
+them into `benchmarks/<name>/data/` from the URLs above before running the
+`init_*.sh` scripts. The tree below marks committed files with ✓ and
+download-required files with ⬇.
+
+```
+benchmarks/
+├── Census/                          # USCensus1990 (UCI), data-capped
+│   ├── queries/query.sql            # ✓ 468 single-table queries (+ground truth)
+│   └── data/
+│       ├── USCensus1990.data.txt    # ⬇ from us+census+data+1990.zip
+│       ├── USCensus1990raw.data.txt # ⬇ from us+census+data+1990.zip
+│       ├── us+census+data+1990.zip  # ⬇ (optional, keep archive)
+│       └── *.readme / *.attributes / *.html / *.mapping.sql   # ✓ docs (committed)
+├── JOB/                             # IMDb (JOB), join-heavy negative control
+│   ├── queries/*.sql                # ✓ the 113 canonical JOB queries
+│   ├── schema.sql / fkindexes.sql   # ✓ schema + indexes
+│   └── data/
+│       ├── *.csv                    # ⬇ 21 CSVs from imdb.tgz (aka_name.csv,
+│       │                            #   cast_info.csv, title.csv, ... )
+│       ├── imdb.tgz                 # ⬇ (optional, keep archive)
+│       └── schematext.sql           # ✓ (schema reference)
+└── stats_CEB/                       # StackExchange (CEB), target-capped
+    ├── queries/stats_CEB.sql            # ✓ 146 CEB join queries
+    ├── queries/stats_CEB_single_table.sql  # ✓ 632 CEB single-table queries
+    └── data/
+        ├── stats.sql                # ✓ schema (committed)
+        └── *.csv                    # ⬇ 8 CSVs from CEB datasets/stats_simplified
+                                     #   (posts.csv, users.csv, votes.csv,
+                                     #   badges.csv, comments.csv, postHistory.csv,
+                                     #   postLinks.csv, tags.csv)
+```
+
+After placing the ⬇ files, each benchmark is initialized idempotently with its
+`benchmarks/init_*.sh` script, e.g. `bash benchmarks/init_census.sh`.
 
 ## Installation
 
