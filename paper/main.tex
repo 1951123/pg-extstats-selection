@@ -403,16 +403,15 @@ statistics coexist (we return to this in \S\ref{sec:e2e}).
 
 Our measurements (\S\ref{sec:rq2}) reveal that per query a
 \emph{single dominant statistic} already captures nearly all improvement
-attainable from the evaluated 2-/3-column MCV candidates. This observation motivates a \emph{restricted} optimization model ---
-the \emph{sparse} special case of a budgeted statistic-selection problem, in which each query selects at most one
-statistic, $\sum_s x_{is}\le 1$. We stress that this restriction is the
-\emph{one-stat sufficiency} phenomenon (\S\ref{sec:rq2}) and is \emph{empirically
-justified}, not a modeling assumption that holds by definition: it
-is exact \emph{conditional on} the one-statistic-per-query regime
-(\S\ref{sec:rq2} characterizes when it holds and when it fails). Within that
-regime, the restriction removes the interaction that makes the general problem
-hard: with at most one statistic per query, $e_i(T_i)$ is either $e_i^0$ (no
-statistic) or $e_{is}$ (the single selected statistic), so no joint term
+attainable from the evaluated 2-/3-column MCV candidates, which motivates a
+\emph{restricted} model: a budgeted statistic-selection problem in which each
+query selects at most one statistic, $\sum_s x_{is}\le 1$. This \emph{one-stat
+sufficiency} is \emph{empirically justified}, not a modeling assumption that
+holds by definition: it is exact conditional on the one-statistic-per-query
+regime, and \S\ref{sec:rq2} characterizes when that regime holds and when it
+fails. Within it, the restriction removes the interaction that makes the general
+problem hard: with at most one statistic per query, $e_i(T_i)$ is either $e_i^0$
+(no statistic) or $e_{is}$ (the single selected statistic), so no joint term
 arises.
 
 \begin{proposition}[Exact linearity of the singleton-effect surrogate]
@@ -636,7 +635,7 @@ at multi-hundred-GB scale the per-candidate protocol becomes infeasible and
 Catalog-Mask the \emph{only} tractable path. Because it relies on the system
 catalog layout and the planner's OID-order selection (\S\ref{sec:switch}),
 Protocol-M is specific to PostgreSQL 16 and to \emph{MCV} statistics --- honest
-limits of the implementation, not of the model (\S\ref{sec:disc}, item~5).
+limits of the implementation, not of the model (\S\ref{sec:disc-objective}).
 
 \subsection{Sampling Determinism vs.\ Statistics Target}
 \label{sec:measure-determinism}
