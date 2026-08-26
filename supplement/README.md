@@ -147,3 +147,26 @@ it grows with the number of statistics mounted during that measurement, a
 property of the measurement *granularity*, not of Protocol-M per se. The cost
 model and its optimal-batching derivation appear in §5.5 of the main text
 (Eqs. 1–2 and Prop. 1).
+
+---
+
+## F. Planner creation-order instrumentation (full detail, §7.2.1)
+
+The main text keeps the mechanism conclusion (the planner walks each relation's
+statistics in OID == CREATE order and uses the *first* matching statistic). The
+supporting per-query numbers are here. For seven overlap-prone queries we read
+the planner's cardinality estimate via `EXPLAIN` under three mask conditions.
+
+- Co-installed estimate is bit-identical to the statistic created first (e.g.
+  `st.308`: 41,177 vs. B-only's 8,926), never a blend.
+- Forcing the planner onto B alone reproduces the Stage-2 degradation (q-error
+  ≈4.4–4.6); the deployed case returns ≈1.00–1.04.
+- Swapping creation order flips the winner: `st.144` (A = AFV, B = ACV) switches
+  from A-only's 11,894 (q 1.04) to B-only's 5,827 (q 2.13).
+- Interference is a *step function of order*, not overlap amount: prepending a
+  single bad sibling before a query's winner lifts its E2E/predicted ratio from
+  1.0 to ≈1.8–4.1 (additional siblings do not accumulate, since the planner uses
+  the first matching one), while naive overlap density stays ≈0.93–1.00.
+
+> Reproduction: `exp_planner_switch.py`, `results/p0_planner_switch.json`
+> (level = 10000, posts table).
