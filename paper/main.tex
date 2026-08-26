@@ -638,6 +638,16 @@ the large fixed target and Protocol-M are two halves of one design decision;
 consequently most queries have no candidate, their predicates served by the
 fixed single-column statistics with baseline q-error already near 1.
 
+\emph{Protocol-M is a large-sample oracle, not a deployment emulator.}
+Fixing the single-column baseline at a generous target means every capacity
+level $L$ is evaluated on the same \emph{large} sample ($\sim$3M rows), even
+though a real ``\texttt{SET STATISTICS} $L$'' deployment builds that candidate
+on the smaller sample its own target implies. Protocol-M thus measures a
+\emph{conditional large-sample oracle} view $e_{is}(L)$, which isolates capacity
+as the only axis (\S\ref{sec:measure-determinism}) but is not a claim that real
+deployment reproduces it exactly; we assess deployment fidelity in
+\S\ref{sec:disc-deployment}.
+
 \emph{Batch granularity.}
 Protocol-M dominates Protocol-A by replacing per-candidate ANALYZEs with
 per-candidate masking, but \emph{masking is not free}: it rewrites the system
@@ -791,10 +801,13 @@ baseline q-error 4.58 only as far as its capacity allows: at target 100 it
 does \emph{nothing} (q-error stays 4.58 --- the correlation is not representable
 in so few MCV entries), at target 1000 it more than halves the error (2.82), and
 at 10000 it becomes near-exact (1.04). Capacity is not always the binding
-constraint, however: on the wide CENSUS \texttt{climate} table, extreme-selectivity
-queries are caught even at a \emph{low} target --- the workload's worst query,
-\texttt{query.184} (baseline q-error 4{,}162, 13 true rows against ~54k
-estimated), is collapsed to 1.08 by a single 3-column MCV already at target 100.
+constraint, however: on the wide CENSUS \texttt{climate} table, most
+\emph{data-capped} combinations are already satisfied below the default target
+100 --- their MCV lists fill at low cardinality, so raising capacity stores
+nothing new, and over the coarse menu $\{100,1000,10000\}$ the capacity axis is
+\emph{invisible}. (The workload's worst query, \texttt{query.184} at 4{,}162,
+is the rare-case counter-example: it needs L10000 in a real deployment though the
+oracle makes it look already-fixed at L100 --- \S\ref{sec:disc-deployment}.)
 
 This contrast is \emph{systematic} once the capacity menu is wide enough to
 expose it. Over the coarse menu $\{100,1000,10000\}$ the capacity axis on CENSUS
@@ -1272,6 +1285,29 @@ maintenance-aware objective (open question~1) is the natural extension.
 emphasizes the heavy error tail while preserving the linear MILP objective. A
 log-objective produces nearly identical mean q-error across budgets, indicating
 that the main conclusions are not sensitive to this choice.
+
+\subsection{Deployment Fidelity of the Oracle}
+\label{sec:disc-deployment}
+
+Protocol-M evaluates every capacity level on the same large sample (a
+\emph{large-sample oracle} view), which a real ``\texttt{SET STATISTICS} $L$''
+deployment need not reproduce. Re-measuring with a real target-specific
+\texttt{ANALYZE} (single-column target back at 100), we find the oracle highly
+faithful in the ordinary regime: the level it deems optimal and a real
+deployment's agree within 1\%, and the headline example
+\texttt{posts(AnswerCount,FavoriteCount,ViewCount)}
+($4.58\to2.82\to1.04$) is reproduced to within 1\%. The oracle can be
+optimistic only on a narrow regime --- when a candidate's columns cover a
+query's rare-selectivity driver and the combination is too rare to appear in a
+real low-capacity sample, so the large sample captures it while a real small
+sample misses it (falling back to base-frequency) with a far worse true
+q-error. Sweeping capacity as a continuous knob, the ratio of real to oracle
+q-error declines smoothly from $\sim$$10^{2}{-}10^{4}$ when the expected sample
+count $\lambda(L){=}(r/N)\cdot\textrm{sample}(L)$ is below one to $\approx$1
+once $\lambda$ exceeds roughly 5 --- so we treat low expected counts as an
+\emph{empirical warning regime}, not a hard threshold: the harmful optimistic
+bias arises when a candidate covers the rare driver AND its expected sample
+count is small.
 
 \subsection{The Interference Fix}
 \label{sec:disc-fix}
