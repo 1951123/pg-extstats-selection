@@ -1297,60 +1297,28 @@ joint effect the per-candidate measurement cannot see by construction.
 \label{sec:switch}
 To verify this optimizer-internal claim directly, for seven overlap-prone
 queries we take a pair of overlapping statistics (A = the good one, B = a
-bad sibling sharing columns, measured bad \S4.2) and read the planner's own
+bad sibling sharing columns) and read the planner's own
 cardinality estimate via \texttt{EXPLAIN} under three mask conditions:
 B-only, A-only, and both live (A created \emph{before} B, as in a normal
-deployment). Table \ref{tab:switch} reports each condition's estimated row
-count and q-error.
-
-\begin{table}[t]
-\caption{Planner behaviour under co-installation (\S\ref{sec:e2e-coinstalled}).
-For each query, A is the good statistic and B a bad overlapping sibling on
-shared columns; ``B-only'' / ``A-only'' mask the other's payload; ``both'' is
-the real deployment with A built before B. Under both, the \texttt{EXPLAIN}
-estimate is \emph{bit-identical} to A-only and never to B-only --- the planner
-uses the statistic created first. The same pair, with B created first, can
-instead track B (e.g.\ st.144 A$=$AFV, B$=$ACV flips 1.042 to 2.126).}
-\label{tab:switch}
-\small
-\begin{tabular}{lrrrrrr}
-\toprule
-query & \multicolumn{3}{c}{estimated rows} & \multicolumn{3}{c}{q-error}\\
-\cmidrule(lr){2-4}\cmidrule(lr){5-7}
-      & B-only & A-only & both & B-only & A-only & both\\
-\midrule
-st.308 &  8\,926 & 41\,177 & 41\,177 & 4.61 & 1.00 & 1.00\\
-st.144 &  2\,685 & 11\,894 & 11\,894 & 4.61 & 1.04 & 1.04\\
-st.567 &  2\,840 & 13\,055 & 13\,055 & 4.58 & 1.00 & 1.00\\
-st.562 &    200 &    876 &    876 & 4.39 & 1.00 & 1.00\\
-st.182 &  1\,189 &  5\,198 &  5\,198 & 4.38 & 1.00 & 1.00\\
-st.588 &  2\,828 & 12\,381 & 12\,381 & 4.51 & 1.03 & 1.03\\
-st.326 &  2\,834 & 12\,521 & 12\,521 & 4.58 & 1.04 & 1.04\\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The result is unambiguous: in every case the co-installed estimate equals the
-A-only estimate to the last digit (e.g.\ st.308: 41\,177 vs.\ 8\,926), never an
-intermediate blend and never B; forcing the planner onto B alone reproduces the
-Stage-2 degradation (q-error $\approx 4.4$--$4.6$), while the deployed case
-returns $\approx 1.00$--$1.04$. Crucially, this is \emph{not} because the
-optimizer ``picks the better statistic'': the planner walks its per-relation
-list in OID order (== CREATE order) and uses the \emph{first} matching
-statistic. Building the same pair with B first flips the winner --- st.144
-(A$=$AFV, B$=$ACV) switches from A-only's 11\,894 (q 1.04) to B-only's 5\,827
-(q 2.13) purely by swapping creation order. So co-installed overlap does not
-``degrade'' per se; it makes the outcome \emph{depend on deployment order}, and
-this is why disjoint deployments (Stage 3) restore exact predictability: with
-no overlapping pairs the ``first-built'' choice is forced.
-
-A systematic probe confirms interference is a \emph{step function of order}, not
-of overlap amount: prepending a single bad sibling before a query's winner
-lifts its E2E/predicted ratio from 1.0 to $\approx$1.8--4.1 (additional siblings
-do not accumulate, since the planner uses the \emph{first} matching one), while
-the naive overlap density $d$ stays $\approx$0.93--1.00 throughout --- so
-overlap density alone cannot predict interference; only the deployment
-\emph{order} of a bad sibling can.
+deployment). In every case the co-installed estimate is \emph{bit-identical} to
+A-only (e.g.\ \texttt{st.308}: $41\,177$ vs.\ B-only's $8\,926$), never a blend
+and never B; forcing the planner onto B alone reproduces the Stage-2
+degradation (q-error $\approx 4.4$--$4.6$), while the deployed case returns
+$\approx 1.00$--$1.04$. Crucially, this is \emph{not} because the optimizer
+``picks the better statistic'': the planner walks its per-relation list in OID
+order (== CREATE order) and uses the \emph{first} matching statistic. Building
+the same pair with B first flips the winner --- st.144 (A$=$AFV, B$=$ACV)
+switches from A-only's $11\,894$ (q 1.04) to B-only's $5\,827$ (q 2.13) purely
+by swapping creation order. So co-installed overlap does not ``degrade'' per
+se; it makes the outcome \emph{depend on deployment order}, and disjoint
+deployments (Stage 3) restore exact predictability because with no overlapping
+pairs the ``first-built'' choice is forced. A systematic probe confirms
+interference is a \emph{step function of order}, not of overlap amount:
+prepending a single bad sibling before a query's winner lifts its
+E2E/predicted ratio from $1.0$ to $\approx1.8$--$4.1$ (additional siblings do
+not accumulate, since the planner uses the \emph{first} matching one), while
+the naive overlap density stays $\approx0.93$--$1.00$ throughout --- so only
+deployment \emph{order}, not overlap density, can predict interference.
 
 \subsection{Stage 3: Global Disjointness Restores Near-Exact Predictability}
 \label{sec:p1}
