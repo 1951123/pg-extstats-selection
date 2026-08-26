@@ -182,26 +182,6 @@ storage-based budgeting and real ANALYZE maintenance cost, and provide
 practical tuning insights for PostgreSQL extended statistics.
 \end{enumerate}
 
-\section*{Nomenclature}
-\begin{center}\small
-\begin{tabular}{@{}l@{\hspace{1.2em}}p{0.62\columnwidth}@{}}
-\toprule
-Symbol & Meaning\\
-\midrule
-$Q=\{q_1,\dots,q_n\}$, $n$ & workload of $n$ queries; $q_i$ is the $i$-th query\\
-$e_i^0$ & baseline q-error of $q_i$ with no extended statistics\\
-$e_{is}$ & q-error of $q_i$ when it uses only physical statistic $s$\\
-$s=(t,\mathrm{cols},L)$ & a physical statistic (table $t$, a column set, capacity level $L$)\\
-$c_s$ & persistent storage cost of statistic $s$ (bytes)\\
-$C$ & storage budget\\
-$y_s$ & $1$ if statistic $s$ is created, otherwise $0$\\
-$x_{is}$ & $1$ if query $q_i$ is assigned statistic $s$, otherwise $0$\\
-$T_i$ & the set of created statistics used by $q_i$\\
-$\Delta_{is}=e_i^0-e_{is}$ & per-query improvement from statistic $s$ on $q_i$\\
-\bottomrule
-\end{tabular}
-\end{center}
-
 \section{Background and Related Work}
 \label{sec:back}
 
@@ -308,6 +288,25 @@ pg\_qualstats \cite{pg_qualstats} & \checkmark & -- & \checkmark & -- & -- & \ch
 
 \subsection{Notation and Objective}
 \label{sec:notn}
+
+\begin{center}\small
+\begin{tabular}{@{}l@{\hspace{1.2em}}p{0.62\columnwidth}@{}}
+\toprule
+Symbol & Meaning\\
+\midrule
+$Q=\{q_1,\dots,q_n\}$, $n$ & workload of $n$ queries; $q_i$ is the $i$-th query\\
+$e_i^0$ & baseline q-error of $q_i$ with no extended statistics\\
+$e_{is}$ & q-error of $q_i$ when it uses only physical statistic $s$\\
+$s=(t,\mathrm{cols},L)$ & a physical statistic (table $t$, a column set, capacity level $L$)\\
+$c_s$ & persistent storage cost of statistic $s$ (bytes)\\
+$C$ & storage budget\\
+$y_s$ & $1$ if statistic $s$ is created, otherwise $0$\\
+$x_{is}$ & $1$ if query $q_i$ is assigned statistic $s$, otherwise $0$\\
+$T_i$ & the set of created statistics used by $q_i$\\
+$\Delta_{is}=e_i^0-e_{is}$ & per-query improvement from statistic $s$ on $q_i$\\
+\bottomrule
+\end{tabular}
+\end{center}
 
 We are given a workload of queries $Q=\{q_1,\dots,q_n\}$. The accuracy of the
 planner's estimate for $q_i$ is the \textbf{q-error}
