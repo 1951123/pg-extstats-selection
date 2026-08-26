@@ -281,8 +281,6 @@ pg\_qualstats \cite{pg_qualstats} & \checkmark & -- & \checkmark & -- & -- & \ch
 \textbf{This work} & \checkmark & MCV & \checkmark & \textbf{storage} & \checkmark & \checkmark & \checkmark\\
 \bottomrule
 \end{tabular}
-
-{\footnotesize candidate discovery = discovery of correlated column groups; multivariate statistics = multi-column statistics; E2E = end-to-end planner validation.}
 \end{table*}
 
 \section{Problem Formulation}
@@ -686,7 +684,7 @@ sub-batch $b$ & \emph{size} $s$ & total & ANALYZE & mask\\
 \bottomrule
 \end{tabular}
 
-{\footnotesize $b$ = sub-batch number; $s$ = candidates in the sub-batch; total/ANALYZE/mask are seconds; $nL$ = distinct (candidate$\times$level) objects measured.}
+{\footnotesize $nL$ = distinct (candidate$\times$level) objects; times in seconds.}
 \end{table*}
 
 \section{Empirical Findings}
@@ -845,7 +843,7 @@ $K$ clusters & base & top-1 & top-$K$ & $\operatorname{cov}_K$\\
 \bottomrule
 \end{tabular}
 
-{\footnotesize All columns are q-error values; $\operatorname{cov}_K$ = fraction of the best $K$-statistic improvement captured by the single best statistic.}
+{\footnotesize All columns are q-error; $\operatorname{cov}_K$ = fraction of the best-$K$ improvement captured by the single best statistic.}
 \end{table}
 
 \subsection{Joint Optimization Matters Under a Shared Budget}
@@ -887,7 +885,7 @@ budget & MILP & best greedy & MILP adv ($\Delta$q) & best-is\\
 \bottomrule
 \end{tabular}
 
-{\footnotesize Each q-error entry is the workload mean; $\Delta$q = MILP advantage over the best greedy; best-is = the winning greedy at that budget.}
+{\footnotesize Entries are workload-mean q-error; $\Delta$q = MILP advantage; best-is = winning greedy.}
 \end{table}
 
 The MILP wins at every budget. Its largest advantages occur at 5\,KB
@@ -1086,7 +1084,7 @@ global-disjoint & 100 KB & 2 & 2.004 & \textbf{2.004} & \textbf{1.000}\\
 \bottomrule
 \end{tabular}
 
-{\footnotesize predicted = model-predicted q-error; E2E = q-error measured on the real table; ratio = E2E/predicted.}
+{\footnotesize predicted = model-predicted q-error; E2E = measured on the real table.}
 \end{table*}
 
 Across the deployments we ran, the global-disjoint solution is
@@ -1243,8 +1241,6 @@ Option-B repaired & 1.030 & 7/50 & 1.026 & 4/46 & 1.020 & 6/50\\
 \quad (iterated) & 1.031 & 7/50 & 1.025 & 4/46 & 1.019 & 3/63\\
 \bottomrule
 \end{tabular}
-
-{\footnotesize mean = achieved workload-mean q-error; tail = queries with E2E/predicted ratio $>1.05$ (\emph{of served}, out of the total served per budget).}
 \end{table}
 
 The two modes make an honest, complementary trade. Option~B \emph{preserves the
