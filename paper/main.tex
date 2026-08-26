@@ -1296,18 +1296,19 @@ deployment need not reproduce. Re-measuring with a real target-specific
 faithful in the ordinary regime: the level it deems optimal and a real
 deployment's agree within 1\%, and the headline example
 \texttt{posts(AnswerCount,FavoriteCount,ViewCount)}
-($4.58\to2.82\to1.04$) is reproduced to within 1\%. The oracle can be
-optimistic only on a narrow regime --- when a candidate's columns cover a
-query's rare-selectivity driver and the combination is too rare to appear in a
-real low-capacity sample, so the large sample captures it while a real small
-sample misses it (falling back to base-frequency) with a far worse true
-q-error. Sweeping capacity as a continuous knob, the ratio of real to oracle
-q-error declines smoothly from $\sim$$10^{2}{-}10^{4}$ when the expected sample
-count $\lambda(L){=}(r/N)\cdot\textrm{sample}(L)$ is below one to $\approx$1
-once $\lambda$ exceeds roughly 5 --- so we treat low expected counts as an
-\emph{empirical warning regime}, not a hard threshold: the harmful optimistic
-bias arises when a candidate covers the rare driver AND its expected sample
-count is small.
+($4.58\to2.82\to1.04$) is reproduced to within 1\%. In our experiments the
+oracle becomes optimistic on a narrow regime --- when a candidate's columns
+cover a query's rare-selectivity driver and the combination is too rare to
+appear in a real low-capacity sample, so the large sample captures it while a
+real small sample misses it (falling back to base-frequency) with a far worse
+true q-error. Sweeping capacity as a continuous knob, the ratio of real to
+oracle q-error declines smoothly from $\sim$$10^{2}{-}10^{4}$ when the expected
+sample count $\lambda(L){=}(r/N)\cdot\textrm{sample}(L)$ is below one to
+$\approx$1 as $\lambda$ grows larger --- in our runs it approached 1 once
+$\lambda$ was several units or larger. We therefore treat low expected counts
+as an \emph{empirical warning regime}, not a hard threshold: the harmful
+optimistic bias arises when a candidate covers the rare driver AND its expected
+sample count is small.
 
 \subsection{The Interference Fix}
 \label{sec:disc-fix}
