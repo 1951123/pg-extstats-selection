@@ -67,6 +67,11 @@ results/*
 !results/true_vs_mask_posts144.json
 # Protocol-M applicability boundary scan (scripts/tmp_boundary_scan.py output)
 !results/boundary_scan.json
+# λ transition curves (scripts/tmp_transition_*.py output: data + plots)
+!results/transition_query184.json
+!results/transition_multicand.json
+!results/transition_query184.png
+!results/transition_multicand.png
 # Official phase-1 run logs (config/progress, auditability)
 !results/phase1_ceb_single_6level.log
 !results/phase1_census_low.log

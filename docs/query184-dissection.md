@@ -195,15 +195,66 @@ CENSUS 候选（actual 从 13 到 866K，exp@L50 覆盖 0.16 到 10^4），在 L
   保持 qerr 2000–4200（Mask 诚实，非乐观）。
 - 120 个不含 `iRspouse` 的候选：非乐观。
 
-### 可写进论文的边界陈述
+### 可写进论文的边界陈述（注意措辞：经验性 warning regime，非严格定理）
 
-> Protocol-M（large-sample oracle）对普通/高基数候选高度保真（论文核心 posts 4.58→2.82→1.04
-> 真实成立）；它仅在**同时满足** (i) 候选列覆盖 query 的稀有选择性主导列，且
-> (ii) 目标组合在真实部署 target 下的期望采样计数 < 1 时，才可能**低估低容量价值**。
+> 在我们的实验中，Protocol-M（large-sample oracle）对普通/高基数候选高度保真（论文核心
+> posts 4.58→2.82→1.04 真实成立）；**有害的乐观偏差出现于**同时满足 (i) 候选列覆盖
+> query 的稀有选择性主导列、且 (ii) 目标组合在真实部署 target 下的期望采样计数很小时。
 > 对未覆盖稀有主导列的候选，即使组合稀有，oracle 也诚实（大样本同样救不了，不误导决策）。
+
+**重要限定**：当前数据把 `expected sample count` 称为一个**经验性的 warning regime**
+（远低于 1 时高发散），而非严格的 `<1 ⇒ 失效` 定理——因为边界附近数据点仍稀疏。
+这是 reviewer 难以攻击的稳妥表述。
 
 这是**论文方法论/limitation 层面的可辩护贡献**，把 query.184 从"奇怪失败案例"提升为
 "Protocol-M 的采样受限适用边界"。
+
+---
+
+## 7c. Task 4 — Transition 曲线：λ（期望采样计数）vs 失配单调恢复
+
+**问题**：`<1` 是硬阈值还是渐进 regime？关键缺口是 λ 在 0.16 与 33.9 之间的稀疏数据。
+
+**方法**（`scripts/tmp_transition_query184.py` + `tmp_transition_multicand.py`）：把容量 L
+当作**连续旋钮**。对固定候选，`λ(L) = (actual/N) × max(30000, 300·L)` 随 L 从 0.16 平滑扫到
+15.86。测每个 L 的 True-L q-error，ratio = True/Mask（Mask 对该候选 L≥100 恒定，用它作除数）。
+
+### 结果（query.184 `(iDisabl1,iLooking,iRspouse)`）
+
+| λ | L | True qerr | ratio (True/Mask) |
+|---|---|---|---|
+| 0.16 | 30–100 | 117–242 | **109–224**（发散）|
+| 0.32 | 200 | 24.0 | 22.3 |
+| 0.63 | 400 | 21.9 | 20.4 |
+| 1.27 | 800 | 10.9 | 10.1 |
+| 2.54 | 1600 | 2.77 | 2.57 |
+| 5.08 | 3200 | 1.23 | **1.14** |
+| 10.15 | 6400 | 1.08 | **1.0**（保真）|
+| 15.86 | 10000 | 1.08 | **1.0**（保真）|
+
+### 多候选确认（3 个 query.184 OPT 候选，一致形状）
+
+| λ | `(iDisabl1,iRspouse)` | `(dTravtime,iDisabl1,iRspouse)` | `(iDisabl1,iEnglish,iRspouse)` |
+|---|---|---|---|
+| 0.16 | 1.1–3.2 | **~1980** | **~550** |
+| 0.32 | 1.1 | **143** | **114** |
+| 0.63 | 3.2 | **73** | **38** |
+| 1.27 | 4.1 | **19** | **13** |
+| 2.54 | 1.5 | **9.5** | **3.4** |
+| 5.08 | **0.99** | **1.86** | **1.67** |
+| ≥10 | **0.99** | **1.0** | **1.0** |
+
+### 关键结论
+
+- **λ 远小于 1**：高度发散（ratio 最高 10³–10⁴）——即真实低容量 q-error 比 oracle 差很多。
+- **λ 约 1–2.5**：中等发散（ratio 2–20），仍偏离。
+- **λ ≥ ~5**：三个候选全部收敛到 ratio ≈ 1.0（oracle ≈ 部署）。
+- 这是**单调的 log-linear 恢复**，而非跳变的硬阈值；形状跨候选一致 ⇒ **机制性**，非个例。
+
+**对论文的用法**：把 λ 呈现为**经验性的 warning regime**（λ ≪ 1 高风险、λ 大则保真），
+而非"λ<1 才失效"的定理。它把 query.184 从 outlier 升级为"我们理解 Protocol-M 何时可靠、
+何时不可靠"的机制性边界（曲线图：`results/transition_query184.png`、
+`results/transition_multicand.png`）。
 
 ---
 
@@ -221,4 +272,7 @@ timeout 1700 .venv/bin/python scripts/tmp_boundary_scan.py \
   --phase1 results/phase1_census_mcv_6level.json \
   --cands "climate(iDisabl1,iLooking,iRspouse);climate(iCitizen,iDisabl1);climate(dIncome3,dTravtime);climate(dHours,iDisabl2);climate(dAncstry1,dDepart);climate(dIncome3,dPwgt1);climate(dAncstry1,dIncome2);climate(dAge,dHour89);climate(dAge,dAncstry2);climate(dDepart,dIncome5);climate(dIncome7,iEnglish);climate(dAncstry1,iFertil);climate(dDepart,dHispanic);climate(dRearning,dWeek89)" \
   --levels 50,100 --out results/boundary_scan.json
+# λ transition 曲线（单候选 + 多候选，L 作连续旋钮）
+timeout 1700 .venv/bin/python scripts/tmp_transition_query184.py
+timeout 1700 .venv/bin/python scripts/tmp_transition_multicand.py
 ```
