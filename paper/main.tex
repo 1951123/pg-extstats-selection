@@ -85,6 +85,7 @@ independent storage cost and error-reduction gain. We model statistic tuning as
 a budget-constrained integer-programming problem to jointly optimize
 column-combination selection and per-statistic sampling-capacity assignment.
 Our experiments demonstrate that our method significantly reduces q-error
+(the ratio of the planner's estimated to the actual cardinality)
 under tight storage budgets while avoiding redundant statistics and planner
 interference. We further characterize applicability boundaries and analyze the
 mismatch between storage-based budgeting and real-world ANALYZE overhead,
@@ -110,7 +111,8 @@ Inaccurate cardinality estimates frequently produce sub-optimal execution plans
 and severely degrade query performance. A major source of estimation error
 originates from the ubiquitous column-independence assumption, which ignores
 real-world attribute correlations within tables. PostgreSQL provides
-multivariate extended statistics including multi-column MCV, n-distinct, and
+multivariate extended statistics including multi-column most-common-value (MCV),
+n-distinct, and
 functional-dependency statistics to mitigate such bias. Unfortunately, these
 statistics require manual identification of correlated column-sets and careful
 configuration, imposing heavy tuning burdens on database administrators.
@@ -155,7 +157,8 @@ overall estimation quality under given storage budgets.
 
 We conduct comprehensive experiments across multiple real and synthetic
 workloads. The results demonstrate that our approach substantially reduces
-q-error and suppresses redundant, interfering statistics under tight storage
+q-error (the ratio of estimated to actual cardinality) and suppresses
+redundant, interfering statistics under tight storage
 budgets. We explicitly acknowledge an important modeling assumption: our
 optimizer uses storage consumption as the budget metric, which exhibits
 inherent mismatch against real-world ANALYZE maintenance overhead. We further
@@ -278,6 +281,8 @@ pg\_qualstats \cite{pg_qualstats} & \checkmark & -- & \checkmark & -- & -- & \ch
 \textbf{This work} & \checkmark & MCV & \checkmark & \textbf{storage} & \checkmark & \checkmark & \checkmark\\
 \bottomrule
 \end{tabular}
+
+{\footnotesize candidate discovery = discovery of correlated column groups; multivariate statistics = multi-column statistics; E2E = end-to-end planner validation.}
 \end{table*}
 
 \section{Problem Formulation}
@@ -371,14 +376,15 @@ singleton $\{s\}$ (surrogate error $e_{is}$); since at most one $x_{is}$
 equals $1$, no two statistics co-occur, so no joint term arises and the
 objective is linear. This is a statement about the \emph{model}; whether the
 real planner reproduces $e_{is}$ for the chosen $s$ is a separate, empirical
-question answered by the E2E validation (\S\ref{sec:e2e}).
+question answered by the end-to-end (E2E) validation (\S\ref{sec:e2e}).
 \end{proof}
 
 The log-space approximation is therefore unnecessary for the sparse surrogate;
 we solve the linear form exactly. This is the sense in which the integer program
 promised in the introduction (\S\ref{sec:intro}) specializes here: one-stat
 sufficiency removes the interaction term, so the general program degenerates to
-an \emph{exactly linear} MILP under the singleton-effect restriction, and
+an \emph{exactly linear} mixed-integer linear program (MILP) under the
+singleton-effect restriction, and
 \S\ref{sec:p1} then determines when that surrogate stays faithful to
 PostgreSQL's actual selection after deployment. We call this the \emph{capacity-aware} selection problem: because
 each capacity level is a distinct physical statistic, choosing \emph{which}
@@ -441,7 +447,8 @@ for every option that survives pruning. We take $c_s$ as the on-disk byte
 size of the candidate's MCV payload --- the serialized list in the
 \texttt{stxmcv} column of its \texttt{pg\_statistic\_ext\_data} row, read with
 \texttt{pg\_column\_size} --- so a coarser capacity is simply a smaller
-serialized list, and a list large enough to be stored out-of-line (TOAST) is
+serialized list, and a list large enough to be stored out-of-line via the
+oversized-attribute storage technique (TOAST) is
 counted by the same call.
 
 \subsection{How PostgreSQL Uses Extended Statistics (Mechanisms)}
@@ -594,7 +601,8 @@ and concurrent writes suspended); standard cache invalidation keeps every
 \texttt{EXPLAIN} fresh, and NULLing a payload does not re-run ANALYZE, so
 masking cost is independent of table size (full safeguards in the artifact).
 Two limits are honest implementation constraints rather than model choices:
-Protocol-M relies on the system-catalog layout and the planner's OID-order
+Protocol-M relies on the system-catalog layout and the planner's
+object-identifier (OID) order
 selection (\S\ref{sec:switch}), so it is specific to PostgreSQL 16 and to
 \emph{MCV} statistics (\S\ref{sec:disc-objective}). Its advantage grows with
 dataset scale --- the classical per-candidate ANALYZE pays the table's fixed
@@ -608,7 +616,8 @@ becomes the \emph{only} tractable path (\S\ref{sec:measure-naive}).
 \emph{Deterministic single-column baseline.}\label{sec:measure-determinism}
 Because \texttt{ANALYZE} is sampling-based, we fix the per-column
 \texttt{statistics\_target} at 10000 rather than PostgreSQL's default of 100:
-it removes run-to-run drift (reproducible, CV~$0$), avoids \emph{empty}
+it removes run-to-run drift (reproducible, coefficient of variation
+(CV)~$0$), avoids \emph{empty}
 high-capacity payloads that would degrade the baseline, and attributes any
 extended-statistic gain purely to correlation rather than to patching a coarse
 per-column estimate. All per-candidate q-errors $e_{is}$ are measured against
@@ -676,6 +685,8 @@ sub-batch $b$ & \emph{size} $s$ & total & ANALYZE & mask\\
 10 & 21 & 27.3 & 22.9 & 3.4\\
 \bottomrule
 \end{tabular}
+
+{\footnotesize $b$ = sub-batch number; $s$ = candidates in the sub-batch; total/ANALYZE/mask are seconds; $nL$ = distinct (candidate$\times$level) objects measured.}
 \end{table*}
 
 \section{Empirical Findings}
@@ -724,6 +735,8 @@ stats\_CEB (join) & 146 & 616   & 111 & 78    & 0/1/2/5/39\\
 job-light (join)  & 70  & 5     & 5   & 1     & 0/0/0/0/1\\
 \bottomrule
 \end{tabular}
+
+{\footnotesize cands/query = total per-query candidate count before dedup; global dedup = distinct column combinations; per-query = min/p25/med/p75/max candidates per query.}
 \end{table*}
 
 \subsection{Capacity Is a Real Decision Axis}
@@ -831,6 +844,8 @@ $K$ clusters & base & top-1 & top-$K$ & $\operatorname{cov}_K$\\
 4 & 10  & 10  & 1.00 & \textbf{$\approx$0}\\
 \bottomrule
 \end{tabular}
+
+{\footnotesize All columns are q-error values; $\operatorname{cov}_K$ = fraction of the best $K$-statistic improvement captured by the single best statistic.}
 \end{table}
 
 \subsection{Joint Optimization Matters Under a Shared Budget}
@@ -871,6 +886,8 @@ budget & MILP & best greedy & MILP adv ($\Delta$q) & best-is\\
 500\,KB  & \textbf{1.0013} & 1.0114 & 0.010 & G2\\
 \bottomrule
 \end{tabular}
+
+{\footnotesize Each q-error entry is the workload mean; $\Delta$q = MILP advantage over the best greedy; best-is = the winning greedy at that budget.}
 \end{table}
 
 The MILP wins at every budget. Its largest advantages occur at 5\,KB
@@ -945,6 +962,8 @@ budget & mean & max & mean & max\\
 500\,KB  & \textbf{1.0013} & \textbf{1.17} & 1.0018 & 1.26\\
 \bottomrule
 \end{tabular}
+
+{\footnotesize mean/max = workload mean and maximum q-error at that budget.}
 \end{table}
 
 Three observations. First, the capacity-aware model is \emph{never worse} than
@@ -1066,6 +1085,8 @@ overlap allowed & 100 KB & 7 & 1.632 & 1.933 & 1.184\\
 global-disjoint & 100 KB & 2 & 2.004 & \textbf{2.004} & \textbf{1.000}\\
 \bottomrule
 \end{tabular}
+
+{\footnotesize predicted = model-predicted q-error; E2E = q-error measured on the real table; ratio = E2E/predicted.}
 \end{table*}
 
 Across the deployments we ran, the global-disjoint solution is
@@ -1222,6 +1243,8 @@ Option-B repaired & 1.030 & 7/50 & 1.026 & 4/46 & 1.020 & 6/50\\
 \quad (iterated) & 1.031 & 7/50 & 1.025 & 4/46 & 1.019 & 3/63\\
 \bottomrule
 \end{tabular}
+
+{\footnotesize mean = achieved workload-mean q-error; tail = queries with E2E/predicted ratio $>1.05$ (\emph{of served}, out of the total served per budget).}
 \end{table}
 
 The two modes make an honest, complementary trade. Option~B \emph{preserves the
