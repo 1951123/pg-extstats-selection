@@ -237,28 +237,53 @@ the two evaluated workloads sit on opposite ends of this axis
 
 \subsection{Related Work}
 
-Prior work on statistics configuration answers essentially \emph{which} column
-groups to build. Chaudhuri and Narasayya \cite{chaudhuri2001automating}
-identify and prune a workload's needed statistics to a
-small effective set; \emph{CORDS} \cite{ilyas2004cords} and \emph{Haas et al.}
-\cite{haas2007detecting} discover correlated column groups and rank them
-under a catalog-space budget. Production PostgreSQL advisors --- EDB's
-Statistics Advisor \cite{edb_query_advisor} (at most two columns, no capacity
-tuning) and \texttt{pg\_qualstats} \cite{pg_qualstats} --- likewise recommend
-\emph{which} statistics, not \emph{how much} capacity. The shared gap across
-this lineage is the capacity axis: none treats PostgreSQL's per-statistic
-\texttt{statistics\_target} as a competing resource dimension against a single
-shared storage budget, so none decides \emph{whether to upgrade} an
-already-chosen statistic from L100 to L1000 to L10000 (``budget allocation''
-rather than ``selection''). Budget-constrained \emph{index and view selection}
-\cite{chaudhuri1997efficient,bruno2005automatic,agrawal2000automated} is the closest
-methodology (cost-driven candidates, MILP/greedy), but its candidates carry no
-capacity axis and the objective is not linear. Learned cardinality estimators
-\cite{kipf2018learned} are orthogonal: they \emph{change the estimator}, whereas
-we leave PostgreSQL's estimator unchanged and optimize the physical statistics
-supplied to it, validating the outcome against the \emph{real} planner (no
-synthetic model accuracy involved) \cite{chaudhuri1998overview}. Table
-\ref{tab:taxonomy} situates our contribution against this lineage.
+Physical database design has extensively investigated workload-driven selection
+of auxiliary structures such as indexes and materialized views under explicit
+space budgets~\cite{agrawal2000automated}. Classic AutoAdmin solutions cast
+physical design as a budget-constrained combinatorial optimization and adopt
+what-if interfaces to estimate candidate benefits without actual
+deployment~\cite{chaudhuri1997efficient,chaudhuri1998autoadmin}. Subsequent work
+further generalized physical-design search frameworks to support rich
+constraints, including update-driven maintenance overhead for physical
+structures~\cite{bruno2005automatic,bruno2010constrained}. A widely-adopted
+implicit assumption within these physical-design solvers is that the benefit
+contributed by each physical object is approximately independent when multiple
+objects co-exist. Nevertheless, multivariate extended statistics in PostgreSQL
+exhibit negative interference: overlapping co-deployed statistics may mislead
+the query planner and degrade cardinality estimation quality, a side-effect
+that does not arise for index selection.
+
+A large body of work studies multidimensional summaries and
+cardinality-estimation mechanisms, including multi-dimensional histograms,
+compact sketches, and learned estimators~\cite{bruno2001stholes,negi2023robust,kipf2018learned}.
+These efforts mostly focus on designing novel summary structures or replacing
+the optimizer's internal estimation logic. By contrast, our work reuses
+PostgreSQL's native multivariate statistics (MCV, ndistinct,
+functional-dependency statistics), and addresses the \emph{deployment} problem:
+selecting appropriate column-sets and assigning per-object sampling capacity,
+rather than inventing new statistic representations.
+
+Multiple industrial and research prototypes support automatic
+multivariate-statistic recommendation. The CORDS prototype extracts column
+correlation and generates candidate statistics guided by workload
+predicates~\cite{kraft2004cords,ilyas2004cords}. Haas et al.\ propose an
+alternative feedback-driven approach to detect attribute dependencies from
+query execution traces~\cite{haas2007detecting}. Early work on automated
+statistics management focuses on pruning redundant candidate statistics for
+workloads, but does not tune per-object sampling resolution~\cite{chaudhuri2001automating}.
+Production PostgreSQL advisors --- EDB's Statistics Advisor~\cite{edb_query_advisor}
+and pg\_qualstats~\cite{pg_qualstats} --- as well as SQL Server's built-in
+tooling recommend promising column combinations derived from query predicates.
+All these existing solutions solve only the ``what'' dimension of statistic
+selection: they treat per-statistic sampling capacity as a global fixed
+parameter and never optimize it for individual candidates. Moreover, prior
+approaches evaluate end-to-end estimation quality after deploying an entire set
+of statistics, lacking isolation mechanisms to quantify the independent benefit
+of each candidate statistic. Consequently, planner interference is not modeled,
+and redundancy caused by overlapping statistics stays concealed from
+optimization formulations.
+
+Table \ref{tab:taxonomy} situates our contribution against this lineage.
 
 \begin{table*}[t]
 \caption{Positioning against automatic statistics configuration. Prior work
