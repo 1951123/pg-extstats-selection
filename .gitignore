@@ -14,6 +14,9 @@ benchmarks/Census/data/
 # Python virtual env / caches / experiment output
 .venv/
 
+# Editor settings: VS Code is personal dev-environment config, not a repo asset
+.vscode/
+
 # Temporary analysis scripts (tmp_ prefix local drafts, not tracked)
 scripts/tmp_*
 __pycache__/
