@@ -695,60 +695,35 @@ extremes are per-query ($B{=}n$) and workload-wide ($B{=}1$).
 
 \emph{Measurement granularity.}\label{prop:batch}
 Because mounting more payloads makes every masked measurement scan a longer
-catalog, grouping candidates into large batches amortizes the fixed ANALYZE
-base but increases the masking term. Under a uniform model ($N_b{=}\rho M$),
-$T(B)$ is strictly convex and minimized at
+catalog, grouping into large batches amortizes the fixed ANALYZE base but
+increases the masking term. Under a uniform model ($N_b{=}\rho M$) $T(B)$ is
+strictly convex and minimized at
 \begin{equation}\label{eq:batch-opt}
   B^{*} \;=\; M_{\text{tot}}\,\sqrt{\tfrac{\mu\rho}{B_0}},
   \qquad\text{i.e.}\qquad
   m^{*} \;=\; \sqrt{\tfrac{B_0}{\mu\rho}}\ \text{meas.\ per batch},
 \end{equation}
 so the optimal granularity \emph{grows} with the ANALYZE base and \emph{shrinks}
-as masking or sharing rises. This fixes the scope of each build: workload-wide
-($B{=}1$) is optimal only under very high sharing; on CENSUS
-($\rho{=}0.624$) it would need $B_0{\ge}\tfrac12(0.0008)(0.624)\,185{,}136^{2}
-\approx 2{,}376$\,h against the measured $22$\,s, so a single build is
-decisively suboptimal and we sub-batch instead, splitting candidate-dense
+as masking or sharing rises; a workload-wide build is optimal only under very
+high sharing, so on CENSUS we sub-batch instead, splitting candidate-dense
 queries into $\approx$55-candidate sub-batches (Tab.~\ref{tab:measurement}). The
-same $m^{*}=\sqrt{B_0/\mu}$ optimum applies \emph{within} a query
-(Prop.~\ref{prop:batch}). We verified it on the most candidate-dense CENSUS
-query (\texttt{query.335}, $n{=}455$): measuring all at once took $181.4$\,s,
-which fell to $63.4$\,s with $7$ sub-batches (a $2.9\times$ speedup) as the mask
-term tracked $\approx1/b$ while the ANALYZE term grew with $b$.
-
-The trade-off is governed by the workload's \textbf{deduplication ratio}
-$\rho_b{=}N_b/M_b$ and the ANALYZE base $B_0$. The two workloads sit on
-opposite sides of it: \emph{stats\_CEB\_single} has only 78 distinct
-combinations out of 616 raw candidates ($\rho{=}0.13$), while \emph{CENSUS} has
-19{,}245 of 30{,}856 ($\rho{=}0.62$). For reproducibility we measure \emph{both}
-with the same sub-batched Protocol-M --- one ANALYZE per query's candidate set,
-splitting candidate-dense queries into $\approx$55-candidate sub-batches to
-bound the mask term (the \emph{harness} granularity of
-Tab.~\ref{tab:measurement}). Against Protocol-A's per-candidate cost, the
-\emph{measured} speedup is $\approx$283$\times$ on CENSUS \texttt{query.3} and
-$\approx$36$\times$ on \texttt{stats\_CEB\_single} \texttt{st.144} (lower
-bounds, since Protocol-A's per-candidate \texttt{ANALYZE} is no more than the
-table's base). In either case Catalog-Mask --- not the MILP --- is the enabling
-component that makes the candidate $\times$ capacity space measurable, and the
-granularity analysis turns it from a fixed trick into a tunable component whose
-operating point is chosen by a measurable cost model.
+same $m^{*}=\sqrt{B_0/\mu}$ optimum applies \emph{within} a query; on the most
+candidate-dense CENSUS query (\texttt{query.335}, $n{=}455$) sub-batching into
+$7$ pieces reduces measurement from $181.4$\,s to $63.4$\,s ($2.9\times$).
+Against Protocol-A's per-candidate cost, the measured speedup is
+$\approx$283$\times$ on CENSUS and $\approx$36$\times$ on
+\texttt{stats\_CEB\_single} (lower bounds, since Protocol-A's per-candidate
+\texttt{ANALYZE} is no more than the table's base). Thus Catalog-Mask --- not
+the MILP --- is the enabling component that makes the candidate $\times$
+capacity space measurable, and the granularity analysis turns it from a fixed
+trick into a tunable component whose operating point is chosen by a measurable
+cost model.
 
 \begin{table*}[t]
-\caption{Measured per-query phase-1 cost across sub-batch sizes, on one
-candidate-dense query per workload at the full six-level menu
-($nL{=}504$ for CENSUS \texttt{query.3}; $nL{=}210$ for \texttt{stats\_CEB\_single}
-\texttt{st.144}). $b$ is the number of sub-batches and $s{=}nL/b$ the sub-batch
-\emph{size} (candidates mounted per ANALYZE+mask build); times are real
-wall-clock. The mask column tracks $\approx1/b$ (e.g.\ CENSUS
-$186.0\to6.3$\,s as $b$ grows $1\to28$), while the ANALYZE column grows roughly
-linearly in $b$ -- the two competing terms of $T_{{q}}(b)$. The measured
-per-query optimum is $b{=}1$/$s{=}504$ on CENSUS (402.0\,s) and
-$b{=}4$/$s{=}52$ on \texttt{stats\_CEB\_single} (22.2\,s); the sub-batched
-Protocol-M time there, versus Protocol-A's per-candidate cost, gives a
-\emph{measured} speedup of $\approx$283$\times$ / $\approx$36$\times$
-(\S\ref{sec:measure-runtime}). Real \texttt{ANALYZE}-at-$N$ anchors on CENSUS:
-1{,}000 stats $\to$420s, 3{,}000 $\to$1{,}013s, 6{,}000 $\to$2{,}003s,
-10{,}000 $\to$3{,}507s.}
+\caption{Measurement cost under sub-batch size $b$ on one candidate-dense query
+per workload. Masking decreases and ANALYZE cost grows with finer batches,
+yielding a workload-dependent optimum; Protocol-M cuts per-candidate cost by
+$\approx$283$\times$/36$\times$ over Protocol-A.}
 \label{tab:measurement}
 \small
 \begin{tabular}{lcccc@{\hskip 6pt}lcccc}
@@ -775,43 +750,24 @@ sub-batch $b$ & \emph{size} $s$ & total & ANALYZE & mask\\
 \end{tabular}
 \end{table*}
 
-\textbf{Scalability and overhead.} The mask term $\mu M_b N_b$
-(Eq.~\ref{eq:batch-cost}) is the one cost that grows with the number of mounted
-statistics: negligible in per-query and high-dedup builds, it becomes dominant
-if a low-dedup workload is measured in a single giant build
-(Tab.~\ref{tab:measurement}: the CENSUS mask falls $186.0\!\to\!6.3$\,s while its
-ANALYZE base grows $210.3\!\to\!3390.4$\,s as $b$ goes $1\!\to\!28$). Sub-batching
-at $b{=}55$ keeps the mask term a small fraction of the total on both workloads.
-
 \section{Empirical Findings}
 \label{sec:findings}
 
-\textbf{Setup.} We evaluate on PostgreSQL 16.14 with three benchmarks in two
-roles (Table \ref{tab:bench}). \emph{Primary:} \texttt{CENSUS} (a single
-69-column table, 468 queries; DB \texttt{census}) and \texttt{stats\_CEB\_single}
-(632 single-table sub-plans over StackExchange; DB \texttt{stats}) --- the
-workloads where extended statistics act directly. \emph{Negative control:}
-\texttt{stats\_CEB} (146 join queries) --- where errors are dominated by joins
-that extended statistics cannot directly repair. (Table \ref{tab:bench} also
-lists the ``job-light'' join sub-plans of the same IMDB schema: we do not use
-the original 113-query JOB \cite{leis2015good}, because its queries are
-MIN/MAX aggregates that return a single row and carry no meaningful whole-query
-cardinality, whereas job-light's `SELECT COUNT(*)` join sub-plans are the
-standard cardinality-estimation form \cite{kipf2018learned}.) \emph{Synthetic:}
-constructed tables used only to stress specific mechanisms (\S\ref{sec:rq2},
-\S\ref{sec:e2e}). Candidates are the 2- and 3-column subsets
-of each query's selection predicates. We restrict to 2/3-column subsets because
-these are the combinations whose correlation the single-relation restriction
-clauses actually exercise, MCV-list accuracy degrades with dimensionality, and
-the candidate set is already large at width 3 (e.g.\ 19{,}245 distinct
-combinations on CENSUS); 1-column predicates are already served well by
-per-column statistics, and higher-order combinations are a limitation rather
-than a hidden win ($\S\ref{sec:disc}$). We evaluate the full capacity menu
-$\{10, 25, 50, 100, 1000, 10000\}$ with the per-column baseline fixed at
+\textbf{Setup.} We evaluate on PostgreSQL 16.14. \emph{Primary:} \texttt{CENSUS}
+(a 69-column table, 468 queries) and \texttt{stats\_CEB\_single} (632
+single-table sub-plans over StackExchange) --- where extended statistics act
+directly; \texttt{stats\_CEB} (146 joins) is the single-table negative control
+and \texttt{job-light} join sub-plans \cite{kipf2018learned} a join-oriented one
+(Table \ref{tab:bench}). \emph{Synthetic} tables stress specific mechanisms
+(\S\ref{sec:rq2}, \S\ref{sec:e2e}). Candidates are the 2-/3-column subsets of
+each query's selection predicates --- they directly exercise single-relation
+correlation while keeping the candidate space tractable (e.g.\ 19{,}245
+distinct combinations on CENSUS); higher-order candidates are an explicit
+limitation (\S\ref{sec:disc}). We evaluate the full capacity menu
+$\{10,25,50,100,1000,10000\}$ with the per-column baseline fixed at
 \texttt{statistics\_target}=10000 (\S\ref{sec:measure}), so capacity is a
-free, two-sided decision axis rather than a fixed "highest-precision"
-setting; where a single operating point is needed we report 1000 as the
-practical default. We organize the results around six research questions.
+free, two-sided decision axis; where a single operating point is needed we
+report 1000. We organize the results around six research questions.
 
 The \emph{mean} q-error on stats\_CEB\_single is only $\approx$1.1 --- but this
 is not a marginal problem. q-error is \emph{multiplicative}, so its cost
@@ -862,28 +818,21 @@ queries are caught even at a \emph{low} target --- the workload's worst query,
 \texttt{query.184} (baseline q-error 4{,}162, 13 true rows against ~54k
 estimated), is collapsed to 1.08 by a single 3-column MCV already at target 100.
 
-This contrast is \emph{systematic}, not anecdotal --- once the capacity menu is
-wide enough to expose it. Over the originally-chosen coarse menu
-$\{100,1000,10000\}$ the capacity axis on CENSUS \emph{appears} absent: across
-the full 468-query workload (30{,}856 candidate-level points), raising the
-target from 100 through 1000 to 10000 changes the q-error of \textbf{91.8\%} of
-candidates by \emph{zero} (identical at all three levels), and \textbf{73.3\%}
-are collapsed on both axes --- identical q-error \emph{and} identical
-persistent size. Yet this collapse is an artifact of the coarse menu's lower
-bound: CENSUS's saturation point is \emph{below} the default target 100, so
-when we extend the menu downward to $\{10,25,50\}$, the capacity axis
-re-emerges --- across that low sub-menu, $\approx$29\% of candidates now vary
-with target, and $\approx$7\% improve by ${\ge}20\%$ as capacity rises from 10
-to 50 (over the full 468-query workload, 30{,}856 candidates), because
-CENSUS's categorical columns are \emph{data-capped}: their MCV lists fill at a
-very low cardinality, so a smaller target genuinely loses entries while a
-larger one stores nothing new. The capacity axis is therefore real and
-two-sided on both workloads --- a DBA may need to \emph{raise} it on
-high-cardinality combinations (the \texttt{posts} case) or find it already
-satisfied below the default (data-capped CENSUS) --- which is precisely why
-\emph{how much} must be decided jointly with \emph{which} statistics
-(Prop.~\ref{prop:linear}). (ANALYZE cost likewise grows with target and with
-installed statistics, \S\ref{sec:measure-runtime}.)
+This contrast is \emph{systematic} once the capacity menu is wide enough to
+expose it. Over the coarse menu $\{100,1000,10000\}$ the capacity axis on CENSUS
+\emph{appears} absent; but that is an artifact of the coarse menu's lower bound,
+because CENSUS's saturation point is \emph{below} the default target 100. When
+we extend the menu downward to $\{10,25,50\}$, the axis re-emerges: across the
+full 468-query workload, $\approx$29\% of candidates now vary with target and
+$\approx$7\% improve by ${\ge}20\%$ as capacity rises from 10 to 50, because
+CENSUS's categorical columns are \emph{data-capped} --- their MCV lists fill at
+a very low cardinality, so a smaller target genuinely loses entries while a
+larger one stores nothing new. Capacity is therefore a genuine two-sided
+allocation axis --- a DBA may need to \emph{raise} it on high-cardinality
+combinations (the \texttt{posts} case) or find it already satisfied below the
+default (data-capped CENSUS) --- so \emph{how much} must be decided jointly with
+\emph{which} statistics (Prop.~\ref{prop:linear}). (ANALYZE cost likewise grows
+with target and installed statistics, \S\ref{sec:measure-runtime}.)
 
 \subsection{RQ2: Is One Statistic per Query Sufficient?}
 \label{sec:rq2}
