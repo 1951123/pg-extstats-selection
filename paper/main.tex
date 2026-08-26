@@ -191,9 +191,9 @@ bottleneck. \textbf{(3)} We present a joint what-and-how-much integer-programmin
 formulation that simultaneously selects column-sets and assigns differentiated
 sampling capacity for PostgreSQL multivariate statistics. \textbf{(4)} We
 perform extensive end-to-end evaluation over real and synthetic workloads,
-characterize the mismatch between storage-based budgeting and real ANALYZE
-maintenance cost as a limitation, and provide practical tuning insights for
-PostgreSQL extended statistics.
+analyze the mismatch between storage-based budgeting and real ANALYZE
+maintenance cost, and provide practical tuning insights for PostgreSQL
+extended statistics.
 
 \section{Background and Related Work}
 \label{sec:back}
@@ -1263,6 +1263,20 @@ persistent size, and here one-stat sufficiency helps directly: because each
 query needs at most one dominant statistic (\S\ref{sec:rq2}), the selected set
 is \emph{small}, so both the number of objects to create and the ANALYZE volume
 to refresh them stay low --- maintenance cost is reduced by construction.
+
+\emph{The resulting storage/ANALYZE mismatch.} Because storage is additive
+while ANALYZE cost is a property of each relation's \emph{maximum}
+\texttt{statistics\_target}, the two can diverge sharply. A \emph{data-capped}
+statistic (\S\ref{sec:rq1}) at L10000 stores the same bytes and yields the same
+q-error as its L1000 twin, yet it forces PostgreSQL to sample ANALYZE at target
+10000 (a $10\times$ larger sample). Quantitatively, at a 100\,KB budget on
+stats\_CEB\_single, the storage-only MILP solution and one capped at L1000 have
+identical storage (99{,}996 B) and identical mean q-error (1.0156), but
+reconstructing them by ANALYZE differs by $\approx$2.7$\times$ (31.4\,s vs.\
+11.6\,s); the CENSUS data-capped case is starker (32.0\,s vs.\ 12.2\,s at
+10\,KB, with identical storage 9{,}991 B and mean 2.238). The storage-only
+objective is thus a genuine but imperfect proxy for maintenance cost; a
+maintenance-aware objective (open question~1) is the natural extension.
 
 \emph{Why arithmetic mean q-error.} q-error is bounded below by 1 with a heavy
 upper tail, so the arithmetic mean rewards repairing the worst queries while the
