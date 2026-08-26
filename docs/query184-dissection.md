@@ -162,6 +162,51 @@ fidelity 建模）可作为后续强化，但当前证据不强制。
 
 ---
 
+## 7b. Task 3 — Protocol-M 的适用边界（论文级 insight）
+
+**问题**：query.184 只是极端 outlier，还是存在一个**可陈述的适用边界**？能否用
+`expected sample count` 找到失效阈值？
+
+**实验**（`scripts/tmp_boundary_scan.py`，`results/boundary_scan.json`）：扫描 14 个
+CENSUS 候选（actual 从 13 到 866K，exp@L50 覆盖 0.16 到 10^4），在 L50/L100 测 True-L。
+定义 `exp@L = (actual/N) × sample_rows(L)`（目标组合在真实小样本 MCV 里的期望出现次数）。
+
+### 结果（L50）
+
+| exp@L50 | 候选 | Mask50 | True50 | ratio | 判定 |
+|---|---|---|---|---|---|
+| **0.16** | query.184 `(iDisabl1,iLooking,iRspouse)` | 1.08 | **237** | **220** | **Mask 乐观（有害）** |
+| 0.55 | query.62 `(dIncome3,dTravtime)` | 2080 | 2110 | 1.02 | 两者都差（无害）|
+| 1.72 | query.59 `(dAncstry1,dDepart)` | 124 | 123 | 0.99 | 两者都差（无害）|
+| 33.9+ | query.201 `(dDepart,dIncome5)` 等 | — | — | ~1.0 | **完全保真** |
+
+### 三种失效形态（关键细化）
+
+| 形态 | 条件 | 对决策影响 |
+|---|---|---|
+| **(a) Mask-乐观**（query.184）| 组合稀有且**候选列覆盖 query 的稀有主导列** | **有害**：低估容量需求，MILP 会选过低的 L |
+| **(b) 两者都差但 Mask 诚实**（query.62/59）| 组合稀有，但**候选列未覆盖稀有主导列**（query 有更多列过滤）| **无害**：大样本也修不好，Mask 老实报差，不误导 |
+| **(c) 普通**（所有 exp 大）| 组合不稀有不成立 | 完全保真 |
+
+**关键判定条件（query.184 验证）**：
+- 7 个 **Mask-乐观** 候选**全部**含 `iDisabl1 + iRspouse`（query 的稀有主导列）：
+  `(iDisabl1,iLooking,iRspouse)→1.08`、`(iDisabl1,iRspouse)→1.30` 等。
+- 38 个含 `iRspouse` 但**不含** `iDisabl1` 的候选（如 `(dDepart,dRpincome,iRspouse)`）
+  保持 qerr 2000–4200（Mask 诚实，非乐观）。
+- 120 个不含 `iRspouse` 的候选：非乐观。
+
+### 可写进论文的边界陈述
+
+> Protocol-M（large-sample oracle）对普通/高基数候选高度保真（论文核心 posts 4.58→2.82→1.04
+> 真实成立）；它仅在**同时满足** (i) 候选列覆盖 query 的稀有选择性主导列，且
+> (ii) 目标组合在真实部署 target 下的期望采样计数 < 1 时，才可能**低估低容量价值**。
+> 对未覆盖稀有主导列的候选，即使组合稀有，oracle 也诚实（大样本同样救不了，不误导决策）。
+
+这是**论文方法论/limitation 层面的可辩护贡献**，把 query.184 从"奇怪失败案例"提升为
+"Protocol-M 的采样受限适用边界"。
+
+---
+
 ## 8. 复现命令
 ```bash
 # 机制深挖（含 MCV dump + 序列测 est）
@@ -171,4 +216,9 @@ timeout 600 .venv/bin/python scripts/validate_true_vs_mask.py \
   --bench stats_ceb_single --phase1 results/phase1_ceb_single_mask_6level.json \
   --cands "posts(AnswerCount,FavoriteCount,ViewCount)" \
   --levels 10,25,50,100,1000,10000 --out results/true_vs_mask_posts144.json
+# 适用边界扫描（14 候选梯度，L50/L100 True-L）
+timeout 1700 .venv/bin/python scripts/tmp_boundary_scan.py \
+  --phase1 results/phase1_census_mcv_6level.json \
+  --cands "climate(iDisabl1,iLooking,iRspouse);climate(iCitizen,iDisabl1);climate(dIncome3,dTravtime);climate(dHours,iDisabl2);climate(dAncstry1,dDepart);climate(dIncome3,dPwgt1);climate(dAncstry1,dIncome2);climate(dAge,dHour89);climate(dAge,dAncstry2);climate(dDepart,dIncome5);climate(dIncome7,iEnglish);climate(dAncstry1,iFertil);climate(dDepart,dHispanic);climate(dRearning,dWeek89)" \
+  --levels 50,100 --out results/boundary_scan.json
 ```

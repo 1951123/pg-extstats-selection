@@ -65,6 +65,8 @@ results/*
 !results/true_vs_mask_pilot.json
 !results/true_vs_mask_census.json
 !results/true_vs_mask_posts144.json
+# Protocol-M applicability boundary scan (scripts/tmp_boundary_scan.py output)
+!results/boundary_scan.json
 # Official phase-1 run logs (config/progress, auditability)
 !results/phase1_ceb_single_6level.log
 !results/phase1_census_low.log

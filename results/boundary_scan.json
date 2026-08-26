@@ -1,0 +1,913 @@
+[
+  {
+    "candidate": "climate(iDisabl1,iLooking,iRspouse)",
+    "qid": "query.184",
+    "table": "climate",
+    "columns": [
+      "iDisabl1",
+      "iLooking",
+      "iRspouse"
+    ],
+    "actual": 13,
+    "N": 2458285,
+    "mask": {
+      "10": {
+        "estimate": 54107,
+        "qerror": 4162.076923076923,
+        "size_bytes": 380
+      },
+      "25": {
+        "estimate": 7718,
+        "qerror": 593.6923076923077,
+        "size_bytes": 767
+      },
+      "50": {
+        "estimate": 14,
+        "qerror": 1.0769230769230769,
+        "size_bytes": 1217
+      },
+      "100": {
+        "estimate": 14,
+        "qerror": 1.0769230769230769,
+        "size_bytes": 1217
+      },
+      "1000": {
+        "estimate": 14,
+        "qerror": 1.0769230769230769,
+        "size_bytes": 1217
+      },
+      "10000": {
+        "estimate": 14,
+        "qerror": 1.0769230769230769,
+        "size_bytes": 1217
+      }
+    },
+    "true": {
+      "50": {
+        "estimate": 3078,
+        "actual": 13,
+        "qerror": 236.76923076923077,
+        "size_bytes": 867,
+        "level": 50,
+        "exp": 0.15864718696164196,
+        "mask_qerr": 1.0769230769230769,
+        "ratio": 219.85714285714286
+      },
+      "100": {
+        "estimate": 2630,
+        "actual": 13,
+        "qerror": 202.30769230769232,
+        "size_bytes": 892,
+        "level": 100,
+        "exp": 0.15864718696164196,
+        "mask_qerr": 1.0769230769230769,
+        "ratio": 187.8571428571429
+      }
+    }
+  },
+  {
+    "candidate": "climate(iCitizen,iDisabl1)",
+    "qid": "query.192",
+    "table": "climate",
+    "columns": [
+      "iCitizen",
+      "iDisabl1"
+    ],
+    "actual": 865763,
+    "N": 2458285,
+    "mask": {
+      "10": {
+        "estimate": 675668,
+        "qerror": 1.2813437960655234,
+        "size_bytes": 318
+      },
+      "25": {
+        "estimate": 675668,
+        "qerror": 1.2813437960655234,
+        "size_bytes": 428
+      },
+      "50": {
+        "estimate": 675668,
+        "qerror": 1.2813437960655234,
+        "size_bytes": 428
+      },
+      "100": {
+        "estimate": 675668,
+        "qerror": 1.2813437960655234,
+        "size_bytes": 428
+      },
+      "1000": {
+        "estimate": 675668,
+        "qerror": 1.2813437960655234,
+        "size_bytes": 428
+      },
+      "10000": {
+        "estimate": 675668,
+        "qerror": 1.2813437960655234,
+        "size_bytes": 428
+      }
+    },
+    "true": {
+      "50": {
+        "estimate": 665086,
+        "actual": 865763,
+        "qerror": 1.3017309039733207,
+        "size_bytes": 384,
+        "level": 50,
+        "exp": 10565.451117344002,
+        "mask_qerr": 1.2813437960655234,
+        "ratio": 1.0159107243273802
+      },
+      "100": {
+        "estimate": 680206,
+        "actual": 865763,
+        "qerror": 1.272795300247278,
+        "size_bytes": 384,
+        "level": 100,
+        "exp": 10565.451117344002,
+        "mask_qerr": 1.2813437960655234,
+        "ratio": 0.9933284916628198
+      }
+    }
+  },
+  {
+    "candidate": "climate(dIncome3,dTravtime)",
+    "qid": "query.62",
+    "table": "climate",
+    "columns": [
+      "dIncome3",
+      "dTravtime"
+    ],
+    "actual": 45,
+    "N": 2458285,
+    "mask": {
+      "10": {
+        "estimate": 93454,
+        "qerror": 2076.7555555555555,
+        "size_bytes": 322
+      },
+      "25": {
+        "estimate": 93454,
+        "qerror": 2076.7555555555555,
+        "size_bytes": 410
+      },
+      "50": {
+        "estimate": 93454,
+        "qerror": 2076.7555555555555,
+        "size_bytes": 410
+      },
+      "100": {
+        "estimate": 93454,
+        "qerror": 2076.7555555555555,
+        "size_bytes": 410
+      },
+      "1000": {
+        "estimate": 93454,
+        "qerror": 2076.7555555555555,
+        "size_bytes": 410
+      },
+      "10000": {
+        "estimate": 93454,
+        "qerror": 2076.7555555555555,
+        "size_bytes": 410
+      }
+    },
+    "true": {
+      "50": {
+        "estimate": 95048,
+        "actual": 45,
+        "qerror": 2112.177777777778,
+        "size_bytes": 388,
+        "level": 50,
+        "exp": 0.5491633394826068,
+        "mask_qerr": 2076.7555555555555,
+        "ratio": 1.0170565197851351
+      },
+      "100": {
+        "estimate": 93338,
+        "actual": 45,
+        "qerror": 2074.177777777778,
+        "size_bytes": 388,
+        "level": 100,
+        "exp": 0.5491633394826068,
+        "mask_qerr": 2076.7555555555555,
+        "ratio": 0.9987587476191496
+      }
+    }
+  },
+  {
+    "candidate": "climate(dHours,iDisabl2)",
+    "qid": "query.11",
+    "table": "climate",
+    "columns": [
+      "dHours",
+      "iDisabl2"
+    ],
+    "actual": 5897,
+    "N": 2458285,
+    "mask": {
+      "10": {
+        "estimate": 26767,
+        "qerror": 4.539087671697473,
+        "size_bytes": 278
+      },
+      "25": {
+        "estimate": 26767,
+        "qerror": 4.539087671697473,
+        "size_bytes": 278
+      },
+      "50": {
+        "estimate": 26767,
+        "qerror": 4.539087671697473,
+        "size_bytes": 278
+      },
+      "100": {
+        "estimate": 26767,
+        "qerror": 4.539087671697473,
+        "size_bytes": 278
+      },
+      "1000": {
+        "estimate": 26767,
+        "qerror": 4.539087671697473,
+        "size_bytes": 278
+      },
+      "10000": {
+        "estimate": 26767,
+        "qerror": 4.539087671697473,
+        "size_bytes": 278
+      }
+    },
+    "true": {
+      "50": {
+        "estimate": 26433,
+        "actual": 5897,
+        "qerror": 4.482448702730202,
+        "size_bytes": 278,
+        "level": 50,
+        "exp": 71.96480473175404,
+        "mask_qerr": 4.539087671697473,
+        "ratio": 0.9875219486681361
+      },
+      "100": {
+        "estimate": 27185,
+        "actual": 5897,
+        "qerror": 4.609971171782262,
+        "size_bytes": 278,
+        "level": 100,
+        "exp": 71.96480473175404,
+        "mask_qerr": 4.539087671697473,
+        "ratio": 1.0156162438823926
+      }
+    }
+  },
+  {
+    "candidate": "climate(dAncstry1,dDepart)",
+    "qid": "query.59",
+    "table": "climate",
+    "columns": [
+      "dAncstry1",
+      "dDepart"
+    ],
+    "actual": 141,
+    "N": 2458285,
+    "mask": {
+      "10": {
+        "estimate": 17924,
+        "qerror": 127.12056737588652,
+        "size_bytes": 326
+      },
+      "25": {
+        "estimate": 17474,
+        "qerror": 123.9290780141844,
+        "size_bytes": 664
+      },
+      "50": {
+        "estimate": 17427,
+        "qerror": 123.59574468085107,
+        "size_bytes": 1234
+      },
+      "100": {
+        "estimate": 17343,
+        "qerror": 123.0,
+        "size_bytes": 1722
+      },
+      "1000": {
+        "estimate": 17343,
+        "qerror": 123.0,
+        "size_bytes": 1722
+      },
+      "10000": {
+        "estimate": 17343,
+        "qerror": 123.0,
+        "size_bytes": 1722
+      }
+    },
+    "true": {
+      "50": {
+        "estimate": 17321,
+        "actual": 141,
+        "qerror": 122.84397163120568,
+        "size_bytes": 1014,
+        "level": 50,
+        "exp": 1.7207117970455013,
+        "mask_qerr": 123.59574468085107,
+        "ratio": 0.9939174843633443
+      },
+      "100": {
+        "estimate": 17899,
+        "actual": 141,
+        "qerror": 126.94326241134752,
+        "size_bytes": 988,
+        "level": 100,
+        "exp": 1.7207117970455013,
+        "mask_qerr": 123.0,
+        "ratio": 1.0320590439946953
+      }
+    }
+  },
+  {
+    "candidate": "climate(dIncome3,dPwgt1)",
+    "qid": "query.103",
+    "table": "climate",
+    "columns": [
+      "dIncome3",
+      "dPwgt1"
+    ],
+    "actual": 166531,
+    "N": 2458285,
+    "mask": {
+      "10": {
+        "estimate": 157958,
+        "qerror": 1.0542739209156864,
+        "size_bytes": 266
+      },
+      "25": {
+        "estimate": 157958,
+        "qerror": 1.0542739209156864,
+        "size_bytes": 266
+      },
+      "50": {
+        "estimate": 157958,
+        "qerror": 1.0542739209156864,
+        "size_bytes": 266
+      },
+      "100": {
+        "estimate": 157958,
+        "qerror": 1.0542739209156864,
+        "size_bytes": 266
+      },
+      "1000": {
+        "estimate": 157958,
+        "qerror": 1.0542739209156864,
+        "size_bytes": 266
+      },
+      "10000": {
+        "estimate": 157958,
+        "qerror": 1.0542739209156864,
+        "size_bytes": 266
+      }
+    },
+    "true": {
+      "50": {
+        "estimate": 155655,
+        "actual": 166531,
+        "qerror": 1.0698724743824484,
+        "size_bytes": 244,
+        "level": 50,
+        "exp": 2032.2826686084,
+        "mask_qerr": 1.0542739209156864,
+        "ratio": 1.014795541421734
+      },
+      "100": {
+        "estimate": 157750,
+        "actual": 166531,
+        "qerror": 1.0556640253565768,
+        "size_bytes": 244,
+        "level": 100,
+        "exp": 2032.2826686084,
+        "mask_qerr": 1.0542739209156864,
+        "ratio": 1.0013185419968305
+      }
+    }
+  },
+  {
+    "candidate": "climate(dAncstry1,dIncome2)",
+    "qid": "query.5",
+    "table": "climate",
+    "columns": [
+      "dAncstry1",
+      "dIncome2"
+    ],
+    "actual": 259137,
+    "N": 2458285,
+    "mask": {
+      "10": {
+        "estimate": 367817,
+        "qerror": 1.4193920590266924,
+        "size_bytes": 322
+      },
+      "25": {
+        "estimate": 367817,
+        "qerror": 1.4193920590266924,
+        "size_bytes": 650
+      },
+      "50": {
+        "estimate": 367817,
+        "qerror": 1.4193920590266924,
+        "size_bytes": 650
+      },
+      "100": {
+        "estimate": 367817,
+        "qerror": 1.4193920590266924,
+        "size_bytes": 650
+      },
+      "1000": {
+        "estimate": 367817,
+        "qerror": 1.4193920590266924,
+        "size_bytes": 650
+      },
+      "10000": {
+        "estimate": 367817,
+        "qerror": 1.4193920590266924,
+        "size_bytes": 650
+      }
+    },
+    "true": {
+      "50": {
+        "estimate": 362362,
+        "actual": 259137,
+        "qerror": 1.3983414178600508,
+        "size_bytes": 492,
+        "level": 50,
+        "exp": 3162.412006744539,
+        "mask_qerr": 1.4193920590266924,
+        "ratio": 0.9851692553634008
+      },
+      "100": {
+        "estimate": 366747,
+        "actual": 259137,
+        "qerror": 1.415262969008671,
+        "size_bytes": 492,
+        "level": 100,
+        "exp": 3162.412006744539,
+        "mask_qerr": 1.4193920590266924,
+        "ratio": 0.9970909446817303
+      }
+    }
+  },
+  {
+    "candidate": "climate(dAge,dHour89)",
+    "qid": "query.86",
+    "table": "climate",
+    "columns": [
+      "dAge",
+      "dHour89"
+    ],
+    "actual": 544332,
+    "N": 2458285,
+    "mask": {
+      "10": {
+        "estimate": 817843,
+        "qerror": 1.5024709184835725,
+        "size_bytes": 326
+      },
+      "25": {
+        "estimate": 734620,
+        "qerror": 1.349580770559144,
+        "size_bytes": 672
+      },
+      "50": {
+        "estimate": 682576,
+        "qerror": 1.2539700036007437,
+        "size_bytes": 958
+      },
+      "100": {
+        "estimate": 682576,
+        "qerror": 1.2539700036007437,
+        "size_bytes": 958
+      },
+      "1000": {
+        "estimate": 682576,
+        "qerror": 1.2539700036007437,
+        "size_bytes": 958
+      },
+      "10000": {
+        "estimate": 682576,
+        "qerror": 1.2539700036007437,
+        "size_bytes": 958
+      }
+    },
+    "true": {
+      "50": {
+        "estimate": 683336,
+        "actual": 544332,
+        "qerror": 1.2553662103275207,
+        "size_bytes": 936,
+        "level": 50,
+        "exp": 6642.826197938807,
+        "mask_qerr": 1.2539700036007437,
+        "ratio": 1.0011134291273058
+      },
+      "100": {
+        "estimate": 686669,
+        "actual": 544332,
+        "qerror": 1.2614893116700836,
+        "size_bytes": 958,
+        "level": 100,
+        "exp": 6642.826197938807,
+        "mask_qerr": 1.2539700036007437,
+        "ratio": 1.0059964018658727
+      }
+    }
+  },
+  {
+    "candidate": "climate(dAge,dAncstry2)",
+    "qid": "query.60",
+    "table": "climate",
+    "columns": [
+      "dAge",
+      "dAncstry2"
+    ],
+    "actual": 388216,
+    "N": 2458285,
+    "mask": {
+      "10": {
+        "estimate": 489800,
+        "qerror": 1.2616687617202795,
+        "size_bytes": 322
+      },
+      "25": {
+        "estimate": 490602,
+        "qerror": 1.263734621963031,
+        "size_bytes": 664
+      },
+      "50": {
+        "estimate": 490602,
+        "qerror": 1.263734621963031,
+        "size_bytes": 1230
+      },
+      "100": {
+        "estimate": 490602,
+        "qerror": 1.263734621963031,
+        "size_bytes": 2254
+      },
+      "1000": {
+        "estimate": 490602,
+        "qerror": 1.263734621963031,
+        "size_bytes": 2254
+      },
+      "10000": {
+        "estimate": 490602,
+        "qerror": 1.263734621963031,
+        "size_bytes": 2254
+      }
+    },
+    "true": {
+      "50": {
+        "estimate": 487824,
+        "actual": 388216,
+        "qerror": 1.2565788117954952,
+        "size_bytes": 822,
+        "level": 50,
+        "exp": 4737.644333346215,
+        "mask_qerr": 1.263734621963031,
+        "ratio": 0.9943375689459072
+      },
+      "100": {
+        "estimate": 485704,
+        "actual": 388216,
+        "qerror": 1.251117934345828,
+        "size_bytes": 848,
+        "level": 100,
+        "exp": 4737.644333346215,
+        "mask_qerr": 1.263734621963031,
+        "ratio": 0.9900163472631582
+      }
+    }
+  },
+  {
+    "candidate": "climate(dDepart,dIncome5)",
+    "qid": "query.201",
+    "table": "climate",
+    "columns": [
+      "dDepart",
+      "dIncome5"
+    ],
+    "actual": 2776,
+    "N": 2458285,
+    "mask": {
+      "10": {
+        "estimate": 36935,
+        "qerror": 13.305115273775217,
+        "size_bytes": 318
+      },
+      "25": {
+        "estimate": 36935,
+        "qerror": 13.305115273775217,
+        "size_bytes": 362
+      },
+      "50": {
+        "estimate": 36935,
+        "qerror": 13.305115273775217,
+        "size_bytes": 362
+      },
+      "100": {
+        "estimate": 36935,
+        "qerror": 13.305115273775217,
+        "size_bytes": 362
+      },
+      "1000": {
+        "estimate": 36935,
+        "qerror": 13.305115273775217,
+        "size_bytes": 362
+      },
+      "10000": {
+        "estimate": 36935,
+        "qerror": 13.305115273775217,
+        "size_bytes": 362
+      }
+    },
+    "true": {
+      "50": {
+        "estimate": 36804,
+        "actual": 2776,
+        "qerror": 13.25792507204611,
+        "size_bytes": 362,
+        "level": 50,
+        "exp": 33.8772762311937,
+        "mask_qerr": 13.305115273775217,
+        "ratio": 0.9964532286449167
+      },
+      "100": {
+        "estimate": 36972,
+        "actual": 2776,
+        "qerror": 13.318443804034581,
+        "size_bytes": 362,
+        "level": 100,
+        "exp": 33.8772762311937,
+        "mask_qerr": 13.305115273775217,
+        "ratio": 1.0010017598483822
+      }
+    }
+  },
+  {
+    "candidate": "climate(dIncome7,iEnglish)",
+    "qid": "query.311",
+    "table": "climate",
+    "columns": [
+      "dIncome7",
+      "iEnglish"
+    ],
+    "actual": 247865,
+    "N": 2458285,
+    "mask": {
+      "10": {
+        "estimate": 354212,
+        "qerror": 1.4290521049764993,
+        "size_bytes": 314
+      },
+      "25": {
+        "estimate": 354212,
+        "qerror": 1.4290521049764993,
+        "size_bytes": 314
+      },
+      "50": {
+        "estimate": 354212,
+        "qerror": 1.4290521049764993,
+        "size_bytes": 314
+      },
+      "100": {
+        "estimate": 354212,
+        "qerror": 1.4290521049764993,
+        "size_bytes": 314
+      },
+      "1000": {
+        "estimate": 354212,
+        "qerror": 1.4290521049764993,
+        "size_bytes": 314
+      },
+      "10000": {
+        "estimate": 354212,
+        "qerror": 1.4290521049764993,
+        "size_bytes": 314
+      }
+    },
+    "true": {
+      "50": {
+        "estimate": 353419,
+        "actual": 247865,
+        "qerror": 1.4258527827648115,
+        "size_bytes": 270,
+        "level": 50,
+        "exp": 3024.8526920190297,
+        "mask_qerr": 1.4290521049764993,
+        "ratio": 0.99776122773932
+      },
+      "100": {
+        "estimate": 353150,
+        "actual": 247865,
+        "qerror": 1.424767514574466,
+        "size_bytes": 270,
+        "level": 100,
+        "exp": 3024.8526920190297,
+        "mask_qerr": 1.4290521049764993,
+        "ratio": 0.9970017955348776
+      }
+    }
+  },
+  {
+    "candidate": "climate(dAncstry1,iFertil)",
+    "qid": "query.5",
+    "table": "climate",
+    "columns": [
+      "dAncstry1",
+      "iFertil"
+    ],
+    "actual": 259137,
+    "N": 2458285,
+    "mask": {
+      "10": {
+        "estimate": 366589,
+        "qerror": 1.414653252912552,
+        "size_bytes": 326
+      },
+      "25": {
+        "estimate": 366589,
+        "qerror": 1.414653252912552,
+        "size_bytes": 668
+      },
+      "50": {
+        "estimate": 366589,
+        "qerror": 1.414653252912552,
+        "size_bytes": 1250
+      },
+      "100": {
+        "estimate": 366589,
+        "qerror": 1.414653252912552,
+        "size_bytes": 2366
+      },
+      "1000": {
+        "estimate": 366589,
+        "qerror": 1.414653252912552,
+        "size_bytes": 3862
+      },
+      "10000": {
+        "estimate": 366589,
+        "qerror": 1.414653252912552,
+        "size_bytes": 3862
+      }
+    },
+    "true": {
+      "50": {
+        "estimate": 361496,
+        "actual": 259137,
+        "qerror": 1.3949995562192972,
+        "size_bytes": 1250,
+        "level": 50,
+        "exp": 3162.412006744539,
+        "mask_qerr": 1.414653252912552,
+        "ratio": 0.9861070572221208
+      },
+      "100": {
+        "estimate": 368836,
+        "actual": 259137,
+        "qerror": 1.423324341950397,
+        "size_bytes": 1250,
+        "level": 100,
+        "exp": 3162.412006744539,
+        "mask_qerr": 1.414653252912552,
+        "ratio": 1.0061294801535234
+      }
+    }
+  },
+  {
+    "candidate": "climate(dDepart,dHispanic)",
+    "qid": "query.22",
+    "table": "climate",
+    "columns": [
+      "dDepart",
+      "dHispanic"
+    ],
+    "actual": 22999,
+    "N": 2458285,
+    "mask": {
+      "10": {
+        "estimate": 299941,
+        "qerror": 13.041480064350624,
+        "size_bytes": 330
+      },
+      "25": {
+        "estimate": 299941,
+        "qerror": 13.041480064350624,
+        "size_bytes": 676
+      },
+      "50": {
+        "estimate": 299941,
+        "qerror": 13.041480064350624,
+        "size_bytes": 1226
+      },
+      "100": {
+        "estimate": 299941,
+        "qerror": 13.041480064350624,
+        "size_bytes": 1450
+      },
+      "1000": {
+        "estimate": 299941,
+        "qerror": 13.041480064350624,
+        "size_bytes": 1450
+      },
+      "10000": {
+        "estimate": 299941,
+        "qerror": 13.041480064350624,
+        "size_bytes": 1450
+      }
+    },
+    "true": {
+      "50": {
+        "estimate": 298088,
+        "actual": 22999,
+        "qerror": 12.960911343971476,
+        "size_bytes": 404,
+        "level": 50,
+        "exp": 280.6712809946772,
+        "mask_qerr": 13.041480064350624,
+        "ratio": 0.993822118349942
+      },
+      "100": {
+        "estimate": 297381,
+        "actual": 22999,
+        "qerror": 12.930170876994652,
+        "size_bytes": 430,
+        "level": 100,
+        "exp": 280.6712809946772,
+        "mask_qerr": 13.041480064350624,
+        "ratio": 0.991464988114329
+      }
+    }
+  },
+  {
+    "candidate": "climate(dRearning,dWeek89)",
+    "qid": "query.59",
+    "table": "climate",
+    "columns": [
+      "dRearning",
+      "dWeek89"
+    ],
+    "actual": 141,
+    "N": 2458285,
+    "mask": {
+      "10": {
+        "estimate": 285,
+        "qerror": 2.021276595744681,
+        "size_bytes": 318
+      },
+      "25": {
+        "estimate": 285,
+        "qerror": 2.021276595744681,
+        "size_bytes": 498
+      },
+      "50": {
+        "estimate": 285,
+        "qerror": 2.021276595744681,
+        "size_bytes": 498
+      },
+      "100": {
+        "estimate": 285,
+        "qerror": 2.021276595744681,
+        "size_bytes": 498
+      },
+      "1000": {
+        "estimate": 285,
+        "qerror": 2.021276595744681,
+        "size_bytes": 498
+      },
+      "10000": {
+        "estimate": 285,
+        "qerror": 2.021276595744681,
+        "size_bytes": 498
+      }
+    },
+    "true": {
+      "50": {
+        "estimate": 240,
+        "actual": 141,
+        "qerror": 1.702127659574468,
+        "size_bytes": 388,
+        "level": 50,
+        "exp": 1.7207117970455013,
+        "mask_qerr": 2.021276595744681,
+        "ratio": 0.8421052631578947
+      },
+      "100": {
+        "estimate": 284,
+        "actual": 141,
+        "qerror": 2.0141843971631204,
+        "size_bytes": 388,
+        "level": 100,
+        "exp": 1.7207117970455013,
+        "mask_qerr": 2.021276595744681,
+        "ratio": 0.9964912280701753
+      }
+    }
+  }
+]
