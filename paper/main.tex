@@ -1149,40 +1149,19 @@ does not optimize for coverage's sake.
 \subsection{Ablation: Are the Components Necessary?}
 \label{sec:ablation}
 
-To show each design choice is not accidental, we switch off one component at a
-time at a fixed budget and compare the achieved mean q-error
-(Table \ref{tab:ablation}). On the 632-query workload at 5 KB and 100 KB:
-
-\begin{table}[t]
-\caption{Component ablation on the 632-query workload at two budgets.
-The capacity axis matters most, especially under tight budgets; the sparse cap
-and pruning cost nothing in quality.}
-\label{tab:ablation}
-\small
-\begin{tabular}{lcc}
-\toprule
-configuration & 5 KB & 100 KB\\
-\midrule
-baseline (no stats) & 1.095 & 1.095\\
-full (ours)         & \textbf{1.0270} & \textbf{1.0156}\\
--- capacity (L10000 only) & 1.0569 & 1.0233\\
--- sparse cap (multi-select) & 1.0270 & 1.0151\\
--- pruning (skip worse than base) & 1.0270 & 1.0156\\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Disabling the \emph{capacity} axis (allowing only L10000) hurts at tight
-budgets (1.027 $\to$ 1.057 at 5 KB), confirming capacity allocation --- the
-``how much'' dimension --- is load-bearing (the same advantage of capacity
-awareness over every fixed what-only level, \S\ref{sec:rq3}). In contrast, the
-sparse per-query cap and the worse-than-baseline pruning are \emph{free}: they
+Switching off one component at a time at a fixed budget (5 KB / 100 KB)
+isolates each design choice. Disabling the \emph{capacity} axis (allowing only
+L10000) hurts at tight budgets (mean q-error 1.027 $\to$ 1.057 at 5 KB, and
+1.0156 $\to$ 1.0233 at 100 KB), confirming capacity allocation --- the ``how
+much'' dimension --- is load-bearing (the same advantage of capacity awareness
+over every fixed what-only level, \S\ref{sec:rq3}). In contrast, the sparse
+per-query cap and the worse-than-baseline pruning are \emph{free}: they
 reproduce full quality while shrinking the problem (pruning cuts 4{,}170 to
-2{,}116 physical-statistic and assignment variables). Thus the ablation separates \emph{modeling
-assumptions} (the capacity axis; global disjointness at deployment) from
-\emph{computational conveniences} (the sparse cap; pruning): the former drive
-the quality and predictability our formulation delivers, while the latter cost
-nothing but solve and measurement time.
+2{,}116 physical-statistic and assignment variables). Thus the ablation
+separates \emph{modeling assumptions} (the capacity axis; global disjointness
+at deployment) from \emph{computational conveniences} (the sparse cap;
+pruning): the former drive the quality and predictability our formulation
+delivers, while the latter cost nothing but solve and measurement time.
 
 \section{End-to-End Validation}
 \label{sec:e2e}
