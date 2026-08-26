@@ -290,7 +290,7 @@ allocating it under a shared budget. Whether a given combination is best served
 by \emph{raising} or \emph{lowering} its capacity is exactly the
 data-capped vs.\ target-capped distinction we quantify in \S\ref{sec:rq1};
 the two evaluated workloads sit on opposite ends of this axis
-(\S\ref{sec:disc-coverage}).
+(\S\ref{sec:measure-runtime}).
 
 \subsection{Related Work}
 
@@ -641,38 +641,25 @@ limits of the implementation, not of the model (\S\ref{sec:disc}, item~5).
 \subsection{Sampling Determinism vs.\ Statistics Target}
 \label{sec:measure-determinism}
 
-Because \texttt{ANALYZE} is sampling-based, we verify that repeated runs do not
-drift: across six fresh \texttt{ANALYZE}s at three targets, determinism is a
-step function of \texttt{statistics\_target} --- at target\,100 the estimate
-shows $1$--$2\%$ run-to-run variation, while at target\,1000/10000 it is exactly
-deterministic (CV $0$). Target also sets \emph{accuracy}: the single-MCV
-estimate of st.144 rises from 4{,}405 (target\,1000) to 11{,}894 (target\,10000),
-the correct $\approx$12{,}391; at low target, MCVs over high-cardinality
-combinations can even be built \emph{empty} (a \texttt{NULL} payload),
-contributing nothing. This is why measurements use target\,10000 (sometimes 1000
-for cross-checks): exactly reproducible, with only accuracy varying with
-capacity.
-
-\emph{Why a fixed large single-column target.} We deliberately fix the
-per-column \texttt{statistics\_target} at 10000 rather than PostgreSQL's
-default of 100, for three reasons: \emph{determinism} (target 100 leaves a
-$1$--$2\%$ run-to-run drift that would make \emph{relative} q-error comparisons
-unreliable, whereas target $\ge$1000 is exactly reproducible, CV $0$);
-\emph{completeness} (at low targets high-cardinality statistics can be built
-\emph{empty}, a \texttt{NULL} payload, risking a degraded baseline); and
-\emph{attribution} (with a maximally precise single-column baseline, any
-improvement from an extended statistic is a \emph{pure} effect of the
-correlation it captures, not of patching a coarse per-column estimate). All
-per-candidate q-errors $e_{is}$ are measured against this \emph{same} baseline,
-so capacity is the \emph{only} axis that changes between levels. This makes the
-single-column ANALYZE \emph{expensive} on a wide table (a CENSUS ANALYZE at
-target\,10000 costs $\approx$22s), precisely what forces the catalog-mask
-protocol (\S\ref{sec:measure-naive}, \S\ref{sec:measure-mask}) --- the large
-fixed target and Protocol-M are two halves of one design decision. Consequently
-most queries have no candidate: their predicates are served by the fixed
-single-column statistics, with baseline q-error already $\approx$1 (79\% of the
-452 no-candidate queries on stats\_CEB\_single are exactly $1.0$; the rest are
-$\le 1.1$).
+Because \texttt{ANALYZE} is sampling-based, we fix the per-column
+\texttt{statistics\_target} at 10000 rather than PostgreSQL's default of 100,
+for three reasons: \emph{determinism} (target 100 leaves a $1$--$2\%$ run-to-run
+drift that would make \emph{relative} q-error comparisons unreliable, whereas
+target $\ge$1000 is exactly reproducible, CV $0$); \emph{completeness} (at low
+targets high-cardinality statistics can be built \emph{empty}, a \texttt{NULL}
+payload --- e.g.\ the single-MCV estimate of st.144 rises from 4{,}405 at
+target\,1000 to the correct $\approx$12{,}391 at target\,10000 --- risking a
+degraded baseline); and \emph{attribution} (with a maximally precise
+single-column baseline, any improvement from an extended statistic is a
+\emph{pure} effect of the correlation it captures, not of patching a coarse
+per-column estimate). All per-candidate q-errors $e_{is}$ are measured against
+this \emph{same} baseline, so capacity is the only axis that changes between
+levels. This makes the single-column ANALYZE \emph{expensive} on a wide table (a
+CENSUS ANALYZE at target\,10000 costs $\approx$22\,s), precisely what forces the
+catalog-mask protocol (\S\ref{sec:measure-naive}, \S\ref{sec:measure-mask}) ---
+the large fixed target and Protocol-M are two halves of one design decision;
+consequently most queries have no candidate, their predicates served by the
+fixed single-column statistics with baseline q-error already near 1.
 
 \subsection{Runtime: A Tunable Measurement-Granularity Cost Model}
 \label{sec:measure-runtime}
@@ -789,20 +776,13 @@ sub-batch $b$ & \emph{size} $s$ & total & ANALYZE & mask\\
 \end{tabular}
 \end{table*}
 
-\textbf{Scalability and overhead.} The mask overhead is the one cost that grows
-with the number of statistics mounted on a table, and it is why granularity
-matters: it goes as $\mu M_b N_b$ per batch (Eq.~\ref{eq:batch-cost}), so it is
-negligible in per-query mode and in high-dedup workload-wide builds, but it
-becomes the dominant term if a low-dedup workload is measured with a single
-giant build. The mask reduction with finer sub-batching is visible directly in
-the measured sweep of Tab.~\ref{tab:measurement} (CENSUS mask
-$186.0\!\to\!6.3$\,s and ANALYZE $210.3\!\to\!3390.4$\,s as $b$ grows
-$1\!\to\!28$): sub-batching trades a shrinking mask term against a growing
-ANALYZE fixed base. Tunable granularity keeps
-it small on both workloads: sub-batched at $b{=}55$ keeps the mask term a
-small fraction of the total even on low-dedup CENSUS, and trivially so on the
-high-sharing stats\_CEB\_single
-(\S\ref{sec:measure-runtime}).
+\textbf{Scalability and overhead.} The mask term $\mu M_b N_b$
+(Eq.~\ref{eq:batch-cost}) is the one cost that grows with the number of mounted
+statistics: negligible in per-query and high-dedup builds, it becomes dominant
+if a low-dedup workload is measured in a single giant build
+(Tab.~\ref{tab:measurement}: the CENSUS mask falls $186.0\!\to\!6.3$\,s while its
+ANALYZE base grows $210.3\!\to\!3390.4$\,s as $b$ goes $1\!\to\!28$). Sub-batching
+at $b{=}55$ keeps the mask term a small fraction of the total on both workloads.
 
 \section{Empirical Findings}
 \label{sec:findings}
@@ -1372,50 +1352,22 @@ preserves nominal quality but, as we verify empirically across budgets
 \section{Discussion and Open Questions}
 \label{sec:disc}
 
-\subsection{Coverage by Design}
-\label{sec:disc-coverage}
-
-The two evaluated workloads are not an arbitrary sample; they are the two
-endpoints of the very axis this paper is about. The central decision is
-\emph{capacity} --- how precisely to store a chosen statistic. On that axis,
-\texttt{stats\_CEB\_single}'s high-cardinality, target-capped statistics sit
-at the \emph{ceiling} (raising the target is what buys accuracy), while
-CENSUS's low-cardinality, data-capped columns sit at the \emph{floor} (their
-MCV lists fill at a small target, so the useful move is often to \emph{lower}
-capacity). Every real deployment of extended statistics lies between these two
-extremes; establishing the method at both ends therefore bounds its behaviour
-over the entire capacity axis, not just at two convenient points. The
-controllable many-cluster synthetic sweeps (\S\ref{sec:rq2}, Table~\ref{tab:sweep})
-probe the one orthogonal dimension where the sparse assumption itself breaks.
-Coverage is by design, not by convenience.
-
 \subsection{Why Does One-Stat Sufficiency Occur? A Mechanistic Hypothesis}
 \label{sec:disc-sparsity}
 
-The one-stat-sufficiency finding admits a mechanistic account that both
-\emph{explains} it and pins down where it should fail. A single-table selection
-query's error is typically dominated by \emph{one} correlated column cluster: its restriction
-clause is a conjunction of predicates whose selectivity error is largest where
-columns are most strongly correlated (where independence fails hardest), and the
-planner's default estimate is about as wrong as the worst such sub-clause. A
-single MCV over exactly that dominant cluster removes the largest error source;
-residual errors in weakly-correlated predicates contribute little. Hence
-\emph{one} well-chosen statistic captures nearly all improvement attainable from
-the 2-/3-column MCV candidates, and a second non-overlapping statistic finds no
-independent ``second cluster'' worth capturing.
-
-This is consistent with every observation we report: $k{=}2,3$ add nothing
-(RQ2); the top-1 coverage CDF is sharply peaked near 1.0; capacity
-\emph{upgrading} the dominant statistic matters more than adding others (RQ3);
-and the sparse cap costs no quality in the ablation (\S\ref{sec:ablation}). It
-also predicts the boundary of our claim. Workloads where a query is genuinely
-driven by \emph{several} independent correlated clusters violate one-stat
-sufficiency and warrant the multi-select model ($\S\ref{sec:formulation}$); our
-controlled stress test (\S\ref{sec:rq2}, Table \ref{tab:sweep}) confirms this
- directly --
-a query over two independent clusters goes from top-1 $=$ 100 to top-2 $=$ 1.00,
-and one-stat sufficiency collapses once $K\ge 3$. Characterising how often that regime
-occurs on real workloads is an open question below.
+A single-table selection query's error is typically dominated by \emph{one}
+correlated column cluster: its restriction is a conjunction of predicates whose
+selectivity error is largest where independence fails hardest, and a single MCV
+over that dominant cluster removes the largest error source while residual
+errors in weakly-correlated predicates contribute little. Hence \emph{one}
+well-chosen statistic captures nearly all attainable improvement --- consistent
+with $k{=}2,3$ adding nothing (RQ2), capacity upgrades mattering more than
+additions (RQ3), and the sparse cap costing no quality in the ablation
+(\S\ref{sec:ablation}). It also predicts the boundary: workloads genuinely
+driven by \emph{several} independent clusters violate one-stat sufficiency and
+warrant the multi-select model (\S\ref{sec:formulation}), confirmed by our
+stress test (Table \ref{tab:sweep}); characterising how often that regime
+occurs is an open question below.
 
 \subsection{What Is Being Optimized}
 \label{sec:disc-objective}
@@ -1423,32 +1375,23 @@ occurs on real workloads is an open question below.
 We optimize a \emph{storage} budget (persistent bytes and estimation quality,
 \S\ref{sec:rq3}); ANALYZE maintenance cost is treated separately because
 PostgreSQL couples sampling effort to the \emph{maximum} target on a relation
-(\S\ref{sec:mechanisms}); an ANALYZE-cost-only variant is an open question
-(\S\ref{sec:disc} item~2). The budget-quality curves in \S\ref{sec:rq3} and
-Fig.~\ref{fig:budgetquality} show that the budget is, in practice, spent on the
-``how much'' axis.
-
-A DBA often values the \emph{maintenance} burden of statistics over their
+(\S\ref{sec:mechanisms}); a maintenance-aware variant is an open question
+below. The budget-quality curves (\S\ref{sec:rq3},
+Fig.~\ref{fig:budgetquality}) show the budget is, in practice, spent on the
+``how much'' axis. A DBA often values the \emph{maintenance} burden over
 persistent size, and here one-stat sufficiency helps directly: because each
-query needs at most one dominant statistic (\S\ref{sec:rq2}), the selected set is
-\emph{small} (a handful of statistics at practical budgets, Table
-\ref{tab:greedy2}), so both the number of objects to create and the ANALYZE
-volume to refresh them stay low --- maintenance cost is reduced by construction,
-not by tuning the per-statistic target.
+query needs at most one dominant statistic (\S\ref{sec:rq2}), the selected set
+is \emph{small}, so both the number of objects to create and the ANALYZE volume
+to refresh them stay low --- maintenance cost is reduced by construction.
 
 \emph{Why arithmetic mean q-error.} q-error is bounded below by 1 with a heavy
-upper tail, so the arithmetic mean rewards repairing the worst queries --
-exactly the cost of a bad estimate -- while the median stays 1.000. It also
-keeps the MILP linear in the $\Delta_{is}$ terms (a geometric mean,
-$\min\sum_i\log e_i$, would stay linear too while weighting \emph{relative}
-improvement). We check the mean choice empirically: solving the sparse MILP
-under the log objective and the linear objective picks overlapping-but-not-identical
-statistic sets (Jaccard $0.29$--$0.90$) yet yields \emph{nearly identical}
-resulting arithmetic and geometric mean q-errors at every budget --- differing
-only in the third--fourth decimal (e.g.\ $1.0247$ vs.\ $1.0246$ at 10\,KB).
-The deployment is robust to the mean choice, and we
-keep the arithmetic mean because it directly targets the worst queries that our
-evaluation emphasizes.
+upper tail, so the arithmetic mean rewards repairing the worst queries while the
+median stays 1.000; it also keeps the MILP linear in the $\Delta_{is}$ terms (a
+geometric mean would stay linear while weighting \emph{relative} improvement).
+We check this empirically: solving under log vs.\ linear objectives picks
+overlapping-but-not-identical sets (Jaccard $0.29$--$0.90$) yet yields nearly
+identical mean q-errors at every budget (e.g.\ $1.0247$ vs.\ $1.0246$ at
+10\,KB), so the deployment is robust to the mean choice.
 
 \subsection{The Interference Fix}
 \label{sec:disc-fix}
@@ -1487,44 +1430,30 @@ Option-B repaired & 1.030 & 7/50 & 1.026 & 4/46 & 1.020 & 6/50\\
 The two modes make an honest, complementary trade. Option~B \emph{preserves the
 nominal quality} of the unconstrained solution --- its achieved mean q-error
 ($1.019$--$1.031$) is close to the overlap baseline and far better than
-Option~A's $\approx\!1.04$. But it does \emph{not} eliminate the predictability
-tail: dropping the statistics flagged by an EXPLAIN check and re-solving fixes
-the originally-scary queries (e.g.\ the Stage-2 hijack st.144) yet introduces new
-interfering pairs as the solver re-opens the budget --- the residual tail never
-reaches zero (Table~\ref{tab:optionB}). Option~A is the only mode with
-\emph{zero} tail at every budget, at the price of the quality gap. We recommend
-A as the default because it makes the deployment semantics match the
-measurement model (\S\ref{sec:measure-correct}) --- the deployment is then
-structurally independent, not just measured independently --- and reserve
-Option~B for deployments where quality outranks the reproducibility guarantee:
-there, the practical loop is solve $\to$ EXPLAIN-check $\to$ drop the flagged
-interferer(s) $\to$ re-solve, and one should expect to repeat it, since the
-interference is emergent (``whack-a-mole'') rather than a fixed set of bad
-statistics.
+Option~A's $\approx\!1.04$ --- but it does \emph{not} eliminate the
+predictability tail: dropping the flagged statistics and re-solving fixes the
+originally-scary queries yet introduces new interfering pairs as the solver
+re-opens the budget, so the residual tail never reaches zero
+(Table~\ref{tab:optionB}). Option~A is the only mode with \emph{zero} tail at
+every budget, at the price of the quality gap. We recommend A as the default
+because it makes the deployment semantics match the measurement model
+(\S\ref{sec:measure-correct}) --- the deployment is then structurally
+independent, not just measured independently --- and reserve Option~B for
+deployments where quality outranks the reproducibility guarantee, expecting to
+repeat the solve $\to$ EXPLAIN-check $\to$ drop $\to$ re-solve loop since the
+interference is emergent rather than a fixed set of bad statistics.
 
 \subsection{Open Questions}
 
-(1) \emph{Level monotonicity}: enforcing that a higher capacity never yields a
-worse q-error could prune options and speed the solve. (2) \emph{Maintenance-aware
-selection}: jointly modeling ANALYZE cost (a function of the \emph{max} target)
-replaces the storage-only budget with an end-to-end maintenance budget.
-(3) \emph{Upgrade vs.\ add}: our data show a smooth capacity-only curve on
-stats\_CEB\_single and a large tail on CENSUS, but a principled
-``upgrade-vs-add'' decision boundary --- e.g.\ a marginal-value heuristic
-(quality gained per storage unit) --- is open. (4) \emph{When does one-stat
-sufficiency fail?}: identifying workloads with genuinely multiple independent
-correlated clusters (the regime needing the multi-select model) is the most
-important open question. (5) \emph{Limits}: we consider MCV statistics on single-table
-workloads; joins need other techniques, there is a real limit on statistics per
-relation, and our 2-/3-column candidate family understates achievable quality on
-harder CENSUS queries, where 4-/5-column candidates help --- extending candidate
-generation to higher arity is future work. (6) \emph{Deployment-mode
-selection}: our new end-to-end comparison (Table~\ref{tab:optionB}) shows
-Option-A (global disjointness) and Option-B (repair) carve a real
-trade-off --- Option-A guarantees predictability at a quality cost, Option-B
-keeps quality but not the guarantee. A principled rule for choosing a mode per
-deployment --- e.g.\ from the workload's quality-versus-reproducibility
-requirements or a budget-dependent crossover point --- is open.
+(1) \emph{Maintenance-aware selection}: jointly modeling ANALYZE cost (a function
+of the \emph{max} target) would replace the storage-only budget with an
+end-to-end maintenance budget. (2) \emph{When does one-stat sufficiency fail?:}
+identifying workloads with genuinely multiple independent correlated clusters
+(the regime needing the multi-select model, \S\ref{sec:formulation}) is the
+most important open question. (3) \emph{Higher-order candidates}: our
+2-/3-column candidate family understates achievable quality on harder CENSUS
+queries, where 4-/5-column MCVs help --- extending candidate generation to
+higher arity is future work.
 
 \section{Conclusion}
 \label{sec:concl}
