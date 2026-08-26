@@ -182,7 +182,7 @@ surviving option. On wide tables the naive protocol (CREATE--ANALYZE--EXPLAIN
 per candidate) is infeasible --- a single CENSUS ANALYZE at target 10000 already
 takes $\sim$22s with a warm cache, and grows linearly with the number of
 statistics (\S\ref{sec:measure-runtime}). Our
-\emph{catalog-mask protocol} (\S\ref{sec:measure}) builds each batch's
+\emph{Catalog-Mask protocol} (\S\ref{sec:measure}) builds each batch's
 candidates in one ANALYZE and isolates each by masking the others'
 \texttt{pg\_statistic\_ext\_data} payloads. This makes the candidate
 $\times$ capacity space measurable --- the full six-level per-candidate
@@ -212,7 +212,7 @@ solvable as a budgeted MILP (\S\ref{sec:formulation}, \S\ref{sec:milp}); (ii) an
 workloads --- at most one 2-/3-column MCV candidate per query --- whose
 linearity is a formal consequence (Prop.~\ref{prop:linear}), and which is what
 makes the optimization tractable (\S\ref{sec:rq2}); (iii) a \emph{scalable
-measurement infrastructure}, the catalog-mask protocol, that turns the
+measurement infrastructure}, the \emph{Catalog-Mask protocol}, that turns the
 otherwise-infeasible candidate $\times$ capacity measurement into a
 \emph{feasible} prerequisite for the optimization (\S\ref{sec:measure},
 \S\ref{sec:measure-runtime}): mounting many candidates in one ANALYZE and
@@ -398,15 +398,16 @@ which treats each statistic's contribution as independent. This is exact only
 when the chosen statistics act independently, and can break when overlapping
 statistics coexist (we return to this in \S\ref{sec:e2e}).
 
-\subsection{The Sparse Special Case: Exact and Linear}
+\subsection{One-Stat Sufficiency: An Exactly-Linear Special Case}
 \label{sec:sparse}
 
 Our measurements (\S\ref{sec:rq2}) reveal that per query a
 \emph{single dominant statistic} already captures nearly all improvement
-attainable from the evaluated 2-/3-column MCV candidates. This observation motivates a \emph{restricted} optimization model:
-the \emph{sparse} special case, in which each query selects at most one
-statistic, $\sum_s x_{is}\le 1$. We stress that this is an \emph{empirically
-justified restriction}, not a modeling assumption that holds by definition: it
+attainable from the evaluated 2-/3-column MCV candidates. This observation motivates a \emph{restricted} optimization model ---
+the \emph{sparse} special case of a budgeted statistic-selection problem, in which each query selects at most one
+statistic, $\sum_s x_{is}\le 1$. We stress that this restriction is the
+\emph{one-stat sufficiency} phenomenon (\S\ref{sec:rq2}) and is \emph{empirically
+justified}, not a modeling assumption that holds by definition: it
 is exact \emph{conditional on} the one-statistic-per-query regime
 (\S\ref{sec:rq2} characterizes when it holds and when it fails). Within that
 regime, the restriction removes the interaction that makes the general problem
@@ -685,144 +686,73 @@ stats\_CEB\_single are exactly $1.0$; the rest are $\le 1.1$).
 
 Protocol-M dominates Protocol-A by replacing per-candidate ANALYZEs with
 per-candidate masking, but \emph{masking is not free}: it rewrites the system
-catalog, and per (candidate, level) the measurement loop
-(Fig.~\ref{fig:mask}, \S\ref{sec:measure-mask}) is
+catalog. Per (candidate, level) the measurement loop is
 \[
   \underbrace{\text{mask all but one payload}}_{\text{UPDATE }\times\,N}\;\to\;
   \underbrace{\text{EXPLAIN}}_{\approx 0.002\text{s}}\;\to\;
   \underbrace{\text{restore all payloads}}_{\text{UPDATE }\times\,N}.
 \]
-We measured each component directly on CENSUS \texttt{climate} by sweeping the
-number of payloads $N$ on the table (target 10000; Fig.~anchors in
-Tab.~\ref{tab:measurement}): the mask and restore are
-\emph{linear in the table's payload count} ($\approx0.0008$\,s and
-$\approx0.00003$\,s per payload respectively), while the EXPLAIN is a constant
-$\approx0.002$\,s. So a single masked measurement costs
-\[
-  \epsilon(N) \;=\; 0.0008\,N + 0.00003\,N + 0.002 \;\approx\; 0.0008\,N \;\text{s},
-\]
-i.e.\ masking is \emph{not} a constant -- it grows with the number of
-statistics mounted on the table during that measurement, which is a property of
+We measured each component on CENSUS \texttt{climate} (Tab.~\ref{tab:measurement}):
+the mask and restore are \emph{linear in the table's payload count}
+($\approx0.0008$\,s / $\approx0.00003$\,s per payload), while the EXPLAIN is a
+constant $\approx0.002$\,s. So one masked measurement costs
+$\epsilon(N)\approx0.0008\,N$\,s --- masking is \emph{not} constant: it grows
+with the number of statistics mounted during that measurement, a property of
 the measurement \emph{granularity}, not of Protocol-M per se.
 
-This makes the measurement \emph{scope} a first-class, tunable decision. Group
-the queries' candidates into $B$ batches; inside a batch $b$ we run
-workload-wide: build the batch's $N_b$ distinct (candidate$\,{\times}\,$level)
-objects, ANALYZE once, then measure each of the batch's $M_b$ (query,
-candidate, level) cells by masking against the $N_b$ payloads. The total
-measurement time is
+Group the queries' candidates into $B$ batches; batch $b$ mounts $N_b$ distinct
+(candidate$\,{\times}\,$level) objects, ANALYZEs once, and measures $M_b$ cells
+by masking against the $N_b$ payloads. The total time is
 \begin{equation}\label{eq:batch-cost}
   T(B) \;=\;\underbrace{\sum_{b=1}^{B}\big(B_0 + c\,N_b\big)}_{\text{one ANALYZE per batch}}
       \;+\;\underbrace{\mu\sum_{b=1}^{B} M_b\,N_b}_{\text{mask + restore}}
       \;+\;\underbrace{\epsilon\,M_{\text{tot}}}_{\text{EXPLAIN}},
 \end{equation}
-where $B_0$ is the fixed \texttt{ANALYZE} base cost of the table (warm cache,
-measured from a single \texttt{ANALYZE} on that workload's table), $c$ is the
-per-statistic \texttt{ANALYZE} increment, $\mu{\approx}0.0008$\,s per payload,
-improving on the earlier constant-\textsc{epsilon} model (which treated masking
-as free). We calibrate the parameters \emph{per dataset}: the \texttt{ANALYZE}
-base term $B_0$ is driven by the table's size (on CENSUS \texttt{climate}
-$B{=}22$\,s \emph{empty}, $\approx$113\,s with a query's statistics mounted;
-on the small \texttt{stats\_CEB\_single} \texttt{posts} table it is
-$\approx$1.9\,s), whereas the masking term $\mu$ is table-independent (a catalog
-\emph{UPDATE}). The two extremes of $B$ are exactly the two ``scopes'': $B{=}n$
-queries is \emph{per-query} (each query ANALYZEs and masks only its own
-candidates) and $B{=}1$ is \emph{workload-wide}.
+where $B_0$ is the table's warm-cache \texttt{ANALYZE} base (per dataset: on
+CENSUS $B{=}22$\,s \emph{empty} and $\approx$113\,s with a query's statistics
+mounted; on the small \texttt{posts} table $\approx$1.9\,s), $c$ the per-statistic
+\texttt{ANALYZE} increment, and $\mu{\approx}0.0008$\,s per payload. The two
+extremes are per-query ($B{=}n$) and workload-wide ($B{=}1$).
 
 \emph{Measurement granularity.}\label{prop:batch}
-Catalog masking is not free: mounting more payloads on a table makes every
-masked measurement scan a longer catalog, so grouping the queries' candidates
-into large batches amortizes the fixed ANALYZE base of \eqref{eq:batch-cost}
-but increases its masking term $\mu M_b N_b$. Under a uniform model
-($N_b{=}\rho M$ per batch), $T(B)$ in \eqref{eq:batch-cost} is strictly convex
-and minimized at
+Because mounting more payloads makes every masked measurement scan a longer
+catalog, grouping candidates into large batches amortizes the fixed ANALYZE
+base but increases the masking term. Under a uniform model ($N_b{=}\rho M$),
+$T(B)$ is strictly convex and minimized at
 \begin{equation}\label{eq:batch-opt}
   B^{*} \;=\; M_{\text{tot}}\,\sqrt{\tfrac{\mu\rho}{B_0}},
   \qquad\text{i.e.}\qquad
   m^{*} \;=\; \sqrt{\tfrac{B_0}{\mu\rho}}\ \text{meas.\ per batch},
 \end{equation}
-so the optimal granularity grows with the ANALYZE base and shrinks as masking
-or sharing rises. We use this only to choose a \emph{practical}
-sub-batching granularity and to justify why we do not mount every candidate at
-once; the optimization problem of \S\ref{sec:milp} remains the statistics
-selection, not the measurement batching.
-
-The same trade-off also fixes the \emph{scope} of each build. Mounting every
-candidate on the table at once ($B{=}1$, workload-wide) is optimal only when
-sharing is so high that the masking term stays small; on CENSUS
-($\rho{=}0.624$) that would require
-$B_0{\ge}\tfrac12(0.0008)(0.624)\,185{,}136^{2}\approx 2{,}376$\,h, far above
-the measured $22$\,s, so a single workload-wide build is decisively suboptimal
-and we sub-batch instead (keeping each ANALYZE+mask batch near the per-query
-minimum, Tab.~\ref{tab:measurement}). On the high-sharing
-stats\_CEB\_single workload the closed form would favour workload-wide, but
-mounting everything still risks a large mask term, so we use the same
-sub-batched harness on both workloads for reproducibility.
-
-\emph{Intra-query granularity.}\label{cor:intraquery}
-The same trade-off applies \emph{within} a candidate-dense query: splitting its
-$n$ candidates (over $L$ levels) into $b$ sub-batches gives
-$T_{{q}}(b) = b\,B_0 + c\,nL + (nL)^2\mu/b$, minimized at
-$b^{*}=nL\sqrt{\mu/B_0}$, i.e.\ the same optimal per-sub-batch count
-$m^{*}=\sqrt{B_0/\mu}$ as above. We validated this directly on the most
-candidate-dense CENSUS query (\texttt{query.335}, $n{=}455$, $L{=}1$, target
-1000): measuring all 455 at once ($b{=}1$) took $181.4$\,s (mask $159.9$\,s),
-splitting into $3$ sub-batches dropped it to $84.7$\,s (mask $57.7$\,s), and
-$7$ sub-batches to $63.4$\,s (mask $25.0$\,s) --- the mask term tracks
-$\approx1/b$ ($159.9\to57.7\to25.0$) while the ANALYZE term grows with $b$
-($21.4\to27.0\to38.4$\,s), exactly the two competing terms of $T_{{q}}(b)$ ---
-a $2.9\times$ speedup at $7$ sub-batches.
-
-We verify this intra-query model end-to-end at the \emph{six-level} menu by
-measuring, for one candidate-dense query per workload, the real per-query
-phase-1 time across a sweep of sub-batch sizes, and comparing against
-$T_{{q}}(b)$. On CENSUS (\texttt{query.3}, 84 candidates, $nL{=}504$) the
-measured optimum is $b{=}1$ (402.0\,s); on \texttt{stats\_CEB\_single}
-(\texttt{st.144}, 35 candidates, $nL{=}210$) it is $b{=}4$
-(22.2\,s) -- the per-query intra-batch optimum for a single query, which
-coexists with the coarser $b{=}55$ harness setting that bounds the mask term
-across the workload (Prop.~\ref{prop:batch}). Beyond confirming convexity,
-this exposes a systematic weakness of
-the fixed-$B_0$ model: its ANALYZE term $bB_0$ assumes the \emph{empty-table}
-base, which on CENSUS \emph{underestimates} the true per-batch build cost
-(113\,s vs.\ 22\,s once a query's statistics are mounted) and on the small
-\texttt{posts} table \emph{overestimates} it (1.9\,s). Fitting the ANALYZE term
-as $bB_f + c_p nL$ on the two lowest $b$ points reproduces the measured times
-on the \emph{held-out} $b{=}7,14,28$ (CENSUS) and $b{=}4,7,10$
-(\texttt{stats\_CEB\_single}) to within 3\% on both workloads, whereas the
-fixed-$B_0$ model is 69\% low on CENSUS and $3$--$10\times$ high on
-\texttt{stats\_CEB\_single}. The model's \emph{form} is thus stable across
-workloads; only the ANALYZE base must be calibrated to the table.
+so the optimal granularity \emph{grows} with the ANALYZE base and \emph{shrinks}
+as masking or sharing rises. This fixes the scope of each build: workload-wide
+($B{=}1$) is optimal only under very high sharing; on CENSUS
+($\rho{=}0.624$) it would need $B_0{\ge}\tfrac12(0.0008)(0.624)\,185{,}136^{2}
+\approx 2{,}376$\,h against the measured $22$\,s, so a single build is
+decisively suboptimal and we sub-batch instead, splitting candidate-dense
+queries into $\approx$55-candidate sub-batches (Tab.~\ref{tab:measurement}). The
+same $m^{*}=\sqrt{B_0/\mu}$ optimum applies \emph{within} a query
+(Prop.~\ref{prop:batch}). We verified it on the most candidate-dense CENSUS
+query (\texttt{query.335}, $n{=}455$): measuring all at once took $181.4$\,s,
+which fell to $63.4$\,s with $7$ sub-batches (a $2.9\times$ speedup) as the mask
+term tracked $\approx1/b$ while the ANALYZE term grew with $b$.
 
 The trade-off is governed by the workload's \textbf{deduplication ratio}
-$\rho_b{=}N_b/M_b$ (distinct payloads mounted per raw measurement) and the
-ANALYZE base $B_0$. The two real workloads sit on opposite sides of it
-(measured with our candidate generator, \S\ref{sec:findings}):
-\emph{stats\_CEB\_single} has only 78 distinct combinations out of 616 raw
-candidates ($\rho{=}0.13$) so its queries reuse the same few groups, while
-\emph{CENSUS} has 19{,}245 of 30{,}856 ($\rho{=}0.62$) so mounting everything at
-once is expensive. For reproducibility we therefore measure \emph{both}
-workloads with the same sub-batched Protocol-M, which builds each query's
-candidate set in one ANALYZE but splits candidate-dense queries into sub-batches
-($\approx$55 candidates) to bound the mask term --- the \emph{harness}
-granularity, coarser than the per-query intra-batch optima of
-Tab.~\ref{tab:measurement} but simple and uniform across the workload.
-Protocol-M's advantage over the per-candidate Protocol-A is then best measured
-rather than modeled: using the \emph{measured} optimal per-query time above and
-Protocol-A's per-candidate cost ($nL$ cells $\times$ two \texttt{ANALYZE}s),
-the speedup is $\approx$283$\times$ on CENSUS \texttt{query.3} and
+$\rho_b{=}N_b/M_b$ and the ANALYZE base $B_0$. The two workloads sit on
+opposite sides of it: \emph{stats\_CEB\_single} has only 78 distinct
+combinations out of 616 raw candidates ($\rho{=}0.13$), while \emph{CENSUS} has
+19{,}245 of 30{,}856 ($\rho{=}0.62$). For reproducibility we measure \emph{both}
+with the same sub-batched Protocol-M --- one ANALYZE per query's candidate set,
+splitting candidate-dense queries into $\approx$55-candidate sub-batches to
+bound the mask term (the \emph{harness} granularity of
+Tab.~\ref{tab:measurement}). Against Protocol-A's per-candidate cost, the
+\emph{measured} speedup is $\approx$283$\times$ on CENSUS \texttt{query.3} and
 $\approx$36$\times$ on \texttt{stats\_CEB\_single} \texttt{st.144} (lower
-bounds: Protocol-A's per-candidate \texttt{ANALYZE} is no more than the table's
-base). We report this measured single-query speedup --- the reproducible
-quantity that supports the comparison; the full-workload runs exist only to
-assemble the per-candidate q-error tables that the downstream experiments
-(\S\ref{sec:findings}, \S\ref{sec:rq4}) consume.
-
-In either case the catalog-mask protocol --- not the MILP --- is the enabling
-component that makes the candidate ${\times}$ capacity space measurable, and the
-optimization (\S\ref{sec:rq4}) stays the cheap part of the pipeline; the
-granularity analysis above turns Protocol-M from a fixed trick into a tunable
-component whose operating point is chosen by a measurable cost model.
+bounds, since Protocol-A's per-candidate \texttt{ANALYZE} is no more than the
+table's base). In either case Catalog-Mask --- not the MILP --- is the enabling
+component that makes the candidate $\times$ capacity space measurable, and the
+granularity analysis turns it from a fixed trick into a tunable component whose
+operating point is chosen by a measurable cost model.
 
 \begin{table*}[t]
 \caption{Measured per-query phase-1 cost across sub-batch sizes, on one
@@ -865,38 +795,6 @@ sub-batch $b$ & \emph{size} $s$ & total & ANALYZE & mask\\
 \bottomrule
 \end{tabular}
 \end{table*}
-
-\begin{figure*}[t]
-\centering
-\begin{tikzpicture}[
-  bs/.style={draw, rounded corners=2pt, inner sep=4pt, font=\small,
-             align=center, text width=30mm, minimum height=10mm},
-  exp/.style={fill=red!12},
-  cheap/.style={fill=green!12},
-  arr/.style={-{Stealth[length=2.5mm]}, thick}
-]
-\node[bs] (a) at (0,0) {candidate\\[-0.5mm]generation};
-\node[bs] (b) at (3.1,0) {candidate $\times$ capacity\\[-0.5mm]\textbf{measurement}};
-\node[bs] (c) at (6.2,0) {sparse\\[-0.5mm]MILP};
-\node[bs] (d) at (9.2,0) {\\[-0.5mm]\textbf{deploy}};
-\node[bs, exp] (b2) at (3.1,-1.9) {expensive\\[-0.5mm]($\approx$36--283$\times$ vs.\ naive)};
-\node[bs, cheap] (c2) at (6.2,-1.9) {cheap\\[-0.5mm]($<$5\,s)};
-\draw[arr] (a.east) -- (b.west);
-\draw[arr] (b.east) -- (c.west);
-\draw[arr] (c.east) -- (d.west);
-\draw (b2.north) -- (b.south);
-\draw (c2.north) -- (c.south);
-\end{tikzpicture}
-\caption{Pipeline cost profile. The candidate $\times$ capacity
-\emph{measurement} (\S\ref{sec:measure}) is the expensive step -- but the
-catalog-mask protocol makes it feasible by amortizing ANALYZE and exposing a
-tunable granularity (Tab.~\ref{tab:measurement}, \S\ref{sec:measure-runtime}),
-cutting phase-1 time by $\approx$36--283$\times$ on the two workloads
-(measured vs.\ per-candidate CREATE/ANALYZE) -- whereas the sparse
-MILP solves in under five seconds (\S\ref{sec:rq4}). The bottleneck is obtaining
-the data the optimization needs, not the optimization itself.}
-\label{fig:pipeline}
-\end{figure*}
 
 \textbf{Scalability and overhead.} The mask overhead is the one cost that grows
 with the number of statistics mounted on a table, and it is why granularity
@@ -1219,7 +1117,8 @@ allocation axis, not just coverage.}
 \end{figure}
 
 The CENSUS workload is the \emph{data-capped} mirror of the same budget-quality
-trade-off (Fig.~\ref{fig:census_budget_quality}). Its baseline is far worse
+trade-off (cf.\ Fig.~\ref{fig:budgetquality}; its extra panels are shown in the
+supplemental material). Its baseline is far worse
 (mean 25.19, max 4{,}162 over 468 queries), and a tiny budget already collapses
 it: 50\,KB drives the mean from 25.19 to 1.31, the 100\,KB budget cuts the
 maximum to 6.2, and 250\,KB brings it to $\approx$3. Beyond $\approx$500\,KB
@@ -1236,21 +1135,6 @@ rarely worth it once the data-capped lists are already full
 on target-capped, high-cardinality \texttt{posts} statistics, capacity upgrades
 are the decisive lever; on data-capped CENSUS statistics, coverage is what
 matters and capacity is already satisfied at or below the default.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/census_budget_quality}
-\caption{Budget-quality curve (left) and capacity-level mix (right) on the
-full 468-query CENSUS workload (the data-capped mirror of
-Fig.~\ref{fig:budgetquality}). A small budget collapses the mean from 25.19 to
-below 1.1 by 250\,KB (maximum to $\approx$3), and the curve \emph{saturates}
-beyond $\approx$500\,KB: the mean stays 1.057 through 2\,MB even as more
-statistics are added, because CENSUS's low-cardinality combinations are already
-captured. The level mix stays concentrated on \emph{low} capacity (L10/L25) at
-every budget --- raising capacity is rarely beneficial on data-capped
-statistics.}
-\label{fig:census_budget_quality}
-\end{figure}
 
 \subsubsection{What-only vs.\ what+how-much.}
 The claim that capacity is a real decision axis requires isolating it: does
@@ -1369,7 +1253,7 @@ nothing but solve and measurement time.
 \label{sec:e2e}
 
 We close the loop of the measurement $\to$ optimization $\to$ deployment
-pipeline (Fig.~\ref{fig:pipeline}) by building the MILP-selected sets on the real
+pipeline by building the MILP-selected sets on the real
 database and asking a causal question with three stages: \emph{Is a single
 deployed statistic predictable? Is a co-installed overlapping set predictable?
 And can we restore predictability?} Each stage controls the previous one, so
@@ -1638,34 +1522,10 @@ improvement). We check the mean choice empirically: solving the sparse MILP
 under the log objective and the linear objective picks overlapping-but-not-identical
 statistic sets (Jaccard $0.29$--$0.90$) yet yields \emph{nearly identical}
 resulting arithmetic and geometric mean q-errors at every budget --- differing
-only in the third--fourth decimal (e.g.\ $1.0247$ vs.\ $1.0246$ at 10\,KB)
-(Table \ref{tab:meanrob}). The deployment is robust to the mean choice, and we
+only in the third--fourth decimal (e.g.\ $1.0247$ vs.\ $1.0246$ at 10\,KB).
+The deployment is robust to the mean choice, and we
 keep the arithmetic mean because it directly targets the worst queries that our
 evaluation emphasizes.
-
-\begin{table}[t]
-\caption{Mean-choice robustness (full 632-query workload). Solving the sparse
-MILP under the geometric (log) and arithmetic (linear) objectives selects
-overlapping-but-not-identical statistic sets (Jaccard $<$ 1), yet produces
-nearly identical resulting arithmetic and geometric mean q-errors at every
-budget (differing in the third--fourth decimal). The deployment is robust to
-the mean choice.}
-\label{tab:meanrob}
-\small
-\begin{tabular}{lrrrrr}
-\toprule
-budget & Jaccard & \multicolumn{2}{c}{arith mean} & \multicolumn{2}{c}{geo mean}\\
-\cmidrule(lr){3-4}\cmidrule(lr){5-6}
-      & & geo-obj & arith-obj & geo-obj & arith-obj\\
-\midrule
-10\,\,KB   & 0.818 & 1.0247 & 1.0246 & 1.0178 & 1.0178\\
-40\,KB   & 0.286 & 1.0180 & 1.0179 & 1.0130 & 1.0133\\
-100\,KB  & 0.539 & 1.0156 & 1.0156 & 1.0114 & 1.0115\\
-250\,KB  & 0.895 & 1.0040 & 1.0040 & 1.0036 & 1.0036\\
-500\,KB  & 0.806 & 1.0013 & 1.0013 & 1.0013 & 1.0013\\
-\bottomrule
-\end{tabular}
-\end{table}
 
 \subsection{The Interference Fix}
 \label{sec:disc-fix}
