@@ -646,7 +646,9 @@ on the smaller sample its own target implies. Protocol-M thus measures a
 \emph{conditional large-sample oracle} view $e_{is}(L)$, which isolates capacity
 as the only axis (\S\ref{sec:measure-determinism}) but is not a claim that real
 deployment reproduces it exactly; we assess deployment fidelity in
-\S\ref{sec:disc-deployment}.
+\S\ref{sec:disc-deployment}. Note that the fixed target\,10000 baseline is a
+\emph{measurement-design baseline, not a deployment recommendation} --- a
+real deployment need not raise any single-column target.
 
 \emph{Batch granularity.}
 Protocol-M dominates Protocol-A by replacing per-candidate ANALYZEs with
@@ -1289,26 +1291,32 @@ that the main conclusions are not sensitive to this choice.
 \subsection{Deployment Fidelity of the Oracle}
 \label{sec:disc-deployment}
 
+This sampling-fidelity issue is distinct from the planner-interference issue of
+\S\ref{sec:e2e}: the former concerns \emph{how a statistic is sampled at a
+given target} (large-sample oracle vs.\ a real target-specific deployment),
+whereas the latter concerns \emph{which statistic the planner uses when several
+are co-installed}. Here we quantify the former.
+
 Protocol-M evaluates every capacity level on the same large sample (a
 \emph{large-sample oracle} view), which a real ``\texttt{SET STATISTICS} $L$''
 deployment need not reproduce. Re-measuring with a real target-specific
-\texttt{ANALYZE} (single-column target back at 100), we find the oracle highly
-faithful in the ordinary regime: the level it deems optimal and a real
-deployment's agree within 1\%, and the headline example
-\texttt{posts(AnswerCount,FavoriteCount,ViewCount)}
-($4.58\to2.82\to1.04$) is reproduced to within 1\%. In our experiments the
-oracle becomes optimistic on a narrow regime --- when a candidate's columns
-cover a query's rare-selectivity driver and the combination is too rare to
-appear in a real low-capacity sample, so the large sample captures it while a
-real small sample misses it (falling back to base-frequency) with a far worse
-true q-error. Sweeping capacity as a continuous knob, the ratio of real to
-oracle q-error declines smoothly from $\sim$$10^{2}{-}10^{4}$ when the expected
-sample count $\lambda(L){=}(r/N)\cdot\textrm{sample}(L)$ is below one to
-$\approx$1 as $\lambda$ grows larger --- in our runs it approached 1 once
-$\lambda$ was several units or larger. We therefore treat low expected counts
-as an \emph{empirical warning regime}, not a hard threshold: the harmful
-optimistic bias arises when a candidate covers the rare driver AND its expected
-sample count is small.
+\texttt{ANALYZE} (single-column target back at 100), across the evaluated
+stats\_CEB\_single candidates and the core \texttt{posts} case the oracle is
+highly faithful: deploying the oracle-selected level under target-specific
+ANALYZE incurs at most 1\% q-error loss relative to the true best level, and
+the headline example \texttt{posts(AnswerCount,FavoriteCount,ViewCount)}
+($4.58\to2.82\to1.04$) is reproduced to within 1\%. In the low-$\lambda$ cases
+we evaluated, the oracle becomes optimistic --- when a candidate's columns cover
+a query's rare-selectivity driver and the combination is too rare to appear in
+a real low-capacity sample, so the large sample captures it while a real small
+sample misses it (falling back to base-frequency) with a far worse true q-error;
+sweeping capacity as a continuous knob, the ratio of real to oracle q-error
+reached $\sim$$10^{2}{-}10^{4}$, and approached 1 as $\lambda$ increased
+($\lambda(L){=}(r/N)\cdot\textrm{sample}(L)$ is the expected sample count);
+in our runs it approached 1 once $\lambda$ was several units or larger. We
+therefore treat low expected counts as an \emph{empirical warning regime}, not
+a hard threshold: the harmful optimistic bias arises when a candidate covers
+the rare driver AND its expected sample count is small.
 
 \subsection{The Interference Fix}
 \label{sec:disc-fix}
@@ -1383,9 +1391,11 @@ dominant statistic per query --- which, together with capacity levels, makes the
 budget-constrained problem an exactly-linear MILP solvable in seconds at
 full-workload scale, via
 a catalog-mask protocol that makes per-candidate, per-capacity measurement
-feasible on wide tables. End-to-end validation shows per-candidate prediction is
-sound and isolates the residual risk to planner cross-talk among co-installed
-overlapping statistics; we explain it as a creation-order effect
+feasible on wide tables. End-to-end validation confirms the correctness of
+\emph{isolated} per-candidate measurement and identifies two distinct
+deployment risks: sampling mismatch in rare low-frequency regimes
+(\S\ref{sec:disc-deployment}) and planner cross-talk among co-installed
+overlapping statistics; we explain the latter as a creation-order effect
 (\S\ref{sec:switch}) and restore empirically near-exact predictability either
 with a conservative global-disjointness mode or with post-selection
 planner-validation. Join-heavy workloads are the negative control.
