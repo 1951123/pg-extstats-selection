@@ -137,7 +137,7 @@ benefit of each candidate statistic; interference and redundancy remain hidden
 from optimization formulations.
 
 \emph{Running example.} On the high-cardinality \texttt{posts} table, the
-statistic \texttt{posts(AnswerCount,FavoriteCount,ViewCount)} can be stored at
+statistic \texttt{posts(AnswerCount,}\allowbreak\texttt{FavoriteCount,}\allowbreak\texttt{ViewCount)} can be stored at
 any level of the capacity menu $\capmenu$ \cite{pgstats}:
 at the default target 100 the list is too small to hold the 3-column
 correlation (q-error stays $\sim$4.7), while at 10000 it drives the error to
@@ -456,7 +456,7 @@ base-cardinality estimates). This is why our evaluation separates single-table
 workloads (where they act directly) from join workloads (a negative control).
 
 \textbf{Capacity is per-object and tunable.} Each statistic can be assigned its
-own \texttt{statistics\_target} via \texttt{ALTER STATISTICS ... SET STATISTICS}
+own \texttt{statistics\_}\allowbreak\texttt{target} via \texttt{ALTER STATISTICS}\allowbreak\texttt{ \dots\ SET STATISTICS}
 (stored in \texttt{stxstattarget}). The ANALYZE sampling effort is coupled to the
 \emph{largest relevant statistics target} on the relation (including the
 extended statistics' own targets) \cite{pgstats}; consequently, raising an
@@ -487,7 +487,10 @@ above it (the exact menu is in \S\ref{sec:findings}).
 
 The obvious protocol (\emph{Protocol-A}) isolates a candidate by
 \[
-  \text{CREATE} \to \text{ANALYZE} \to \text{EXPLAIN} \to \text{DROP} \to \text{ANALYZE},
+  \begin{aligned}
+    \text{CREATE} &\to \text{ANALYZE}\\
+    &\to \text{EXPLAIN} \to \text{DROP} \to \text{ANALYZE},
+  \end{aligned}
 \]
 a clean, drop-analyzable cycle that costs two ANALYZEs per candidate. On a wide
 table this is prohibitive. On the CENSUS \texttt{climate} table (69 columns,
@@ -525,7 +528,7 @@ ANALYZE. Payloads are restored from a
 temporary backup table via \texttt{UPDATE ... FROM} (the \texttt{pg\_mcv\_list}
 type has no bytea cast, so the round-trip must happen inside the server).
 Multiple capacity levels are measured with one object per (candidate, level)
-via \texttt{ALTER STATISTICS ... SET STATISTICS}, again built by a single
+via \texttt{ALTER STATISTICS}\allowbreak\texttt{ \dots\ SET STATISTICS}, again built by a single
 ANALYZE at the maximum target. Protocol-M therefore replaces two ANALYZEs per
 candidate with \emph{one} mask--EXPLAIN--restore cycle per candidate, whose cost
 is dominated by the catalog UPDATE and grows with the number of payloads
@@ -734,7 +737,7 @@ job-light (join)  & 70  & 5     & 5   & 1     & 0/0/0/0/1\\
 \textbf{Yes.} Capacity is not a storage knob that can be swept under the rug ---
 it sets estimation precision directly. On \texttt{stats\_CEB\_single} (the
 \texttt{posts} table), a single 3-column MCV,
-\texttt{posts(AnswerCount,FavoriteCount,ViewCount)}, repairs a query with
+\texttt{posts(AnswerCount,}\allowbreak\texttt{FavoriteCount,}\allowbreak\texttt{ViewCount)}, repairs a query with
 baseline q-error 4.58 only as far as its capacity allows: at target 100 it
 does \emph{nothing} (q-error stays 4.58 --- the correlation is not representable
 in so few MCV entries), at target 1000 it more than halves the error (2.82), and
@@ -1007,7 +1010,7 @@ and restoring predictability --- each stage controlling the previous.
 
 We first confirm that the mask-measured q-error of a single statistic matches
 what it delivers when deployed alone. For the statistic
-\texttt{posts(AnswerCount,FavoriteCount,ViewCount)} the catalog-mask measurement
+\texttt{posts(AnswerCount,}\allowbreak\texttt{FavoriteCount,}\allowbreak\texttt{ViewCount)} the catalog-mask measurement
 predicts q-errors of 1.042 / 1.029 / 1.025 for queries st.144 / st.588 / st.284.
 Building \emph{only} that statistic and re-measuring on the real table gives
 1.042 / 1.029 / 1.025 --- matching the prediction exactly. This is the
@@ -1018,14 +1021,14 @@ candidate in isolation, then compose).
 \subsection{Overlap Breaks the Independence Assumption}
 \label{sec:e2e-coinstalled}
 
-Next we deploy the 2 MB MILP solution for stats\_CEB\_single: five statistics,
+Next we deploy the 2 MB MILP solution for stats\_\allowbreak CEB\_single: five statistics,
 all pairwise-overlapping MCVs over \{AnswerCount, FavoriteCount, ViewCount,
 PostTypeId\}, predicted mean q-error 1.021. Measured on the real table the mean
 is \textbf{1.32} --- a 1.29$\times$ gap. Five of the eight queries match their
 prediction (st.562: 1.003, st.308: 1.000, st.182: 1.000, st.398: 1.060, st.314:
 1.008), but the three queries served by the \emph{same} statistic
-\texttt{(AnswerCount,FavoriteCount,ViewCount)} degrade from their Stage-1
-predictions (1.042/1.029/1.025) to 2.13 / 2.07 / 1.90.
+\texttt{(AnswerCount,}\allowbreak\texttt{FavoriteCount,}\allowbreak\texttt{ViewCount)} degrade from their Stage-1
+predictions (1.042/\allowbreak1.029/\allowbreak1.025) to 2.13 / 2.07 / 1.90.
 
 Compare Stage 1 and Stage 2 for the very same statistic: alone it delivers
 1.042; co-installed with four overlapping siblings it gives 2.13.
