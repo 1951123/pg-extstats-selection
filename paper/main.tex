@@ -684,7 +684,7 @@ sub-batch $b$ & \emph{size} $s$ & total & ANALYZE & mask\\
 \bottomrule
 \end{tabular}
 
-{\footnotesize $nL$ = distinct (candidate$\times$level) objects; times in seconds.}
+{\footnotesize $nL$ = distinct (candidate$\times$level) objects}
 \end{table*}
 
 \section{Empirical Findings}
@@ -717,15 +717,12 @@ already near q-error 1; the method's value is that it targets and clears that
 tail. Hence we report median/P90/max alongside the mean.
 
 \begin{table*}[t]
-\caption{Workload characteristics and candidate distribution. ``cands/query'' =
-sum of per-query candidate counts before dedup; ``global dedup'' = distinct
-column combinations; ``per-query'' = min/p25/med/p75/max of candidates/query.}
+\caption{Workload characteristics and candidate distribution.}
 \label{tab:bench}
 \small
 \begin{tabular}{lcccl@{\hskip 3pt}c}
 \toprule
-benchmark & queries & cands/query & with & global & per-query \\
-          &         & (total)     & any  & dedup  & min/p25/med/p75/max \\
+benchmark & queries & \shortstack[c]{candidates\\per query (total)} & \shortstack[c]{queries\\with any\\candidate} & \shortstack[c]{global\\distinct} & \shortstack[c]{per-query\\min/p25/med/p75/max} \\
 \midrule
 CENSUS            & 468 & 30856 & 467 & 19245 & 0/20/56/84/455\\
 stats\_CEB\_single & 632 & 616   & 180 & 78    & 0/0/0/1/35\\
@@ -733,8 +730,6 @@ stats\_CEB (join) & 146 & 616   & 111 & 78    & 0/1/2/5/39\\
 job-light (join)  & 70  & 5     & 5   & 1     & 0/0/0/0/1\\
 \bottomrule
 \end{tabular}
-
-{\footnotesize cands/query = total per-query candidate count before dedup; global dedup = distinct column combinations; per-query = min/p25/med/p75/max candidates per query.}
 \end{table*}
 
 \subsection{Capacity Is a Real Decision Axis}
