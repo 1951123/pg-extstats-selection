@@ -262,12 +262,8 @@ optimization formulations.
 Table \ref{tab:taxonomy} situates our contribution against this lineage.
 
 \begin{table*}[t]
-\caption{Positioning against automatic statistics configuration. Prior work
-discovers or selects column groups under a workload and (sometimes) a budget;
-none treats PostgreSQL's per-statistic \texttt{statistics\_target} (capacity) as
-a competing resource dimension against a single shared storage budget, nor
-validates the deployed set against the real planner. \checkmark\;\,= yes,
-\;$\sim$\;= partial, -- = no/depends.}
+\caption{Positioning against automatic statistics configuration.
+\checkmark\;\,= yes, \;$\sim$\;= partial, -- = no/depends.}
 \label{tab:taxonomy}
 \small
 \begin{tabular}{lccccccl}
@@ -573,13 +569,10 @@ per candidate, whereas Protocol-M pays it once per batch of candidates.
       {planner\\[-0.5mm]{\scriptsize sees only S1}};
 \draw[arr] (r0.east) -- (pln.west);
 \end{tikzpicture}
-\caption{The catalog-mask protocol (Protocol-M): all candidates (S1--S4) are
-built in one ANALYZE; to measure S1 we NULL the others' payloads in
-\texttt{pg\_statistic\_ext\_data}, so the planner's
-\texttt{statext\_is\_kind\_built()} includes only S1 in
-\texttt{rel->statlist}. Measuring each candidate is a mask--EXPLAIN--restore
-cycle (
-\S\ref{sec:measure-runtime}) rather than an ANALYZE.}
+\caption{The catalog-mask protocol (Protocol-M): all candidates are built in one
+ANALYZE, and each is measured by NULLing the others' payloads so that the
+planner sees only it, via a mask--EXPLAIN--restore cycle
+(\S\ref{sec:measure-runtime}) rather than an ANALYZE.}
 \label{fig:mask}
 \end{figure*}
 
@@ -659,10 +652,8 @@ base). Thus Catalog-Mask --- not the MILP --- is the enabling component that
 makes the candidate $\times$ capacity space measurable.
 
 \begin{table*}[t]
-\caption{Measurement cost under sub-batch size $b$ on one candidate-dense query
-per workload. Masking decreases and ANALYZE cost grows with finer batches,
-yielding a workload-dependent optimum; Protocol-M cuts per-candidate cost by
-$\approx$283$\times$/36$\times$ over Protocol-A.}
+\caption{Measurement cost vs.\ sub-batch size $b$ on one candidate-dense query
+per workload.}
 \label{tab:measurement}
 \small
 \begin{tabular}{lcccc@{\hskip 6pt}lcccc}
@@ -719,12 +710,9 @@ already near q-error 1; the method's value is that it targets and clears that
 tail. Hence we report median/P90/max alongside the mean.
 
 \begin{table*}[t]
-\caption{Workload characteristics and candidate distribution.
-Per-query candidates are the 2/3-column subsets of each query's selection
-predicates; ``cands/query (total)'' is the sum of per-query candidate counts
-before deduplication, ``global dedup'' the number of distinct column
-combinations across the workload, and ``per-query min/p25/med/p75/max'' the
-five-point summary of the candidate-count distribution per query.}
+\caption{Workload characteristics and candidate distribution. ``cands/query'' =
+sum of per-query candidate counts before dedup; ``global dedup'' = distinct
+column combinations; ``per-query'' = min/p25/med/p75/max of candidates/query.}
 \label{tab:bench}
 \small
 \begin{tabular}{lcccl@{\hskip 3pt}c}
@@ -830,10 +818,9 @@ $K{=}1$ and \emph{decays} with $K$ (Table
 regime where the multi-select model (\S\ref{sec:multi}) is required.
 
 \begin{table}[t]
-\caption{Controlled one-stat-sufficiency decay. As a query is driven by $K$
-mutually independent correlated clusters, the single best statistic captures a
-shrinking fraction ($\operatorname{cov}_K$) of the improvement of the best $K$-statistic
-set. One-stat sufficiency holds ($1.000$) only for $K{=}1$; it fails once $K\ge 3$.}
+\caption{Controlled one-stat-sufficiency decay: $\operatorname{cov}_K$, the fraction
+of the best $K$-statistic improvement captured by the single best statistic, as
+a query is driven by $K$ independent correlated clusters.}
 \label{tab:sweep}
 \small
 \begin{tabular}{lcccc}
@@ -869,10 +856,8 @@ so the simpler greedy is not a strawman).
 
 \begin{table}[t]
 \caption{MILP vs.\ the strongest greedy baseline (best of per-query benefit/byte
-G1, marginal G2, and add-or-upgrade G3) on the 632-query workload. Even this
-strong adversary loses at every budget; the MILP advantage is largest under the
-tightest budget and under a mid-range budget (250\,KB) where only the MILP can
-reallocate capacity. ``best-is'' names the winning greedy.}
+G1, marginal G2, and add-or-upgrade G3) on the 632-query workload.
+``best-is'' names the winning greedy.}
 \label{tab:greedy2}
 \small
 \begin{tabular}{lcccl}
@@ -907,14 +892,9 @@ $(1071.5 / 332.5 / 2542.9 / 4162.1)$ to $(1.10 / 1.09 / 1.17 / 1.41)$.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/budget_quality}
-\caption{Budget-quality curve (left) and capacity-level mix (right) on the full
-632-query stats\_CEB\_single workload. Mean, median and P90 all decrease as the
-budget rises. The right panel shows the mix of chosen
-\texttt{statistics\_target} levels across the full two-sided menu
-$\capmenu$: under the tightest budgets the solver spends on
-\emph{low} capacity (L10/L25/L50) to fit many statistics, and shifts to
-\emph{high} capacity (L1000/L10000) as the budget grows --- capacity is a real
-allocation axis, not just coverage.}
+\caption{Budget-quality curve (left) and the mix of chosen
+\texttt{statistics\_target} levels across the capacity menu $\capmenu$
+(right), on the full 632-query stats\_CEB\_single workload.}
 \label{fig:budgetquality}
 \end{figure}
 
@@ -948,10 +928,8 @@ the full model's mean/max q-error against the \emph{best} what-only variant.
 
 \begin{table}[t]
 \caption{What-only (fixed capacity) vs.\ what+how-much (capacity-aware) MILP on
-the 632-query workload. ``Best what-only'' is the best of the all-L100 /
-all-L1000 / all-L10000 column-selection variants at that budget. The full model
-is never worse, and at generous budgets it keeps collapsing the \emph{tail}
-(max) where fixed-capacity selection saturates.}
+the 632-query workload. ``best what-only'' = best of the all-L100 / all-L1000 /
+all-L10000 column-selection variants at that budget.}
 \label{tab:whathowmuch}
 \small
 \begin{tabular}{lcc@{\hskip 6pt}cc}
@@ -1074,12 +1052,9 @@ set to be pairwise column-disjoint, so the planner cannot cross-talk. Table
 \ref{tab:p1} measures predicted vs E2E for both models at two budgets.
 
 \begin{table*}[t]
-\caption{Three-stage causal summary and Option-A ablation (ratio $=$
-E2E$/_{}$predicted q-error; $1.000$ means the deployment reproduces the model's
-prediction exactly). The global-disjoint solution reproduces its prediction
-exactly (ratio 1.000) because the deployed set is pairwise column-disjoint, at
-a quantified nominal-quality cost. The systematic sweep below extends this
-observation to 159 global-disjoint query-deployment points.}
+\caption{Three-stage causal summary and Option-A ablation. Ratio $=$
+E2E$/_{}$predicted q-error; $1.000$ means the deployment reproduces its
+prediction exactly.}
 \label{tab:p1}
 \small
 \begin{tabular}{lccccc}
@@ -1115,10 +1090,9 @@ Fig.~\ref{fig:e2epredict} summarizes 234 disjoint (159 global-disjoint MILP $+$
 \centering
 \includegraphics[width=\linewidth]{figures/e2e_predict}
 \caption{Predicted vs.\ E2E measured q-error across 464 systematic
-query-deployment points (log-log). Disjoint points (singletons, global-disjoint
-MILP) hug the diagonal --- 234 points, mean ratio 1.0000, worst 1.036.
-Overlapping points scatter above it --- 230 points, mean ratio 1.048, worst
-2.05.}
+query-deployment points (log-log). Disjoint points are singletons and
+global-disjoint MILP deployments; overlapping points are unconstrained
+deployments.}
 \label{fig:e2epredict}
 \end{figure}
 
@@ -1233,10 +1207,8 @@ number of queries whose E2E/predicted ratio exceeds $1.05$ (``tail'').
 \begin{table}[t]
 \caption{Option-A vs.\ Option-B end-to-end on the real \texttt{posts} workload
 at three budgets. \emph{mean} = achieved arithmetic-mean q-error over the
-workload; \emph{tail} = queries with E2E/predicted ratio $>1.05$ (out of served).
-Option-B preserves the nominal quality of the unconstrained solution (close to
-\textsf{overlap}, far better than Option-A) but never eliminates the tail;
-Option-A is the only mode with zero tail at every budget, at a quality cost.}
+workload; \emph{tail} = queries with E2E/predicted ratio $>1.05$ (out of
+served).}
 \label{tab:optionB}
 \small
 \setlength{\tabcolsep}{2.6pt}
