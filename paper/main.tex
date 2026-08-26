@@ -84,7 +84,7 @@ that eliminates cross-statistic interference to measure each candidate's
 independent storage cost and error-reduction gain. We model statistic tuning as
 a budget-constrained integer-programming problem to jointly optimize
 column-combination selection and per-statistic sampling-capacity assignment.
-Our experiments demonstrate that our method significantly reduces Q-error
+Our experiments demonstrate that our method significantly reduces q-error
 under tight storage budgets while avoiding redundant statistics and planner
 interference. We further characterize applicability boundaries and analyze the
 mismatch between storage-based budgeting and real-world ANALYZE overhead,
@@ -155,7 +155,7 @@ overall estimation quality under given storage budgets.
 
 We conduct comprehensive experiments across multiple real and synthetic
 workloads. The results demonstrate that our approach substantially reduces
-Q-error and suppresses redundant, interfering statistics under tight storage
+q-error and suppresses redundant, interfering statistics under tight storage
 budgets. We explicitly acknowledge an important modeling assumption: our
 optimizer uses storage consumption as the budget metric, which exhibits
 inherent mismatch against real-world ANALYZE maintenance overhead. We further
@@ -712,7 +712,7 @@ is not a marginal problem. q-error is \emph{multiplicative}, so its cost
 concentrates in the worst estimates: a query wrong by a factor of 10 or 1000
 (not 10\%) is what makes the optimizer pick a categorically wrong plan. The two
 primary workloads span this spectrum (Table \ref{tab:bench}): on
-\texttt{CENSUS}, 22\% of queries have baseline q-error $>2$ (worst $4{,}172$);
+\texttt{CENSUS}, 22\% of queries have baseline q-error $>2$ (worst $4{,}162$);
 on \texttt{stats\_CEB\_single}, 5.1\% exceed q-error 2 (tail 4.7). The mean
 improvement ($1.095\to1.016$) looks small only \emph{because} most queries are
 already near q-error 1; the method's value is that it targets and clears that
