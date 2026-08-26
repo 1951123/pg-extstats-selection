@@ -56,18 +56,66 @@ The work rests on three findings/components:
 
 ## Benchmarks
 
-* **Census (USCensus 1990)** — a wide, 69-column single-table workload
-  (data-capped statistics).
-  Source: <https://github.com/wuziniu/BayesCard/tree/master>
-* **JOB / IMDB** — join-heavy workload (negative control).
-  Source: <https://github.com/gregrahn/join-order-benchmark>
-* **stats_CEB / stats_CEB_single** — the Cardinality Estimation Benchmark's
-  single-table and join workloads (target-capped statistics);
-  **job-light** is the same benchmark's IMDB join sub-plans.
-  Source: <https://github.com/Nathaniel-Han/End-to-End-CardEst-Benchmark/tree/master>
+Three benchmark suites cover the two single-table regimes the method targets,
+plus a join-heavy negative control. Each is loaded by the corresponding
+`benchmarks/init_*.sh` script from the CSV/raw files vendored under
+`benchmarks/<name>/data/`. **Data availability:** all raw data are third-party
+public datasets; the vendored files are verbatim copies (details per benchmark
+below), and every query workload is deterministically reproduced from the
+query files in `benchmarks/<name>/queries/`. Principal numbers map to artifacts
+in [`docs/reproducibility.md`](docs/reproducibility.md).
 
-Initialize a benchmark with the corresponding `benchmarks/init_*.sh` script
-(e.g. `bash benchmarks/init_census.sh`).
+### 1. Census — `benchmarks/Census` (data-capped, wide single-table)
+
+- **Data set:** *USCensus1990* (a discretized one-percent sample of the 1990
+  U.S. Census), downloaded from the UCI Machine Learning Repository:
+  <https://archive.ics.uci.edu/static/public/116/us+census+data+1990.zip>.
+  The 69-column `climate` table is built from `USCensus1990.data.txt`
+  (`benchmarks/Census/data/`, with the original `.readme`, `.attributes`,
+  and `.html` documentation included).
+- **Workload:** 468 `SELECT COUNT(*) ... WHERE` queries over the single
+  `climate` table, following the census single-table workload in
+  [BayesCard](https://github.com/wuziniu/BayesCard/tree/master)
+  (`benchmarks/Census/queries/query.sql`, one query per line, ground-truth
+  cardinality appended after `||`).
+- **Role:** the *data-capped* regime (categorical columns whose MCV lists fill
+  at low cardinality), stressing wide-table measurement scale.
+
+### 2. JOB / IMDB — `benchmarks/JOB` (join-heavy negative control)
+
+- **Data set:** the public *Internet Movie Database* (IMDb) import used by the
+  [Join Order Benchmark (JOB)](https://github.com/gregrahn/join-order-benchmark)
+  (Leis et al., *How good are query optimizers, really?*, PVLDB 9(3), 2015),
+  downloaded from:
+  <https://bonsai.cedardb.com/job/imdb.tgz>.
+  Schemas and CSVs are under `benchmarks/JOB/`
+  (`schema.sql`, `fkindexes.sql`, `data/*.csv`, `schematext.sql`).
+- **Workload:** the canonical JOB query set (`benchmarks/JOB/queries/`).
+- **Role:** the join-heavy *negative control*: a single-relation MCV cannot
+  repair cross-table join selectivity, so the method should correctly do little.
+
+### 3. stats_CEB / stats_CEB_single — `benchmarks/stats_CEB` (target-capped)
+
+- **Data set:** *StackExchange* public data exports (Posts, Users, Votes,
+  Badges, Comments, PostHistory, PostLinks, Tags), as packaged by the
+  [Cardinality Estimation Benchmark (CEB)](https://github.com/Nathaniel-Han/End-to-End-CardEst-Benchmark),
+  downloaded from its `datasets/stats_simplified` directory:
+  <https://github.com/Nathaniel-Han/End-to-End-CardEst-Benchmark/tree/master/datasets/stats_simplified>.
+  CSVs and schema are under `benchmarks/stats_CEB/` (`data/*.csv`, `stats.sql`),
+  with the benchmark's "no secondary indexes" convention kept to keep
+  join-order tests fair.
+- **Workload:** the CEB single-table sub-plans
+  (`stats_CEB_single`, 632 queries) and the CEB join workload
+  (`stats_CEB`, 146 joins), both parsed from
+  `benchmarks/stats_CEB/queries/stats_CEB_single_table.sql` and
+  `benchmarks/stats_CEB/queries/stats_CEB.sql`.
+- **Role:** the *target-capped* regime (high-cardinality statistics whose MCV
+  lists are still filling), the paper's primary workload for the capacity axis.
+- **job-light** (the IMDB join sub-plan workload referenced in the paper) is the
+  same CEB benchmark's IMDB-derived join workload.
+
+Each benchmark is initialized idempotently with its `benchmarks/init_*.sh`
+script, e.g. `bash benchmarks/init_census.sh`.
 
 ## Installation
 
