@@ -1,0 +1,385 @@
+{
+  "bench": "census",
+  "phase1": "results/phase1_census_mcv_6level.json",
+  "single_col_target_deployed": 100,
+  "candidates": [
+    {
+      "candidate": "climate(dRearning,iSex,iTmpabsnt)",
+      "qid": "query.4",
+      "table": "climate",
+      "columns": [
+        "dRearning",
+        "iSex",
+        "iTmpabsnt"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 400563,
+          "qerror": 1.1340615099756237,
+          "size_bytes": 372
+        },
+        "25": {
+          "estimate": 361024,
+          "qerror": 1.0221199226524655,
+          "size_bytes": 763
+        },
+        "50": {
+          "estimate": 360845,
+          "qerror": 1.0216131434185232,
+          "size_bytes": 1338
+        },
+        "100": {
+          "estimate": 360845,
+          "qerror": 1.0216131434185232,
+          "size_bytes": 1338
+        },
+        "1000": {
+          "estimate": 360845,
+          "qerror": 1.0216131434185232,
+          "size_bytes": 1338
+        },
+        "10000": {
+          "estimate": 360845,
+          "qerror": 1.0216131434185232,
+          "size_bytes": 1338
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 408735,
+          "actual": 353211,
+          "qerror": 1.1571978222648784,
+          "size_bytes": 372,
+          "level": 10
+        },
+        "25": {
+          "estimate": 355543,
+          "actual": 353211,
+          "qerror": 1.0066022858857737,
+          "size_bytes": 759,
+          "level": 25
+        },
+        "50": {
+          "estimate": 359258,
+          "actual": 353211,
+          "qerror": 1.0171200783667553,
+          "size_bytes": 763,
+          "level": 50
+        },
+        "100": {
+          "estimate": 359511,
+          "actual": 353211,
+          "qerror": 1.0178363640996457,
+          "size_bytes": 813,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 361384,
+          "actual": 353211,
+          "qerror": 1.0231391434581596,
+          "size_bytes": 1188,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 360845,
+          "actual": 353211,
+          "qerror": 1.0216131434185232,
+          "size_bytes": 1338,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "climate(dRpincome,iDisabl1,iRspouse)",
+      "qid": "query.184",
+      "table": "climate",
+      "columns": [
+        "dRpincome",
+        "iDisabl1",
+        "iRspouse"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 54107,
+          "qerror": 4162.076923076923,
+          "size_bytes": 384
+        },
+        "25": {
+          "estimate": 39005,
+          "qerror": 3000.3846153846152,
+          "size_bytes": 775
+        },
+        "50": {
+          "estimate": 2914,
+          "qerror": 224.15384615384616,
+          "size_bytes": 1404
+        },
+        "100": {
+          "estimate": 5,
+          "qerror": 2.6,
+          "size_bytes": 2475
+        },
+        "1000": {
+          "estimate": 5,
+          "qerror": 2.6,
+          "size_bytes": 2475
+        },
+        "10000": {
+          "estimate": 5,
+          "qerror": 2.6,
+          "size_bytes": 2475
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 54706,
+          "actual": 13,
+          "qerror": 4208.153846153846,
+          "size_bytes": 384,
+          "level": 10
+        },
+        "25": {
+          "estimate": 38935,
+          "actual": 13,
+          "qerror": 2995.0,
+          "size_bytes": 775,
+          "level": 25
+        },
+        "50": {
+          "estimate": 3649,
+          "actual": 13,
+          "qerror": 280.6923076923077,
+          "size_bytes": 1354,
+          "level": 50
+        },
+        "100": {
+          "estimate": 4371,
+          "actual": 13,
+          "qerror": 336.2307692307692,
+          "size_bytes": 1300,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 253,
+          "actual": 13,
+          "qerror": 19.46153846153846,
+          "size_bytes": 1779,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 5,
+          "actual": 13,
+          "qerror": 2.6,
+          "size_bytes": 2475,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "climate(iAvail,iClass,iRagechld)",
+      "qid": "query.1",
+      "table": "climate",
+      "columns": [
+        "iAvail",
+        "iClass",
+        "iRagechld"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 785706,
+          "qerror": 1.971198691396989,
+          "size_bytes": 384
+        },
+        "25": {
+          "estimate": 729264,
+          "qerror": 1.829595602531906,
+          "size_bytes": 775
+        },
+        "50": {
+          "estimate": 729264,
+          "qerror": 1.829595602531906,
+          "size_bytes": 1408
+        },
+        "100": {
+          "estimate": 729264,
+          "qerror": 1.829595602531906,
+          "size_bytes": 2666
+        },
+        "1000": {
+          "estimate": 729264,
+          "qerror": 1.829595602531906,
+          "size_bytes": 4355
+        },
+        "10000": {
+          "estimate": 729264,
+          "qerror": 1.829595602531906,
+          "size_bytes": 4355
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 788136,
+          "actual": 398593,
+          "qerror": 1.9772951356396122,
+          "size_bytes": 384,
+          "level": 10
+        },
+        "25": {
+          "estimate": 730285,
+          "actual": 398593,
+          "qerror": 1.8321571126437244,
+          "size_bytes": 775,
+          "level": 25
+        },
+        "50": {
+          "estimate": 723816,
+          "actual": 398593,
+          "qerror": 1.8159275250694318,
+          "size_bytes": 1258,
+          "level": 50
+        },
+        "100": {
+          "estimate": 729457,
+          "actual": 398593,
+          "qerror": 1.830079805716608,
+          "size_bytes": 1283,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 731518,
+          "actual": 398593,
+          "qerror": 1.8352504936112777,
+          "size_bytes": 2491,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 729264,
+          "actual": 398593,
+          "qerror": 1.829595602531906,
+          "size_bytes": 4355,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "climate(iDisabl1,iLooking,iRspouse)",
+      "qid": "query.184",
+      "table": "climate",
+      "columns": [
+        "iDisabl1",
+        "iLooking",
+        "iRspouse"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 54107,
+          "qerror": 4162.076923076923,
+          "size_bytes": 380
+        },
+        "25": {
+          "estimate": 7718,
+          "qerror": 593.6923076923077,
+          "size_bytes": 767
+        },
+        "50": {
+          "estimate": 14,
+          "qerror": 1.0769230769230769,
+          "size_bytes": 1217
+        },
+        "100": {
+          "estimate": 14,
+          "qerror": 1.0769230769230769,
+          "size_bytes": 1217
+        },
+        "1000": {
+          "estimate": 14,
+          "qerror": 1.0769230769230769,
+          "size_bytes": 1217
+        },
+        "10000": {
+          "estimate": 14,
+          "qerror": 1.0769230769230769,
+          "size_bytes": 1217
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 53598,
+          "actual": 13,
+          "qerror": 4122.923076923077,
+          "size_bytes": 380,
+          "level": 10
+        },
+        "25": {
+          "estimate": 7618,
+          "actual": 13,
+          "qerror": 586.0,
+          "size_bytes": 767,
+          "level": 25
+        },
+        "50": {
+          "estimate": 2493,
+          "actual": 13,
+          "qerror": 191.76923076923077,
+          "size_bytes": 892,
+          "level": 50
+        },
+        "100": {
+          "estimate": 1641,
+          "actual": 13,
+          "qerror": 126.23076923076923,
+          "size_bytes": 942,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 85,
+          "actual": 13,
+          "qerror": 6.538461538461538,
+          "size_bytes": 1092,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 14,
+          "actual": 13,
+          "qerror": 1.0769230769230769,
+          "size_bytes": 1217,
+          "level": 10000
+        }
+      }
+    }
+  ],
+  "analysis": {
+    "argmin_agreement": 0.0,
+    "spearman_by_level": {},
+    "per_candidate": [
+      {
+        "candidate": "climate(dRearning,iSex,iTmpabsnt)",
+        "argmin_mask": 50,
+        "argmin_true": 25,
+        "agree": false,
+        "spearman_mask_vs_true": 0.3194382824999699
+      },
+      {
+        "candidate": "climate(dRpincome,iDisabl1,iRspouse)",
+        "argmin_mask": 100,
+        "argmin_true": 10000,
+        "agree": false,
+        "spearman_mask_vs_true": 0.8451542547285166
+      },
+      {
+        "candidate": "climate(iAvail,iClass,iRagechld)",
+        "argmin_mask": 25,
+        "argmin_true": 50,
+        "agree": false,
+        "spearman_mask_vs_true": 0.6546536707079771
+      },
+      {
+        "candidate": "climate(iDisabl1,iLooking,iRspouse)",
+        "argmin_mask": 50,
+        "argmin_true": 10000,
+        "agree": false,
+        "spearman_mask_vs_true": 0.8305395344999218
+      }
+    ]
+  }
+}

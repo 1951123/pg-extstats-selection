@@ -60,6 +60,10 @@ results/*
 # stats_CEB mcv measurement & reproduction
 !results/phase1_stats_ceb_mcv.json
 !results/phase1_stats_ceb_mcv_r3.json
+# Protocol-M vs True-L sampling-mismatch validation (scripts/validate_true_vs_mask.py output)
+!results/true_vs_mask_smoke.json
+!results/true_vs_mask_pilot.json
+!results/true_vs_mask_census.json
 # Official phase-1 run logs (config/progress, auditability)
 !results/phase1_ceb_single_6level.log
 !results/phase1_census_low.log

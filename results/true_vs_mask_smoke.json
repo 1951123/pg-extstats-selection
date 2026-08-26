@@ -1,0 +1,291 @@
+{
+  "bench": "stats_ceb_single",
+  "phase1": "results/phase1_ceb_single_mask_6level.json",
+  "single_col_target_deployed": 100,
+  "candidates": [
+    {
+      "candidate": "postHistory(CreationDate,PostHistoryTypeId)",
+      "qid": "st.8",
+      "table": "postHistory",
+      "columns": [
+        "CreationDate",
+        "PostHistoryTypeId"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 42107,
+          "qerror": 1.004773553090935,
+          "size_bytes": 370
+        },
+        "25": {
+          "estimate": 42107,
+          "qerror": 1.004773553090935,
+          "size_bytes": 822
+        },
+        "50": {
+          "estimate": 42107,
+          "qerror": 1.004773553090935,
+          "size_bytes": 1572
+        },
+        "100": {
+          "estimate": 42107,
+          "qerror": 1.004773553090935,
+          "size_bytes": 1668
+        },
+        "1000": {
+          "estimate": 42113,
+          "qerror": 1.0046303991641536,
+          "size_bytes": 12156
+        },
+        "10000": {
+          "estimate": 46584,
+          "qerror": 1.1010683558665029,
+          "size_bytes": 108709
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 41969,
+          "actual": 42308,
+          "qerror": 1.0080773904548594,
+          "size_bytes": 0,
+          "level": 10
+        },
+        "25": {
+          "estimate": 41857,
+          "actual": 42308,
+          "qerror": 1.0107747808012997,
+          "size_bytes": 0,
+          "level": 25
+        },
+        "50": {
+          "estimate": 43053,
+          "actual": 42308,
+          "qerror": 1.0176089628439067,
+          "size_bytes": 0,
+          "level": 50
+        },
+        "100": {
+          "estimate": 42743,
+          "actual": 42308,
+          "qerror": 1.0102817434055025,
+          "size_bytes": 0,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 42088,
+          "actual": 42308,
+          "qerror": 1.0052271431286828,
+          "size_bytes": 12174,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 46568,
+          "actual": 42308,
+          "qerror": 1.1006901767987143,
+          "size_bytes": 108709,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "posts(AnswerCount,CommentCount,FavoriteCount)",
+      "qid": "st.132",
+      "table": "posts",
+      "columns": [
+        "AnswerCount",
+        "CommentCount",
+        "FavoriteCount"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 761,
+          "qerror": 2.1734559789750327,
+          "size_bytes": 368
+        },
+        "25": {
+          "estimate": 761,
+          "qerror": 2.1734559789750327,
+          "size_bytes": 767
+        },
+        "50": {
+          "estimate": 1224,
+          "qerror": 1.3513071895424837,
+          "size_bytes": 1408
+        },
+        "100": {
+          "estimate": 1404,
+          "qerror": 1.1780626780626782,
+          "size_bytes": 2686
+        },
+        "1000": {
+          "estimate": 1697,
+          "qerror": 1.0259975816203144,
+          "size_bytes": 13954
+        },
+        "10000": {
+          "estimate": 1682,
+          "qerror": 1.0169286577992744,
+          "size_bytes": 17786
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 769,
+          "actual": 1654,
+          "qerror": 2.150845253576073,
+          "size_bytes": 368,
+          "level": 10
+        },
+        "25": {
+          "estimate": 767,
+          "actual": 1654,
+          "qerror": 2.1564537157757497,
+          "size_bytes": 763,
+          "level": 25
+        },
+        "50": {
+          "estimate": 1219,
+          "actual": 1654,
+          "qerror": 1.3568498769483184,
+          "size_bytes": 1412,
+          "level": 50
+        },
+        "100": {
+          "estimate": 1389,
+          "actual": 1654,
+          "qerror": 1.1907847372210223,
+          "size_bytes": 1968,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 1697,
+          "actual": 1654,
+          "qerror": 1.0259975816203144,
+          "size_bytes": 13954,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 1682,
+          "actual": 1654,
+          "qerror": 1.0169286577992744,
+          "size_bytes": 17786,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "users(Reputation,UpVotes,Views)",
+      "qid": "st.102",
+      "table": "users",
+      "columns": [
+        "Reputation",
+        "UpVotes",
+        "Views"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 35860,
+          "qerror": 1.2012193079422504,
+          "size_bytes": 376
+        },
+        "25": {
+          "estimate": 35600,
+          "qerror": 1.192509965497605,
+          "size_bytes": 775
+        },
+        "50": {
+          "estimate": 35312,
+          "qerror": 1.1828626938666131,
+          "size_bytes": 1432
+        },
+        "100": {
+          "estimate": 34903,
+          "qerror": 1.169162228251767,
+          "size_bytes": 1962
+        },
+        "1000": {
+          "estimate": 33669,
+          "qerror": 1.1278263491106422,
+          "size_bytes": 13926
+        },
+        "10000": {
+          "estimate": 29880,
+          "qerror": 1.0009044317154054,
+          "size_bytes": 88976
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 35960,
+          "actual": 29853,
+          "qerror": 1.2045690550363448,
+          "size_bytes": 376,
+          "level": 10
+        },
+        "25": {
+          "estimate": 35749,
+          "actual": 29853,
+          "qerror": 1.1975010886678057,
+          "size_bytes": 775,
+          "level": 25
+        },
+        "50": {
+          "estimate": 35521,
+          "actual": 29853,
+          "qerror": 1.1898636652932704,
+          "size_bytes": 1432,
+          "level": 50
+        },
+        "100": {
+          "estimate": 34907,
+          "actual": 29853,
+          "qerror": 1.1692962181355309,
+          "size_bytes": 1913,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 33696,
+          "actual": 29853,
+          "qerror": 1.1287307808260476,
+          "size_bytes": 13926,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 29903,
+          "actual": 29853,
+          "qerror": 1.001674873547047,
+          "size_bytes": 88976,
+          "level": 10000
+        }
+      }
+    }
+  ],
+  "analysis": {
+    "argmin_agreement": 1.0,
+    "spearman_by_level": {},
+    "per_candidate": [
+      {
+        "candidate": "postHistory(CreationDate,PostHistoryTypeId)",
+        "argmin_mask": 1000,
+        "argmin_true": 1000,
+        "agree": true,
+        "spearman_mask_vs_true": 0.8451542547285166
+      },
+      {
+        "candidate": "posts(AnswerCount,CommentCount,FavoriteCount)",
+        "argmin_mask": 10000,
+        "argmin_true": 10000,
+        "agree": true,
+        "spearman_mask_vs_true": 0.9819805060619656
+      },
+      {
+        "candidate": "users(Reputation,UpVotes,Views)",
+        "argmin_mask": 10000,
+        "argmin_true": 10000,
+        "agree": true,
+        "spearman_mask_vs_true": 1.0
+      }
+    ]
+  }
+}

@@ -1,0 +1,1508 @@
+{
+  "bench": "stats_ceb_single",
+  "phase1": "results/phase1_ceb_single_mask_6level.json",
+  "single_col_target_deployed": 100,
+  "candidates": [
+    {
+      "candidate": "comments(CreationDate,Score)",
+      "qid": "st.37",
+      "table": "comments",
+      "columns": [
+        "CreationDate",
+        "Score"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 134583,
+          "qerror": 1.0005647072810087,
+          "size_bytes": 368
+        },
+        "25": {
+          "estimate": 134589,
+          "qerror": 1.0005201019399803,
+          "size_bytes": 820
+        },
+        "50": {
+          "estimate": 134600,
+          "qerror": 1.0004383358098068,
+          "size_bytes": 1570
+        },
+        "100": {
+          "estimate": 134623,
+          "qerror": 1.0002674134434681,
+          "size_bytes": 1364
+        },
+        "1000": {
+          "estimate": 134804,
+          "qerror": 1.0010767939758947,
+          "size_bytes": 10767
+        },
+        "10000": {
+          "estimate": 136837,
+          "qerror": 1.016174188134473,
+          "size_bytes": 104818
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 133372,
+          "actual": 134659,
+          "qerror": 1.00964970158654,
+          "size_bytes": 0,
+          "level": 10
+        },
+        "25": {
+          "estimate": 133177,
+          "actual": 134659,
+          "qerror": 1.011128047635853,
+          "size_bytes": 0,
+          "level": 25
+        },
+        "50": {
+          "estimate": 133293,
+          "actual": 134659,
+          "qerror": 1.0102481000502652,
+          "size_bytes": 0,
+          "level": 50
+        },
+        "100": {
+          "estimate": 133229,
+          "actual": 134659,
+          "qerror": 1.0107333988846272,
+          "size_bytes": 0,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 133827,
+          "actual": 134659,
+          "qerror": 1.0062169816255315,
+          "size_bytes": 10767,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 135860,
+          "actual": 134659,
+          "qerror": 1.0089188245865481,
+          "size_bytes": 104818,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "postHistory(CreationDate,PostHistoryTypeId)",
+      "qid": "st.8",
+      "table": "postHistory",
+      "columns": [
+        "CreationDate",
+        "PostHistoryTypeId"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 42107,
+          "qerror": 1.004773553090935,
+          "size_bytes": 370
+        },
+        "25": {
+          "estimate": 42107,
+          "qerror": 1.004773553090935,
+          "size_bytes": 822
+        },
+        "50": {
+          "estimate": 42107,
+          "qerror": 1.004773553090935,
+          "size_bytes": 1572
+        },
+        "100": {
+          "estimate": 42107,
+          "qerror": 1.004773553090935,
+          "size_bytes": 1668
+        },
+        "1000": {
+          "estimate": 42113,
+          "qerror": 1.0046303991641536,
+          "size_bytes": 12156
+        },
+        "10000": {
+          "estimate": 46584,
+          "qerror": 1.1010683558665029,
+          "size_bytes": 108709
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 41014,
+          "actual": 42308,
+          "qerror": 1.0315502023699226,
+          "size_bytes": 0,
+          "level": 10
+        },
+        "25": {
+          "estimate": 41303,
+          "actual": 42308,
+          "qerror": 1.0243323729511173,
+          "size_bytes": 0,
+          "level": 25
+        },
+        "50": {
+          "estimate": 41640,
+          "actual": 42308,
+          "qerror": 1.0160422670509126,
+          "size_bytes": 0,
+          "level": 50
+        },
+        "100": {
+          "estimate": 42268,
+          "actual": 42308,
+          "qerror": 1.0009463423866756,
+          "size_bytes": 0,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 42096,
+          "actual": 42308,
+          "qerror": 1.0050361079437475,
+          "size_bytes": 12176,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 46568,
+          "actual": 42308,
+          "qerror": 1.1006901767987143,
+          "size_bytes": 108709,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "postLinks(CreationDate,LinkTypeId)",
+      "qid": "st.18",
+      "table": "postLinks",
+      "columns": [
+        "CreationDate",
+        "LinkTypeId"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 9545,
+          "qerror": 1.0068565400843883,
+          "size_bytes": 370
+        },
+        "25": {
+          "estimate": 9552,
+          "qerror": 1.0075949367088608,
+          "size_bytes": 820
+        },
+        "50": {
+          "estimate": 9560,
+          "qerror": 1.0084388185654007,
+          "size_bytes": 1570
+        },
+        "100": {
+          "estimate": 9575,
+          "qerror": 1.0100210970464134,
+          "size_bytes": 1472
+        },
+        "1000": {
+          "estimate": 9723,
+          "qerror": 1.025632911392405,
+          "size_bytes": 11727
+        },
+        "10000": {
+          "estimate": 9480,
+          "qerror": 1.0,
+          "size_bytes": 102632
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 9539,
+          "actual": 9480,
+          "qerror": 1.0062236286919832,
+          "size_bytes": 370,
+          "level": 10
+        },
+        "25": {
+          "estimate": 9545,
+          "actual": 9480,
+          "qerror": 1.0068565400843883,
+          "size_bytes": 820,
+          "level": 25
+        },
+        "50": {
+          "estimate": 9554,
+          "actual": 9480,
+          "qerror": 1.0078059071729957,
+          "size_bytes": 1570,
+          "level": 50
+        },
+        "100": {
+          "estimate": 9569,
+          "actual": 9480,
+          "qerror": 1.0093881856540083,
+          "size_bytes": 1472,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 9716,
+          "actual": 9480,
+          "qerror": 1.0248945147679325,
+          "size_bytes": 11727,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 9480,
+          "actual": 9480,
+          "qerror": 1.0,
+          "size_bytes": 102632,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "posts(AnswerCount,CommentCount)",
+      "qid": "st.12",
+      "table": "posts",
+      "columns": [
+        "AnswerCount",
+        "CommentCount"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 40931,
+          "qerror": 1.0303193178764263,
+          "size_bytes": 318
+        },
+        "25": {
+          "estimate": 41382,
+          "qerror": 1.0190904257889903,
+          "size_bytes": 664
+        },
+        "50": {
+          "estimate": 41964,
+          "qerror": 1.0049566294919454,
+          "size_bytes": 1238
+        },
+        "100": {
+          "estimate": 42168,
+          "qerror": 1.0000948586605958,
+          "size_bytes": 2374
+        },
+        "1000": {
+          "estimate": 42172,
+          "qerror": 1.0,
+          "size_bytes": 4389
+        },
+        "10000": {
+          "estimate": 42172,
+          "qerror": 1.0,
+          "size_bytes": 4389
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 41080,
+          "actual": 42172,
+          "qerror": 1.0265822784810126,
+          "size_bytes": 318,
+          "level": 10
+        },
+        "25": {
+          "estimate": 41121,
+          "actual": 42172,
+          "qerror": 1.0255587169572724,
+          "size_bytes": 664,
+          "level": 25
+        },
+        "50": {
+          "estimate": 41937,
+          "actual": 42172,
+          "qerror": 1.005603643560579,
+          "size_bytes": 1238,
+          "level": 50
+        },
+        "100": {
+          "estimate": 42190,
+          "actual": 42172,
+          "qerror": 1.0004268234847766,
+          "size_bytes": 1562,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 42172,
+          "actual": 42172,
+          "qerror": 1.0,
+          "size_bytes": 4389,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 42172,
+          "actual": 42172,
+          "qerror": 1.0,
+          "size_bytes": 4389,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "posts(AnswerCount,CommentCount,CreationDate)",
+      "qid": "st.144",
+      "table": "posts",
+      "columns": [
+        "AnswerCount",
+        "CommentCount",
+        "CreationDate"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 2695,
+          "qerror": 4.597773654916512,
+          "size_bytes": 424
+        },
+        "25": {
+          "estimate": 2695,
+          "qerror": 4.597773654916512,
+          "size_bytes": 919
+        },
+        "50": {
+          "estimate": 2695,
+          "qerror": 4.597773654916512,
+          "size_bytes": 1744
+        },
+        "100": {
+          "estimate": 2695,
+          "qerror": 4.597773654916512,
+          "size_bytes": 1316
+        },
+        "1000": {
+          "estimate": 2695,
+          "qerror": 4.597773654916512,
+          "size_bytes": 11754
+        },
+        "10000": {
+          "estimate": 2871,
+          "qerror": 4.315917798676419,
+          "size_bytes": 122835
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 2683,
+          "actual": 12391,
+          "qerror": 4.61833768169959,
+          "size_bytes": 0,
+          "level": 10
+        },
+        "25": {
+          "estimate": 2727,
+          "actual": 12391,
+          "qerror": 4.543821048771544,
+          "size_bytes": 0,
+          "level": 25
+        },
+        "50": {
+          "estimate": 2719,
+          "actual": 12391,
+          "qerror": 4.557190143435086,
+          "size_bytes": 0,
+          "level": 50
+        },
+        "100": {
+          "estimate": 2657,
+          "actual": 12391,
+          "qerror": 4.663530297327814,
+          "size_bytes": 0,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 2686,
+          "actual": 12391,
+          "qerror": 4.613179448994788,
+          "size_bytes": 11754,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 2861,
+          "actual": 12391,
+          "qerror": 4.331003145753233,
+          "size_bytes": 122835,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "posts(AnswerCount,CommentCount,FavoriteCount)",
+      "qid": "st.132",
+      "table": "posts",
+      "columns": [
+        "AnswerCount",
+        "CommentCount",
+        "FavoriteCount"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 761,
+          "qerror": 2.1734559789750327,
+          "size_bytes": 368
+        },
+        "25": {
+          "estimate": 761,
+          "qerror": 2.1734559789750327,
+          "size_bytes": 767
+        },
+        "50": {
+          "estimate": 1224,
+          "qerror": 1.3513071895424837,
+          "size_bytes": 1408
+        },
+        "100": {
+          "estimate": 1404,
+          "qerror": 1.1780626780626782,
+          "size_bytes": 2686
+        },
+        "1000": {
+          "estimate": 1697,
+          "qerror": 1.0259975816203144,
+          "size_bytes": 13954
+        },
+        "10000": {
+          "estimate": 1682,
+          "qerror": 1.0169286577992744,
+          "size_bytes": 17786
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 722,
+          "actual": 1654,
+          "qerror": 2.2167715693088295,
+          "size_bytes": 372,
+          "level": 10,
+          "qerror_repeats": [
+            2.290858725761773,
+            2.214190093708166,
+            2.14526588845655
+          ],
+          "repeats": 3
+        },
+        "25": {
+          "estimate": 794,
+          "actual": 1654,
+          "qerror": 2.151964889448349,
+          "size_bytes": 767,
+          "level": 25,
+          "qerror_repeats": [
+            2.0831234256926954,
+            2.187830687830688,
+            2.1849405548216643
+          ],
+          "repeats": 3
+        },
+        "50": {
+          "estimate": 1218,
+          "actual": 1654,
+          "qerror": 1.3501753635838636,
+          "size_bytes": 1412,
+          "level": 50,
+          "qerror_repeats": [
+            1.3579638752052545,
+            1.3210862619808306,
+            1.371475953565506
+          ],
+          "repeats": 3
+        },
+        "100": {
+          "estimate": 1466,
+          "actual": 1654,
+          "qerror": 1.1342647495805054,
+          "size_bytes": 1959,
+          "level": 100,
+          "qerror_repeats": [
+            1.1282401091405183,
+            1.175550817341862,
+            1.0990033222591362
+          ],
+          "repeats": 3
+        },
+        "1000": {
+          "estimate": 1697,
+          "actual": 1654,
+          "qerror": 1.0259975816203144,
+          "size_bytes": 13954,
+          "level": 1000,
+          "qerror_repeats": [
+            1.0259975816203144,
+            1.0259975816203144,
+            1.0259975816203144
+          ],
+          "repeats": 3
+        },
+        "10000": {
+          "estimate": 1682,
+          "actual": 1654,
+          "qerror": 1.0169286577992744,
+          "size_bytes": 17786,
+          "level": 10000,
+          "qerror_repeats": [
+            1.0169286577992744,
+            1.0169286577992744,
+            1.0169286577992744
+          ],
+          "repeats": 3
+        }
+      }
+    },
+    {
+      "candidate": "posts(AnswerCount,CommentCount,Score)",
+      "qid": "st.26",
+      "table": "posts",
+      "columns": [
+        "AnswerCount",
+        "CommentCount",
+        "Score"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 18709,
+          "qerror": 2.097600085520338,
+          "size_bytes": 376
+        },
+        "25": {
+          "estimate": 19409,
+          "qerror": 2.0219485805554123,
+          "size_bytes": 763
+        },
+        "50": {
+          "estimate": 19464,
+          "qerror": 2.016235100698726,
+          "size_bytes": 1400
+        },
+        "100": {
+          "estimate": 19281,
+          "qerror": 2.035371609356361,
+          "size_bytes": 2666
+        },
+        "1000": {
+          "estimate": 18414,
+          "qerror": 2.1312045183012924,
+          "size_bytes": 14802
+        },
+        "10000": {
+          "estimate": 18091,
+          "qerror": 2.169255430877232,
+          "size_bytes": 34199
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 18441,
+          "actual": 39244,
+          "qerror": 2.128084160294995,
+          "size_bytes": 376,
+          "level": 10
+        },
+        "25": {
+          "estimate": 19591,
+          "actual": 39244,
+          "qerror": 2.003164718493186,
+          "size_bytes": 763,
+          "level": 25
+        },
+        "50": {
+          "estimate": 19489,
+          "actual": 39244,
+          "qerror": 2.0136487249217505,
+          "size_bytes": 1404,
+          "level": 50
+        },
+        "100": {
+          "estimate": 19685,
+          "actual": 39244,
+          "qerror": 1.9935991871983745,
+          "size_bytes": 1997,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 18414,
+          "actual": 39244,
+          "qerror": 2.1312045183012924,
+          "size_bytes": 14802,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 18092,
+          "actual": 39244,
+          "qerror": 2.169135529515808,
+          "size_bytes": 34199,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "posts(AnswerCount,FavoriteCount)",
+      "qid": "st.132",
+      "table": "posts",
+      "columns": [
+        "AnswerCount",
+        "FavoriteCount"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 1326,
+          "qerror": 1.2473604826546003,
+          "size_bytes": 310
+        },
+        "25": {
+          "estimate": 1584,
+          "qerror": 1.0441919191919191,
+          "size_bytes": 656
+        },
+        "50": {
+          "estimate": 1643,
+          "qerror": 1.0066950699939137,
+          "size_bytes": 1234
+        },
+        "100": {
+          "estimate": 1631,
+          "qerror": 1.014101778050276,
+          "size_bytes": 2366
+        },
+        "1000": {
+          "estimate": 1627,
+          "qerror": 1.0165949600491702,
+          "size_bytes": 4312
+        },
+        "10000": {
+          "estimate": 1627,
+          "qerror": 1.0165949600491702,
+          "size_bytes": 4312
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 1347,
+          "actual": 1654,
+          "qerror": 1.2279138827023015,
+          "size_bytes": 310,
+          "level": 10
+        },
+        "25": {
+          "estimate": 1625,
+          "actual": 1654,
+          "qerror": 1.0178461538461538,
+          "size_bytes": 656,
+          "level": 25
+        },
+        "50": {
+          "estimate": 1641,
+          "actual": 1654,
+          "qerror": 1.007921998781231,
+          "size_bytes": 870,
+          "level": 50
+        },
+        "100": {
+          "estimate": 1655,
+          "actual": 1654,
+          "qerror": 1.0006045949214026,
+          "size_bytes": 870,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 1627,
+          "actual": 1654,
+          "qerror": 1.0165949600491702,
+          "size_bytes": 4312,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 1627,
+          "actual": 1654,
+          "qerror": 1.0165949600491702,
+          "size_bytes": 4312,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "posts(AnswerCount,ViewCount)",
+      "qid": "st.26",
+      "table": "posts",
+      "columns": [
+        "AnswerCount",
+        "ViewCount"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 19281,
+          "qerror": 2.035371609356361,
+          "size_bytes": 326
+        },
+        "25": {
+          "estimate": 21223,
+          "qerror": 1.8491259482636762,
+          "size_bytes": 716
+        },
+        "50": {
+          "estimate": 23354,
+          "qerror": 1.6803973623362165,
+          "size_bytes": 1358
+        },
+        "100": {
+          "estimate": 25755,
+          "qerror": 1.5237429625315473,
+          "size_bytes": 2538
+        },
+        "1000": {
+          "estimate": 35536,
+          "qerror": 1.104344889689329,
+          "size_bytes": 11491
+        },
+        "10000": {
+          "estimate": 38746,
+          "qerror": 1.0128529396582873,
+          "size_bytes": 66623
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 19390,
+          "actual": 39244,
+          "qerror": 2.059384479642499,
+          "size_bytes": 326,
+          "level": 10,
+          "qerror_repeats": [
+            2.0239298607529657,
+            2.091897654584222,
+            2.0623259235903095
+          ],
+          "repeats": 3
+        },
+        "25": {
+          "estimate": 20939,
+          "actual": 39244,
+          "qerror": 1.8645914558219887,
+          "size_bytes": 716,
+          "level": 25,
+          "qerror_repeats": [
+            1.8742060270308993,
+            1.8496488664749964,
+            1.8699194739600704
+          ],
+          "repeats": 3
+        },
+        "50": {
+          "estimate": 23570,
+          "actual": 39244,
+          "qerror": 1.673193078045342,
+          "size_bytes": 1350,
+          "level": 50,
+          "qerror_repeats": [
+            1.6649978786593127,
+            1.6827030271846326,
+            1.6718783282920802
+          ],
+          "repeats": 3
+        },
+        "100": {
+          "estimate": 25796,
+          "actual": 39244,
+          "qerror": 1.5092720717618713,
+          "size_bytes": 1685,
+          "level": 100,
+          "qerror_repeats": [
+            1.5213211350596991,
+            1.5159147095179233,
+            1.4905803707079914
+          ],
+          "repeats": 3
+        },
+        "1000": {
+          "estimate": 35537,
+          "actual": 39244,
+          "qerror": 1.104313813771562,
+          "size_bytes": 11491,
+          "level": 1000,
+          "qerror_repeats": [
+            1.104313813771562,
+            1.104313813771562,
+            1.104313813771562
+          ],
+          "repeats": 3
+        },
+        "10000": {
+          "estimate": 38746,
+          "actual": 39244,
+          "qerror": 1.0128529396582873,
+          "size_bytes": 66623,
+          "level": 10000,
+          "qerror_repeats": [
+            1.0128529396582873,
+            1.0128529396582873,
+            1.0128529396582873
+          ],
+          "repeats": 3
+        }
+      }
+    },
+    {
+      "candidate": "posts(CommentCount,CreationDate)",
+      "qid": "st.14",
+      "table": "posts",
+      "columns": [
+        "CommentCount",
+        "CreationDate"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 90780,
+          "qerror": 1.0001762813450266,
+          "size_bytes": 370
+        },
+        "25": {
+          "estimate": 90797,
+          "qerror": 1.0003635802741175,
+          "size_bytes": 820
+        },
+        "50": {
+          "estimate": 90826,
+          "qerror": 1.0006830902119783,
+          "size_bytes": 1570
+        },
+        "100": {
+          "estimate": 90884,
+          "qerror": 1.0013221100877,
+          "size_bytes": 1276
+        },
+        "1000": {
+          "estimate": 91787,
+          "qerror": 1.0112709884976423,
+          "size_bytes": 11256
+        },
+        "10000": {
+          "estimate": 91959,
+          "qerror": 1.0131660129566789,
+          "size_bytes": 109951
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 90463,
+          "actual": 90764,
+          "qerror": 1.0033273271945435,
+          "size_bytes": 0,
+          "level": 10
+        },
+        "25": {
+          "estimate": 90467,
+          "actual": 90764,
+          "qerror": 1.0032829650590822,
+          "size_bytes": 0,
+          "level": 25
+        },
+        "50": {
+          "estimate": 90494,
+          "actual": 90764,
+          "qerror": 1.002983623223639,
+          "size_bytes": 0,
+          "level": 50
+        },
+        "100": {
+          "estimate": 90458,
+          "actual": 90764,
+          "qerror": 1.0033827853810608,
+          "size_bytes": 0,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 91476,
+          "actual": 90764,
+          "qerror": 1.0078445198536865,
+          "size_bytes": 11256,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 91959,
+          "actual": 90764,
+          "qerror": 1.0131660129566789,
+          "size_bytes": 109951,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "posts(CommentCount,FavoriteCount,ViewCount)",
+      "qid": "st.23",
+      "table": "posts",
+      "columns": [
+        "CommentCount",
+        "FavoriteCount",
+        "ViewCount"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 5777,
+          "qerror": 2.050718365933876,
+          "size_bytes": 380
+        },
+        "25": {
+          "estimate": 5777,
+          "qerror": 2.050718365933876,
+          "size_bytes": 815
+        },
+        "50": {
+          "estimate": 5777,
+          "qerror": 2.050718365933876,
+          "size_bytes": 1540
+        },
+        "100": {
+          "estimate": 5777,
+          "qerror": 2.050718365933876,
+          "size_bytes": 2130
+        },
+        "1000": {
+          "estimate": 6215,
+          "qerror": 1.9061946902654867,
+          "size_bytes": 13048
+        },
+        "10000": {
+          "estimate": 12369,
+          "qerror": 1.0440617877943783,
+          "size_bytes": 112014
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 5712,
+          "actual": 11847,
+          "qerror": 2.0740546218487395,
+          "size_bytes": 380,
+          "level": 10
+        },
+        "25": {
+          "estimate": 5949,
+          "actual": 11847,
+          "qerror": 1.9914271306101865,
+          "size_bytes": 815,
+          "level": 25
+        },
+        "50": {
+          "estimate": 5670,
+          "actual": 11847,
+          "qerror": 2.0894179894179894,
+          "size_bytes": 1540,
+          "level": 50
+        },
+        "100": {
+          "estimate": 5756,
+          "actual": 11847,
+          "qerror": 2.0582001389854065,
+          "size_bytes": 1602,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 6213,
+          "actual": 11847,
+          "qerror": 1.9068083051665863,
+          "size_bytes": 13048,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 12367,
+          "actual": 11847,
+          "qerror": 1.043892968684055,
+          "size_bytes": 112014,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "posts(CommentCount,Score,ViewCount)",
+      "qid": "st.26",
+      "table": "posts",
+      "columns": [
+        "CommentCount",
+        "Score",
+        "ViewCount"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 17902,
+          "qerror": 2.1921573008602393,
+          "size_bytes": 372
+        },
+        "25": {
+          "estimate": 17902,
+          "qerror": 2.1921573008602393,
+          "size_bytes": 763
+        },
+        "50": {
+          "estimate": 17902,
+          "qerror": 2.1921573008602393,
+          "size_bytes": 1412
+        },
+        "100": {
+          "estimate": 18555,
+          "qerror": 2.1150094314201024,
+          "size_bytes": 2774
+        },
+        "1000": {
+          "estimate": 19793,
+          "qerror": 1.9827211640478957,
+          "size_bytes": 14270
+        },
+        "10000": {
+          "estimate": 19225,
+          "qerror": 2.0413003901170352,
+          "size_bytes": 115702
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 17929,
+          "actual": 39244,
+          "qerror": 2.188856043281834,
+          "size_bytes": 372,
+          "level": 10
+        },
+        "25": {
+          "estimate": 18036,
+          "actual": 39244,
+          "qerror": 2.175870481259703,
+          "size_bytes": 763,
+          "level": 25
+        },
+        "50": {
+          "estimate": 17782,
+          "actual": 39244,
+          "qerror": 2.2069508491733214,
+          "size_bytes": 1412,
+          "level": 50
+        },
+        "100": {
+          "estimate": 18885,
+          "actual": 39244,
+          "qerror": 2.078051363516018,
+          "size_bytes": 2019,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 19793,
+          "actual": 39244,
+          "qerror": 1.9827211640478957,
+          "size_bytes": 14270,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 19225,
+          "actual": 39244,
+          "qerror": 2.0413003901170352,
+          "size_bytes": 115702,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "posts(FavoriteCount,PostTypeId,Score)",
+      "qid": "st.84",
+      "table": "posts",
+      "columns": [
+        "FavoriteCount",
+        "PostTypeId",
+        "Score"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 6091,
+          "qerror": 2.1472664587095713,
+          "size_bytes": 368
+        },
+        "25": {
+          "estimate": 9343,
+          "qerror": 1.3998715615969175,
+          "size_bytes": 771
+        },
+        "50": {
+          "estimate": 11628,
+          "qerror": 1.1247850017199863,
+          "size_bytes": 1432
+        },
+        "100": {
+          "estimate": 12666,
+          "qerror": 1.0326069793147008,
+          "size_bytes": 2738
+        },
+        "1000": {
+          "estimate": 13079,
+          "qerror": 1.0,
+          "size_bytes": 9176
+        },
+        "10000": {
+          "estimate": 13079,
+          "qerror": 1.0,
+          "size_bytes": 9176
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 6022,
+          "actual": 13079,
+          "qerror": 2.1718698106941217,
+          "size_bytes": 368,
+          "level": 10
+        },
+        "25": {
+          "estimate": 9354,
+          "actual": 13079,
+          "qerror": 1.398225358135557,
+          "size_bytes": 771,
+          "level": 25
+        },
+        "50": {
+          "estimate": 11719,
+          "actual": 13079,
+          "qerror": 1.116050857581705,
+          "size_bytes": 1432,
+          "level": 50
+        },
+        "100": {
+          "estimate": 12224,
+          "actual": 13079,
+          "qerror": 1.0699443717277486,
+          "size_bytes": 2031,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 13079,
+          "actual": 13079,
+          "qerror": 1.0,
+          "size_bytes": 9176,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 13079,
+          "actual": 13079,
+          "qerror": 1.0,
+          "size_bytes": 9176,
+          "level": 10000
+        }
+      }
+    },
+    {
+      "candidate": "posts(FavoriteCount,ViewCount)",
+      "qid": "st.23",
+      "table": "posts",
+      "columns": [
+        "FavoriteCount",
+        "ViewCount"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 5777,
+          "qerror": 2.050718365933876,
+          "size_bytes": 322
+        },
+        "25": {
+          "estimate": 5777,
+          "qerror": 2.050718365933876,
+          "size_bytes": 712
+        },
+        "50": {
+          "estimate": 5777,
+          "qerror": 2.050718365933876,
+          "size_bytes": 1362
+        },
+        "100": {
+          "estimate": 5777,
+          "qerror": 2.050718365933876,
+          "size_bytes": 2658
+        },
+        "1000": {
+          "estimate": 8379,
+          "qerror": 1.413891872538489,
+          "size_bytes": 11452
+        },
+        "10000": {
+          "estimate": 11861,
+          "qerror": 1.001181733772263,
+          "size_bytes": 70657
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 5679,
+          "actual": 11847,
+          "qerror": 2.0491542186150267,
+          "size_bytes": 322,
+          "level": 10,
+          "qerror_repeats": [
+            2.086106708927628,
+            1.9887527278831627,
+            2.07260321903429
+          ],
+          "repeats": 3
+        },
+        "25": {
+          "estimate": 5715,
+          "actual": 11847,
+          "qerror": 2.0870470325688997,
+          "size_bytes": 712,
+          "level": 25,
+          "qerror_repeats": [
+            2.072965879265092,
+            2.1046367027891275,
+            2.0835385156524797
+          ],
+          "repeats": 3
+        },
+        "50": {
+          "estimate": 5810,
+          "actual": 11847,
+          "qerror": 2.0320399507662317,
+          "size_bytes": 1362,
+          "level": 50,
+          "qerror_repeats": [
+            2.0390705679862307,
+            2.042938437661666,
+            2.014110846650799
+          ],
+          "repeats": 3
+        },
+        "100": {
+          "estimate": 5848,
+          "actual": 11847,
+          "qerror": 2.0342827893771918,
+          "size_bytes": 1758,
+          "level": 100,
+          "qerror_repeats": [
+            2.0258207934336525,
+            2.0557001561686623,
+            2.0213274185292613
+          ],
+          "repeats": 3
+        },
+        "1000": {
+          "estimate": 8377,
+          "actual": 11847,
+          "qerror": 1.41422943774621,
+          "size_bytes": 11452,
+          "level": 1000,
+          "qerror_repeats": [
+            1.41422943774621,
+            1.41422943774621,
+            1.41422943774621
+          ],
+          "repeats": 3
+        },
+        "10000": {
+          "estimate": 11861,
+          "actual": 11847,
+          "qerror": 1.001181733772263,
+          "size_bytes": 70657,
+          "level": 10000,
+          "qerror_repeats": [
+            1.001181733772263,
+            1.001181733772263,
+            1.001181733772263
+          ],
+          "repeats": 3
+        }
+      }
+    },
+    {
+      "candidate": "users(Reputation,UpVotes,Views)",
+      "qid": "st.102",
+      "table": "users",
+      "columns": [
+        "Reputation",
+        "UpVotes",
+        "Views"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 35860,
+          "qerror": 1.2012193079422504,
+          "size_bytes": 376
+        },
+        "25": {
+          "estimate": 35600,
+          "qerror": 1.192509965497605,
+          "size_bytes": 775
+        },
+        "50": {
+          "estimate": 35312,
+          "qerror": 1.1828626938666131,
+          "size_bytes": 1432
+        },
+        "100": {
+          "estimate": 34903,
+          "qerror": 1.169162228251767,
+          "size_bytes": 1962
+        },
+        "1000": {
+          "estimate": 33669,
+          "qerror": 1.1278263491106422,
+          "size_bytes": 13926
+        },
+        "10000": {
+          "estimate": 29880,
+          "qerror": 1.0009044317154054,
+          "size_bytes": 88976
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 35820,
+          "actual": 29853,
+          "qerror": 1.1998794091046125,
+          "size_bytes": 376,
+          "level": 10
+        },
+        "25": {
+          "estimate": 35656,
+          "actual": 29853,
+          "qerror": 1.1943858238702978,
+          "size_bytes": 775,
+          "level": 25
+        },
+        "50": {
+          "estimate": 35237,
+          "actual": 29853,
+          "qerror": 1.1803503835460423,
+          "size_bytes": 1432,
+          "level": 50
+        },
+        "100": {
+          "estimate": 34847,
+          "actual": 29853,
+          "qerror": 1.167286369879074,
+          "size_bytes": 1940,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 33696,
+          "actual": 29853,
+          "qerror": 1.1287307808260476,
+          "size_bytes": 13926,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 29903,
+          "actual": 29853,
+          "qerror": 1.001674873547047,
+          "size_bytes": 88976,
+          "level": 10000
+        }
+      }
+    }
+  ],
+  "analysis": {
+    "argmin_agreement": 0.6666666666666666,
+    "spearman_by_level": {},
+    "per_candidate": [
+      {
+        "candidate": "comments(CreationDate,Score)",
+        "argmin_mask": 100,
+        "argmin_true": 1000,
+        "agree": false,
+        "spearman_mask_vs_true": -0.7714285714285715
+      },
+      {
+        "candidate": "postHistory(CreationDate,PostHistoryTypeId)",
+        "argmin_mask": 1000,
+        "argmin_true": 100,
+        "agree": false,
+        "spearman_mask_vs_true": 0.6761234037828132
+      },
+      {
+        "candidate": "postLinks(CreationDate,LinkTypeId)",
+        "argmin_mask": 10000,
+        "argmin_true": 10000,
+        "agree": true,
+        "spearman_mask_vs_true": 1.0
+      },
+      {
+        "candidate": "posts(AnswerCount,CommentCount)",
+        "argmin_mask": 1000,
+        "argmin_true": 1000,
+        "agree": true,
+        "spearman_mask_vs_true": 1.0
+      },
+      {
+        "candidate": "posts(AnswerCount,CommentCount,CreationDate)",
+        "argmin_mask": 10000,
+        "argmin_true": 10000,
+        "agree": true,
+        "spearman_mask_vs_true": 0.6546536707079771
+      },
+      {
+        "candidate": "posts(AnswerCount,CommentCount,FavoriteCount)",
+        "argmin_mask": 10000,
+        "argmin_true": 10000,
+        "agree": true,
+        "spearman_mask_vs_true": 0.9819805060619656
+      },
+      {
+        "candidate": "posts(AnswerCount,CommentCount,Score)",
+        "argmin_mask": 50,
+        "argmin_true": 100,
+        "agree": false,
+        "spearman_mask_vs_true": 0.7714285714285715
+      },
+      {
+        "candidate": "posts(AnswerCount,FavoriteCount)",
+        "argmin_mask": 50,
+        "argmin_true": 100,
+        "agree": false,
+        "spearman_mask_vs_true": 0.8999999999999998
+      },
+      {
+        "candidate": "posts(AnswerCount,ViewCount)",
+        "argmin_mask": 10000,
+        "argmin_true": 10000,
+        "agree": true,
+        "spearman_mask_vs_true": 1.0
+      },
+      {
+        "candidate": "posts(CommentCount,CreationDate)",
+        "argmin_mask": 10,
+        "argmin_true": 50,
+        "agree": false,
+        "spearman_mask_vs_true": 0.7714285714285715
+      },
+      {
+        "candidate": "posts(CommentCount,FavoriteCount,ViewCount)",
+        "argmin_mask": 10000,
+        "argmin_true": 10000,
+        "agree": true,
+        "spearman_mask_vs_true": 0.8305395344999218
+      },
+      {
+        "candidate": "posts(CommentCount,Score,ViewCount)",
+        "argmin_mask": 1000,
+        "argmin_true": 1000,
+        "agree": true,
+        "spearman_mask_vs_true": 0.9296696802013682
+      },
+      {
+        "candidate": "posts(FavoriteCount,PostTypeId,Score)",
+        "argmin_mask": 1000,
+        "argmin_true": 1000,
+        "agree": true,
+        "spearman_mask_vs_true": 1.0
+      },
+      {
+        "candidate": "posts(FavoriteCount,ViewCount)",
+        "argmin_mask": 10000,
+        "argmin_true": 10000,
+        "agree": true,
+        "spearman_mask_vs_true": 0.8305395344999218
+      },
+      {
+        "candidate": "users(Reputation,UpVotes,Views)",
+        "argmin_mask": 10000,
+        "argmin_true": 10000,
+        "agree": true,
+        "spearman_mask_vs_true": 1.0
+      }
+    ]
+  }
+}
