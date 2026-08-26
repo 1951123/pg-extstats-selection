@@ -106,13 +106,15 @@ in [`docs/reproducibility.md`](docs/reproducibility.md).
   join-order tests fair.
 - **Workload:** the CEB single-table sub-plans
   (`stats_CEB_single`, 632 queries) and the CEB join workload
-  (`stats_CEB`, 146 joins), both parsed from
-  `benchmarks/stats_CEB/queries/stats_CEB_single_table.sql` and
-  `benchmarks/stats_CEB/queries/stats_CEB.sql`.
+  (`stats_CEB`, 146 joins), both from the CEB workloads directory
+  <https://github.com/Nathaniel-Han/End-to-End-CardEst-Benchmark/tree/master/workloads/stats_CEB>
+  and parsed from `benchmarks/stats_CEB/queries/stats_CEB_single_table.sql`
+  and `benchmarks/stats_CEB/queries/stats_CEB.sql`.
 - **Role:** the *target-capped* regime (high-cardinality statistics whose MCV
   lists are still filling), the paper's primary workload for the capacity axis.
 - **job-light** (the IMDB join sub-plan workload referenced in the paper) is the
-  same CEB benchmark's IMDB-derived join workload.
+  same CEB benchmark's IMDB-derived join workload, from
+  <https://github.com/Nathaniel-Han/End-to-End-CardEst-Benchmark/tree/master/workloads/job-light>.
 
 ### Data files: what is in the repo vs. what you must download
 
