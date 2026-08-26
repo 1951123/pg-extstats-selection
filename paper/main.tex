@@ -625,22 +625,18 @@ however, linear in the number of payloads mounted on the table, which is why
 measurement granularity matters (\S\ref{sec:measure-runtime}).
 
 \emph{Protocol-M's advantage grows with table size.} The masking step's
-independence of row count is what makes the protocol scalable: the analysis
-(ANALYZE) cost $T(N)=B_0+cN$ of \S\ref{sec:measure-naive} has a base term
-$B_0$ that is proportional to table size, while the classical per-candidate
-protocol pays this base $2N$ times. Protocol-M pays it once. The saved cost is
-therefore $(2N-1)\,B_0$, which grows linearly in $B_0$ and hence in table size
---- so Protocol-M's advantage is not a constant offset but a \emph{monotone
-increasing function of dataset scale}. Our two benchmarks (CENSUS
-$\approx$740\,MB; the small \texttt{stats\_CEB\_single} tables, largest
-$\approx$9\,MB) are both \emph{small} by production standards; at the
-multi-hundred-GB scale of real workloads $B_0$ is orders of magnitude larger
-and the per-candidate protocol becomes infeasible, making the catalog-mask
-approach the \emph{only} tractable measurement path rather than merely an
-optimization. Because it relies on the layout of the system catalog and the
-planner's OID-order selection (\S\ref{sec:switch}), Protocol-M is specific to
-PostgreSQL 16 and to \emph{MCV} statistics --- honest limits of the
-implementation, not of the model (\S\ref{sec:disc}, item~5).
+independence of row count is what makes the protocol scalable: the ANALYZE
+cost $T(N)=B_0+cN$ of \S\ref{sec:measure-naive} has a base term $B_0$
+proportional to table size, which the classical per-candidate protocol pays
+$2N$ times but Protocol-M pays once, so the saving is
+$(2N-1)\,B_0$ --- a \emph{monotone increasing function of dataset scale}.
+Our two benchmarks (CENSUS $\approx$740\,MB; the small \texttt{stats\_CEB\_single}
+tables, largest $\approx$9\,MB) are both \emph{small} by production standards;
+at multi-hundred-GB scale the per-candidate protocol becomes infeasible and
+Catalog-Mask the \emph{only} tractable path. Because it relies on the system
+catalog layout and the planner's OID-order selection (\S\ref{sec:switch}),
+Protocol-M is specific to PostgreSQL 16 and to \emph{MCV} statistics --- honest
+limits of the implementation, not of the model (\S\ref{sec:disc}, item~5).
 
 \subsection{Sampling Determinism vs.\ Statistics Target}
 \label{sec:measure-determinism}
@@ -659,27 +655,24 @@ capacity.
 
 \emph{Why a fixed large single-column target.} We deliberately fix the
 per-column \texttt{statistics\_target} at 10000 rather than PostgreSQL's
-default of 100, for three reasons. First, \emph{determinism}: as just measured,
-target 100 leaves a $1$--$2\%$ run-to-run drift that would make \emph{relative}
-q-error comparisons across capacity levels unreliable, whereas target $\ge$1000
-is exactly reproducible (CV $0$). Second, \emph{completeness}: at low targets,
-high-cardinality statistics can be built \emph{empty} (a \texttt{NULL} payload),
-risking a degraded baseline. Third, \emph{attribution}: with a maximally precise
-single-column baseline, any improvement attributed to an extended statistic is
-a \emph{pure} effect of the correlation it captures, not of patching a coarse
-per-column estimate. All per-candidate q-errors $e_{is}$ are measured against
-this \emph{same} baseline, so the extended statistic's capacity is the \emph{only}
-axis that changes between levels. These requirements necessarily make the
+default of 100, for three reasons: \emph{determinism} (target 100 leaves a
+$1$--$2\%$ run-to-run drift that would make \emph{relative} q-error comparisons
+unreliable, whereas target $\ge$1000 is exactly reproducible, CV $0$);
+\emph{completeness} (at low targets high-cardinality statistics can be built
+\emph{empty}, a \texttt{NULL} payload, risking a degraded baseline); and
+\emph{attribution} (with a maximally precise single-column baseline, any
+improvement from an extended statistic is a \emph{pure} effect of the
+correlation it captures, not of patching a coarse per-column estimate). All
+per-candidate q-errors $e_{is}$ are measured against this \emph{same} baseline,
+so capacity is the \emph{only} axis that changes between levels. This makes the
 single-column ANALYZE \emph{expensive} on a wide table (a CENSUS ANALYZE at
-target\,10000 costs $\approx$22s), which is precisely what forces the
-catalog-mask protocol (\S\ref{sec:measure-naive},
-\S\ref{sec:measure-mask}) --- the large fixed target and Protocol-M are two
-halves of one design decision. (PostgreSQL builds per-column statistics
-automatically, so its capacity is a non-selected baseline; we do not make it a
-decision variable.) Consequently most queries have no candidate at all --- their
-predicates are served by the fixed single-column statistics, with baseline
-q-error already $\approx$1 (79\% of the 452 no-candidate queries on
-stats\_CEB\_single are exactly $1.0$; the rest are $\le 1.1$).
+target\,10000 costs $\approx$22s), precisely what forces the catalog-mask
+protocol (\S\ref{sec:measure-naive}, \S\ref{sec:measure-mask}) --- the large
+fixed target and Protocol-M are two halves of one design decision. Consequently
+most queries have no candidate: their predicates are served by the fixed
+single-column statistics, with baseline q-error already $\approx$1 (79\% of the
+452 no-candidate queries on stats\_CEB\_single are exactly $1.0$; the rest are
+$\le 1.1$).
 
 \subsection{Runtime: A Tunable Measurement-Granularity Cost Model}
 \label{sec:measure-runtime}
@@ -920,109 +913,71 @@ likewise grows with target and with the number of installed statistics,
 \subsection{RQ2: Is One Statistic per Query Sufficient?}
 \label{sec:rq2}
 
-We do not test whether one-stat sufficiency holds \emph{by
-construction}; we test whether it survives progressively stronger attempts to
-falsify it: (1) real-workload top-$k$ joint measurement, (2) exhaustive
-enumeration of arbitrary subsets, (3) wider 4-/5-column candidates, (4) a
-synthetic many-cluster regime engineered to break it, and (5) a workload-scope
-negative control.
+We measure whether one-stat sufficiency survives progressively stronger
+attempts to falsify it.
 
-\textbf{Step 1: real-workload top-$k$.} For each query we greedily rank non-overlapping
-candidates by single q-error and measure the \emph{joint} q-error of keeping the
-top-1/2/3. On stats\_CEB\_single, adding a 2nd/3rd non-overlapping candidate
-changes nothing for $93\%$ of the 180 queries with candidates (the joint
-$k{=}2,3$ q-error equals $k{=}1$ exactly), and the largest $k{=}2$-$k{=}1$ gap
-among the repairable queries (baseline $>1.2$) is $0.027$; on the wide CENSUS
-table the two hardest queries are identical at $k{=}1,2,3$ (q.184: $1.08$ at all
-three; q.382: $1.12$). This is not an
-artefact of a small candidate space: it holds on the widest, highest-error,
-most-candidate-dense workload in our study.
+\textbf{Main evidence.} (1) \emph{Real-workload top-$k$.} For each query we
+greedily rank non-overlapping candidates by single q-error and measure the
+\emph{joint} q-error of keeping the top-1/2/3. On stats\_CEB\_single, adding a
+2nd/3rd non-overlapping candidate changes nothing for $93\%$ of the 180 queries
+with candidates (the joint $k{=}2,3$ q-error equals $k{=}1$ exactly), and the
+largest $k{=}2$-$k{=}1$ gap among the repairable queries (baseline $>1.2$) is
+$0.027$; on the wide CENSUS table the two hardest queries are identical at all
+$k$ (q.184 $=1.08$, q.382 $=1.12$) --- not an artefact of a small space, since
+this holds on the widest, highest-error, most-candidate-dense workload.
 
-This is not just anecdotal. The \emph{distribution} over the whole 632-query
-workload makes it precise. The natural one-stat-sufficiency
-question is \emph{non-circular}: how much of the improvement of the measured
-\emph{best $k$-subset} does a single statistic already capture? We define the
-top-1 coverage ratio against the measured joint q-error of the best $k$
-non-overlapping subsets (obtained by the mask protocol, not by a model),
+(2) \emph{Coverage distribution.} To quantify how much of a multi-statistic gain
+a single statistic captures, define the top-1 coverage ratio against the
+\emph{measured} joint q-error of the best $k$ non-overlapping subsets (obtained
+by the mask protocol, not by a model):
 \[
   \operatorname{coverage}_k(i)\;=\;
   \frac{e_i^0 - e_i(\{s_1\})}{e_i^0 - e_i(\{s_1,\dots,s_k\})},
 \]
-where $e_i(\{s_1\})$ and $e_i(\{s_1,\dots,s_k\})$ are the \emph{measured} joint
-q-errors of the best 1- and $k$-statistic subsets (a value of $1$ means the
-single best statistic already realizes the entire multi-statistic gain; the
-denominator is not the single-statistic value, so this is not a tautology).
-Across the 35 queries with real repair room (baseline $>1.2$), this ratio
-against the best \emph{2-subset} has \textbf{median 1.000}, with $100\%$ of such
-queries exceeding $0.9$; against the best \emph{3-subset} it is also median
-$1.000$. Equivalent statements hold on the joint measurements directly: for
-$93\%$ of the 180 queries with candidates the joint q-error at $k{=}2$ equals
-$k{=}1$ exactly, and among the 35 repairable queries (baseline $>1.2$) the largest
-$k{=}2$-$k{=}1$ gap is $0.027$. By baseline regime, a single candidate
-reaches the estimation floor ($\le1.05$) for $94\%$ of near-baseline queries
-(base 1--1.1) and $97\%$ of the genuinely repairable queries (base 2--10, $n{=}32$).
-One dominant column cluster drives a single-table query's error, and one
-well-chosen 3-column MCV captures it --- measured, not assumed.
+where the denominator is the best $k$-subset value (not the singleton), so a
+value of $1$ means the single best statistic already realizes the entire
+multi-statistic gain --- a non-circular statement. Across the 35 repairable
+queries (baseline $>1.2$) this ratio is \textbf{median 1.000} against the best
+2-subset, with $100\%$ of such queries exceeding $0.9$; against the best
+3-subset it is also median 1.000. By baseline regime, a single candidate reaches
+the estimation floor ($\le1.05$) for $97\%$ of the genuinely repairable queries
+(base 2--10, $n{=}32$).
 
-\textbf{Step 2: exhaustive check --- one statistic equals the best \emph{subset}.}
-A skeptic may ask whether restricting to one statistic per query loses anything
-against the \emph{true} multi-select optimum --- i.e.\ an arbitrary subset, not
-just top-$k$. For every query with few candidates we settle this exactly: we
-enumerate \emph{all} non-empty subsets of its candidates (173 queries, up to 10
-candidates each, 18{,}177 subsets in total) and measure each subset's real joint
-q-error (mask protocol, keep-only-that-subset).
+(3) \emph{Exhaustive check.} Restricting to one statistic per query might still
+lose against the true multi-select optimum, so for every query with few
+candidates we enumerate \emph{all} non-empty subsets (173 queries, up to 10
+candidates, 18{,}177 subsets) and measure each subset's joint q-error. The best
+arbitrary subset never beats the best single statistic by more than $0.0011$ of
+absolute joint q-error ($170/173$ exactly equal; the rest differ only in the
+third decimal), including the hard ten-candidate queries \texttt{st.562}
+(baseline 4.70), \texttt{st.567} and \texttt{st.588}. One dominant column
+cluster drives a single-table query's error, and one well-chosen 3-column MCV
+captures it --- measured, not assumed.
 
-Across all 18{,}177 enumerated subsets, the best arbitrary
-subset never beats the best single statistic by more than $0.0011$ of absolute
-joint q-error ($170/173$ exactly equal; the remaining three, e.g.\ \texttt{st.26}
-with baseline 2.19, differ in the third decimal). This includes the hard
-ten-candidate queries \texttt{st.562} (baseline 4.70), \texttt{st.567} (4.56)
-and \texttt{st.588} (4.49), where the exhaustive optimum equals the singleton.
-So even against the true, unconstrained multi-select optimum, the sparse
-restriction to one statistic per query loses essentially nothing on these
-workloads.
+\textbf{Boundary.} One-stat sufficiency is not universal. (4) \emph{Width
+sensitivity.} Relaxing to 4/5-column MCVs on the hardest CENSUS queries, the
+best solution is still a \emph{single} statistic (query.62 $1.406\to1.023$),
+so the structure survives width relaxation; but the higher-arity candidates
+capture more correlation on the hard tail, so our candidate family (and the
+reported achievable quality) is an underestimate there --- extending candidate
+generation to higher arity is the natural next step, while the sparse MILP is
+agnostic to how columns are grouped into candidates. On \texttt{posts} the
+2/3-column candidates already reach $\approx$1.0 everywhere, so this effect is
+confined to the CENSUS tail.
 
-\textbf{Step 3: candidate-width sensitivity.}
-A reviewer-driven check is whether the 2/3-column candidate restriction itself
-manufactures one-stat sufficiency. We relax the width on the hardest CENSUS
-queries (where
-2/3-column candidates leave the largest residual) and re-measure the best
-single-candidate q-error with 4- and 5-column MCVs admitted (mask protocol,
-identical to \S\ref{sec:measure}): query.62 drops $1.406\to1.023$, query.295
-$1.099\to1.014$, query.382 $1.119\to1.020$.
-
-Two observations. First, \emph{one-stat sufficiency is robust to width}: in
-every case the best solution is still a \emph{single} statistic (query.62's best
-at 5 columns is one 5-column MCV), never a combination ---
-so the one-statistic-per-query structure that makes the objective linear
-survives width relaxation. Second, \emph{the 2/3-column scope is a real
-limitation}: on hard queries where 3 columns leave residual error, a single
-4- or 5-column MCV captures more correlation (query.62: $1.406\to1.023$). This
-does not invalidate the allocation model --- the sparse MILP is agnostic to how
-columns are grouped into candidates --- but it means our \emph{candidate
-family} (and hence the reported achievable quality) is an underestimate on
-such queries; extending candidate generation to higher arity is the natural
-next step. On the evaluated single-table workloads over \texttt{posts}, the
-2/3-column candidates already reach $\approx$1.0 everywhere, so the width effect
-is confined to the harder CENSUS tail.
-
-\textbf{Step 4: a controlled many-cluster stress test --- where one-stat
-sufficiency fails.}
-One-stat sufficiency is not universal, so we build a controlled \emph{failure
-test} matching the mechanistic hypothesis (\S\ref{sec:disc-sparsity}): on a
-synthetic table we vary the number $K$ of \emph{mutually independent},
+(5) \emph{Synthetic many-cluster stress test.} We build the controlled failure
+test matching the mechanistic hypothesis (\S\ref{sec:disc-sparsity}): on a
+synthetic table vary the number $K$ of \emph{mutually independent},
 perfectly-correlated column clusters a query filters on, and measure the
 top-1 vs.\ top-$K$ coverage ratio
 \[
-  \operatorname{cov}_K = \frac{e^0 - e(\{s_1\})}{e^0 - e(\{s_1,\dots,s_K\})},
+  \operatorname{cov}_K = \frac{e^0 - e(\{s_1\})}{e^0 - e(\{s_1,\dots,s_K\})}.
 \]
-the fraction of the best $K$-statistic improvement a \emph{single} best
-statistic captures. One-stat sufficiency holds exactly only for $K{=}1$ (one
-3-column MCV captures the whole error and a second changes nothing) and
-\emph{decays} with $K$ (Table \ref{tab:sweep}): $\operatorname{cov}_K$ is $1.000$ at $K{=}1$,
-drops to $0.90$ at $K{=}2$, and collapses to $\approx 0$ once three or more
-independent clusters coexist --- the monotone failure regime where the
-multi-select model (\S\ref{sec:multi}) is required.
+One-stat sufficiency holds exactly only for $K{=}1$ (one 3-column MCV captures
+the whole error and a second changes nothing) and \emph{decays} with $K$ (Table
+\ref{tab:sweep}): $\operatorname{cov}_K$ is $1.000$ at $K{=}1$, drops to $0.90$
+at $K{=}2$, and collapses to $\approx 0$ for $K\ge3$ --- the monotone failure
+regime where the multi-select model (\S\ref{sec:multi}) is required.
 
 \begin{table}[t]
 \caption{Controlled one-stat-sufficiency decay. As a query is driven by $K$
