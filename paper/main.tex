@@ -76,8 +76,9 @@ costs.
 Through extensive workload-driven evaluation, we identify a fundamental
 per-query property termed one-stat sufficiency: most single-table queries gain
 nearly all possible cardinality improvements from at most one well-chosen
-multivariate statistic. Additional statistics bring negligible marginal
-benefits yet worsen planner interference and maintenance overhead.
+multivariate statistic. For most evaluated queries, additional statistics bring
+negligible marginal benefits yet worsen planner interference and maintenance
+overhead.
 Motivated by this observation, we propose Catalog-Mask, an isolation protocol
 that eliminates cross-statistic interference to measure each candidate's
 independent storage cost and error-reduction gain. We model statistic tuning as
@@ -150,8 +151,9 @@ Motivated by this gap, we conduct extensive workload-driven evaluations and
 identify an empirical property we term \emph{one-stat sufficiency}. For most
 single-table queries, nearly all achievable cardinality-estimation improvement
 can be obtained by deploying at most one well-chosen multivariate statistic;
-additional statistics yield negligible marginal gains while amplifying planner
-interference and ANALYZE maintenance overhead (a single well-chosen statistic
+additional statistics often yield negligible marginal gains while amplifying
+planner interference and ANALYZE maintenance overhead (a single well-chosen
+statistic
 already captures $\ge$0.9 of the best multi-statistic gain for every query with
 repair room; \S\ref{sec:rq2}). This finding reshapes our understanding of
 extended-statistics tuning: effective tuning favors \emph{compact, precise}
@@ -473,7 +475,8 @@ optimization is not the bottleneck at full-workload scale --- the phase-1
 Our MILP needs a per-candidate, per-capacity q-error $e_{is}$ and size $c_s$
 for every option that survives pruning. This section turns the measurement
 from an afterthought into a first-class systems component: it is, in fact, the
-pipeline's true bottleneck (\S\ref{sec:rq4}). We take $c_s$ as the on-disk byte
+pipeline's dominant cost, whereas \S\ref{sec:rq3} quantifies how cheap the
+optimization itself is. We take $c_s$ as the on-disk byte
 size of the candidate's MCV payload --- the serialized list in the
 \texttt{stxmcv} column of its \texttt{pg\_statistic\_ext\_data} row, read with
 \texttt{pg\_column\_size} --- so a coarser capacity is simply a smaller
@@ -500,12 +503,13 @@ Protocol-A would need $\approx$9.8 days of ANALYZE time at this capacity alone
 
 Crucially, this infeasibility is \emph{not} an accident of an arbitrarily
 large menu: the $\approx$22s per-ANALYZE base cost is the necessary
-consequence of fixing the single-column statistics at a generous target for
-determinism, completeness, and attribution (\S\ref{sec:measure-determinism}).
-One cannot buy it away by shrinking the single-column target without
-sacrificing exactly those guarantees. Protocol-M is therefore the mechanism
-that makes a principled (expensive-but-stable) measurement tractable, rather
-than a way to paper over an unnecessarily high cost.
+consequence of fixing the single-column statistics at a generous target so
+that the baseline is fixed and reproducible --- a comparability requirement,
+not a claim of exact determinism given ANALYZE's sampling
+(\S\ref{sec:measure-determinism}). One cannot buy it away by shrinking the
+target without sacrificing that reproducibility. Protocol-M is therefore the
+mechanism that makes a principled (expensive-but-stable) measurement
+tractable, rather than a way to paper over an unnecessarily high cost.
 
 \subsection{The Catalog-Mask Protocol (Protocol-M)}
 \label{sec:measure-mask}
@@ -805,7 +809,7 @@ larger one stores nothing new. Capacity is therefore a genuine two-sided
 allocation axis --- a DBA may need to \emph{raise} it on high-cardinality
 combinations (the \texttt{posts} case) or find it already satisfied below the
 default (data-capped CENSUS) --- so \emph{how much} must be decided jointly with
-\emph{which} statistics (Prop.~\ref{prop:linear}). (ANALYZE cost likewise grows
+\emph{which} statistics. (ANALYZE cost likewise grows
 with target and installed statistics, \S\ref{sec:measure-runtime}.)
 
 \subsection{One Statistic Usually Captures the Attainable Repair}
@@ -870,8 +874,9 @@ top-1 vs.\ top-$K$ coverage ratio
 \[
   \operatorname{cov}_K = \frac{e^0 - e(\{s_1\})}{e^0 - e(\{s_1,\dots,s_K\})}.
 \]
-One-stat sufficiency holds exactly only for $K{=}1$ (one 3-column MCV captures
-the whole error and a second changes nothing) and \emph{decays} with $K$ (Table
+In this controlled construction, one-stat sufficiency holds exactly only for
+$K{=}1$ (one 3-column MCV captures the whole error and a second changes nothing)
+and \emph{decays} with $K$ (Table
 \ref{tab:sweep}): $\operatorname{cov}_K$ is $1.000$ at $K{=}1$, drops to $0.90$
 at $K{=}2$, and collapses to $\approx 0$ for $K\ge3$ --- the monotone failure
 regime where the multi-select model (\S\ref{sec:multi}) is required.
@@ -1116,15 +1121,15 @@ planner's estimate under three mask conditions --- B-only, A-only, and both live
 (A created \emph{before} B, as in a normal deployment). In every case the
 co-installed estimate is \emph{bit-identical} to A-only, never a blend and
 never B. Crucially, this is \emph{not} because the optimizer ``picks the better
-statistic'': the planner walks its per-relation list in OID order (== CREATE
-order) and uses the \emph{first} matching statistic, so building the same pair
-with B first flips the winner purely by swapping creation order. Thus
-co-installed overlap does not ``degrade'' per se; it makes the outcome
-\emph{depend on deployment order}, and a systematic probe confirms interference
-is a \emph{step function of order}, not of overlap amount --- so only
-deployment order, not overlap density, can predict it. Disjoint deployments
-(Stage 3) restore predictability because with no overlapping pairs the
-``first-built'' choice is forced.
+statistic'': the planner traverses its per-relation statistic list in OID
+order, which in our deployments matches creation order, and uses the
+\emph{first} matching statistic, so building the same pair with B first flips
+the winner purely by swapping creation order. Thus, in our instrumented cases,
+the co-installed estimate depends on which statistic the planner happens to
+reach first rather than on which is intrinsically better; this explains why
+overlap can invalidate isolated measurements even when each isolated
+measurement is correct. Disjoint deployments (Stage 3) restore predictability
+because with no overlapping pairs the ``first-built'' choice is forced.
 
 \subsection{Disjointness Restores Predictability}
 \label{sec:p1}
@@ -1216,7 +1221,7 @@ quality but does not guarantee predictability (Table~\ref{tab:optionB}).
 \section{Discussion and Open Questions}
 \label{sec:disc}
 
-\subsection{Why Does One-Stat Sufficiency Occur? A Mechanistic Hypothesis}
+\subsection{A Mechanistic Interpretation}
 \label{sec:disc-sparsity}
 
 A single-table selection query's error is typically dominated by \emph{one}
@@ -1262,14 +1267,10 @@ reconstructing them by ANALYZE differs by $\approx$2.7$\times$ (31.4\,s vs.\
 objective is thus a genuine but imperfect proxy for maintenance cost; a
 maintenance-aware objective (open question~1) is the natural extension.
 
-\emph{Why arithmetic mean q-error.} q-error is bounded below by 1 with a heavy
-upper tail, so the arithmetic mean rewards repairing the worst queries while the
-median stays 1.000; it also keeps the MILP linear in the $\Delta_{is}$ terms (a
-geometric mean would stay linear while weighting \emph{relative} improvement).
-We check this empirically: solving under log vs.\ linear objectives picks
-overlapping-but-not-identical sets (Jaccard $0.29$--$0.90$) yet yields nearly
-identical mean q-errors at every budget (e.g.\ $1.0247$ vs.\ $1.0246$ at
-10\,KB), so the deployment is robust to the mean choice.
+\emph{Why arithmetic mean q-error.} We use arithmetic mean q-error because it
+emphasizes the heavy error tail while preserving the linear MILP objective. A
+log-objective produces nearly identical mean q-error across budgets, indicating
+that the main conclusions are not sensitive to this choice.
 
 \subsection{The Interference Fix}
 \label{sec:disc-fix}
