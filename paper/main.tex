@@ -610,9 +610,10 @@ catalog layout and the planner's OID-order selection (\S\ref{sec:switch}),
 Protocol-M is specific to PostgreSQL 16 and to \emph{MCV} statistics --- honest
 limits of the implementation, not of the model (\S\ref{sec:disc-objective}).
 
-\subsection{Sampling Determinism vs.\ Statistics Target}
-\label{sec:measure-determinism}
+\subsection{Measurement Cost and Granularity}
+\label{sec:measure-runtime}
 
+\emph{Deterministic single-column baseline.}\label{sec:measure-determinism}
 Because \texttt{ANALYZE} is sampling-based, we fix the per-column
 \texttt{statistics\_target} at 10000 rather than PostgreSQL's default of 100,
 for three reasons: \emph{determinism} (target 100 leaves a $1$--$2\%$ run-to-run
@@ -633,9 +634,7 @@ the large fixed target and Protocol-M are two halves of one design decision;
 consequently most queries have no candidate, their predicates served by the
 fixed single-column statistics with baseline q-error already near 1.
 
-\subsection{Runtime: A Tunable Measurement-Granularity Cost Model}
-\label{sec:measure-runtime}
-
+\emph{Batch granularity.}
 Protocol-M dominates Protocol-A by replacing per-candidate ANALYZEs with
 per-candidate masking, but \emph{masking is not free}: it rewrites the system
 catalog. Per (candidate, level) the measurement loop is
@@ -740,7 +739,9 @@ limitation (\S\ref{sec:disc}). We evaluate the full capacity menu
 $\capmenu$ with the per-column baseline fixed at
 \texttt{statistics\_target}=10000 (\S\ref{sec:measure}), so capacity is a
 free, two-sided decision axis; where a single operating point is needed we
-report 1000. We organize the results around six research questions.
+report 1000. We organize the findings around the three claims of the
+introduction --- capacity matters, one statistic usually suffices, and joint
+optimization helps --- followed by a scope control.
 
 The \emph{mean} q-error on stats\_CEB\_single is only $\approx$1.1 --- but this
 is not a marginal problem. q-error is \emph{multiplicative}, so its cost
@@ -775,7 +776,7 @@ job-light (join)  & 70  & 5     & 5   & 1     & 0/0/0/0/1\\
 \end{tabular}
 \end{table*}
 
-\subsection{RQ1: Does Capacity Materially Affect Repair Quality?}
+\subsection{Capacity Is a Real Decision Axis}
 \label{sec:rq1}
 
 \textbf{Yes.} Capacity is not a storage knob that can be swept under the rug ---
@@ -807,7 +808,7 @@ default (data-capped CENSUS) --- so \emph{how much} must be decided jointly with
 \emph{which} statistics (Prop.~\ref{prop:linear}). (ANALYZE cost likewise grows
 with target and installed statistics, \S\ref{sec:measure-runtime}.)
 
-\subsection{RQ2: Is One Statistic per Query Sufficient?}
+\subsection{One Statistic Usually Captures the Attainable Repair}
 \label{sec:rq2}
 
 We measure whether one-stat sufficiency survives progressively stronger
@@ -894,7 +895,7 @@ $K$ clusters & base & top-1 & top-$K$ & $\operatorname{cov}_K$\\
 \end{tabular}
 \end{table}
 
-\subsection{RQ3: Does the MILP Beat a Budgeted Greedy?}
+\subsection{Joint Optimization Matters Under a Shared Budget}
 \label{sec:rq3}
 
 With a \emph{generous} budget the per-query-best greedy \emph{union} (ignoring
@@ -1032,27 +1033,26 @@ coverage --- the same capacity-reallocation behaviour that separates the MILP
 from greedy above. The ``how much'' axis is not a modelling luxury but the
 component that buys the last, hardest repairs.
 
-\subsection{RQ4: Does the Approach Scale?}
-\label{sec:rq4}
+\emph{Optimization overhead.} The optimization is not the bottleneck: on the
+full 468-query CENSUS workload the worst-case MILP over the six-level menu
+(115{,}470 statistics, 300{,}606 binary variables) solves optimally in
+$\approx$4.0\,s and with pruning in $\approx$2.8\,s
+(\S\ref{sec:scale}). Measurement (\S\ref{sec:measure}) dominates the
+pipeline, not the solve. \label{sec:rq4}
 
-\emph{The optimization is not the bottleneck.} On the full 468-query CENSUS
-workload the worst-case MILP over the six-level menu (115{,}470 statistics,
-300{,}606 binary variables) solves optimally in $\approx$4.0s and with pruning
-in $\approx$2.8s
-(\S\ref{sec:scale}). Measurement (\S\ref{sec:measure}) dominates the pipeline,
-not the solve.
+\emph{Component ablation.} Switching off one component at a time at a fixed
+budget isolates each design choice \label{sec:ablation}: disabling the
+\emph{capacity} axis (allowing only L10000) hurts at tight budgets (mean q-error
+1.027 $\to$ 1.057 at 5\,KB, and 1.0156 $\to$ 1.0233 at 100\,KB), confirming
+that capacity allocation --- the ``how much'' dimension --- is load-bearing
+(the same advantage of capacity awareness over every fixed what-only level
+above, \S\ref{sec:rq3}). In contrast, the sparse per-query cap and the
+worse-than-baseline pruning are \emph{free}: they reproduce full quality while
+shrinking the problem (pruning cuts 4{,}170 to 2{,}116 variables). So the
+ablation separates \emph{modeling assumptions} (capacity; global disjointness
+at deployment) from \emph{computational conveniences} (sparse cap; pruning).
 
-\subsection{RQ5: Does Prediction Survive Real PostgreSQL Execution?}
-\label{sec:rq5}
-
-\emph{(a) Are individual candidate measurements predictive?} Yes --- a single
-deployed statistic reproduces its mask-measured q-error exactly. \emph{(b) Are
-co-installed overlapping statistics independent?} No --- overlapping MCVs let
-the planner switch to a suboptimal one, the one place the surrogate model and
-the real system diverge (removed by global disjointness). Both are validated
-end-to-end in \S\ref{sec:e2e}.
-
-\subsection{RQ6: Does It Help Where Extended Statistics Cannot?}
+\subsection{Scope: Single-Relation Correlation}
 \label{sec:rq6}
 
 \textbf{No --- a measured negative control.} On the join-heavy \texttt{stats\_CEB}
@@ -1062,34 +1062,20 @@ error lives in cross-table join selectivity, which a single-relation MCV cannot
 repair (\S\ref{sec:mechanisms}). This is the expected null result: the method
 does not optimize for coverage's sake.
 
-\subsection{Ablation: Are the Components Necessary?}
-\label{sec:ablation}
-
-Switching off one component at a time at a fixed budget (5 KB / 100 KB)
-isolates each design choice. Disabling the \emph{capacity} axis (allowing only
-L10000) hurts at tight budgets (mean q-error 1.027 $\to$ 1.057 at 5 KB, and
-1.0156 $\to$ 1.0233 at 100 KB), confirming capacity allocation --- the ``how
-much'' dimension --- is load-bearing (the same advantage of capacity awareness
-over every fixed what-only level, \S\ref{sec:rq3}). In contrast, the sparse
-per-query cap and the worse-than-baseline pruning are \emph{free}: they
-reproduce full quality while shrinking the problem (pruning cuts 4{,}170 to
-2{,}116 physical-statistic and assignment variables). Thus the ablation
-separates \emph{modeling assumptions} (the capacity axis; global disjointness
-at deployment) from \emph{computational conveniences} (the sparse cap;
-pruning): the former drive the quality and predictability our formulation
-delivers, while the latter cost nothing but solve and measurement time.
-
 \section{End-to-End Validation}
 \label{sec:e2e}
 
 We close the loop of the measurement $\to$ optimization $\to$ deployment
-pipeline by building the MILP-selected sets on the real
-database and asking a causal question with three stages: \emph{Is a single
-deployed statistic predictable? Is a co-installed overlapping set predictable?
-And can we restore predictability?} Each stage controls the previous one, so
-together they isolate exactly where the model is sound and where it is not.
+pipeline by building the MILP-selected sets on the real database. Our
+measurement model (\S\ref{sec:measure-correct}) makes two predictions:
+(a) an isolated measurement should be exactly predictive, and (b) co-installed
+overlapping statistics should not affect each other. We test both causally in
+three stages: \emph{Is a single deployed statistic predictable? Is a
+co-installed overlapping set predictable? And can we restore predictability?}
+Each stage controls the previous one, so together they isolate exactly where
+the model is sound and where it is not.
 
-\subsection{Stage 1: A Single Deployed Statistic Is Predictable (RQ5a)}
+\subsection{Isolated Measurements Are Predictive}
 \label{sec:e2e-singleton}
 
 We first confirm that the mask-measured q-error of a single statistic matches
@@ -1102,8 +1088,7 @@ grounding for \S\ref{sec:measure-correct}: per-candidate measurement is sound,
 and it validates the economic premise of the whole pipeline (measure each
 candidate in isolation, then compose).
 
-\subsection{Stage 2: Co-installed Overlapping Statistics Break Predictability
-(RQ5b)}
+\subsection{Overlap Breaks the Independence Assumption}
 \label{sec:e2e-coinstalled}
 
 Next we deploy the 2 MB MILP solution for stats\_CEB\_single: five statistics,
@@ -1123,8 +1108,7 @@ statistic --- a second-order interaction among co-installed statistics, exactly
 the independence assumption the per-candidate sparse model relies on, and a
 joint effect the per-candidate measurement cannot see by construction.
 
-\subsubsection{Direct planner instrumentation: how the switch is decided.}
-\label{sec:switch}
+\emph{Why overlap breaks predictability: creation order.} \label{sec:switch}
 To verify this optimizer-internal claim directly, we instrument \texttt{EXPLAIN}
 on seven overlap-prone queries: for each we take a pair of overlapping
 statistics (A = the good one, B = a bad sibling sharing columns) and read the
@@ -1142,7 +1126,7 @@ deployment order, not overlap density, can predict it. Disjoint deployments
 (Stage 3) restore predictability because with no overlapping pairs the
 ``first-built'' choice is forced.
 
-\subsection{Stage 3: Global Disjointness Restores Near-Exact Predictability}
+\subsection{Disjointness Restores Predictability}
 \label{sec:p1}
 
 We fix the gap with the Option-A model: a \emph{global-disjointness} constraint
@@ -1241,10 +1225,10 @@ selectivity error is largest where independence fails hardest, and a single MCV
 over that dominant cluster removes the largest error source while residual
 errors in weakly-correlated predicates contribute little. Hence \emph{one}
 well-chosen statistic captures nearly all attainable improvement --- consistent
-with $k{=}2,3$ adding nothing (RQ2), capacity upgrades mattering more than
-additions (RQ3), and the sparse cap costing no quality in the ablation
-(\S\ref{sec:ablation}). It also predicts the boundary: workloads genuinely
-driven by \emph{several} independent clusters violate one-stat sufficiency and
+with $k{=}2,3$ adding nothing (\S\ref{sec:rq2}), capacity upgrades mattering
+more than additions (\S\ref{sec:rq3}), and the sparse cap costing no quality in
+the ablation (\S\ref{sec:ablation}). It also predicts the boundary: workloads
+genuinely driven by \emph{several} independent clusters violate one-stat sufficiency and
 warrant the multi-select model (\S\ref{sec:formulation}), confirmed by our
 stress test (Table \ref{tab:sweep}); characterising how often that regime
 occurs is an open question below.
