@@ -1,0 +1,106 @@
+{
+  "bench": "stats_ceb_single",
+  "phase1": "results/phase1_ceb_single_mask_6level.json",
+  "single_col_target_deployed": 100,
+  "candidates": [
+    {
+      "candidate": "posts(AnswerCount,FavoriteCount,ViewCount)",
+      "qid": "st.144",
+      "table": "posts",
+      "columns": [
+        "AnswerCount",
+        "FavoriteCount",
+        "ViewCount"
+      ],
+      "mask": {
+        "10": {
+          "estimate": 2695,
+          "qerror": 4.597773654916512,
+          "size_bytes": 380
+        },
+        "25": {
+          "estimate": 2695,
+          "qerror": 4.597773654916512,
+          "size_bytes": 815
+        },
+        "50": {
+          "estimate": 2695,
+          "qerror": 4.597773654916512,
+          "size_bytes": 1528
+        },
+        "100": {
+          "estimate": 2695,
+          "qerror": 4.597773654916512,
+          "size_bytes": 2023
+        },
+        "1000": {
+          "estimate": 4404,
+          "qerror": 2.8135785649409626,
+          "size_bytes": 12358
+        },
+        "10000": {
+          "estimate": 11894,
+          "qerror": 1.0417857743400034,
+          "size_bytes": 107916
+        }
+      },
+      "true": {
+        "10": {
+          "estimate": 2704,
+          "actual": 12391,
+          "qerror": 4.582470414201183,
+          "size_bytes": 380,
+          "level": 10
+        },
+        "25": {
+          "estimate": 2738,
+          "actual": 12391,
+          "qerror": 4.5255661066471875,
+          "size_bytes": 815,
+          "level": 25
+        },
+        "50": {
+          "estimate": 2640,
+          "actual": 12391,
+          "qerror": 4.693560606060606,
+          "size_bytes": 1528,
+          "level": 50
+        },
+        "100": {
+          "estimate": 2667,
+          "actual": 12391,
+          "qerror": 4.646044244469441,
+          "size_bytes": 1707,
+          "level": 100
+        },
+        "1000": {
+          "estimate": 4396,
+          "actual": 12391,
+          "qerror": 2.81869881710646,
+          "size_bytes": 12358,
+          "level": 1000
+        },
+        "10000": {
+          "estimate": 11891,
+          "actual": 12391,
+          "qerror": 1.042048608191069,
+          "size_bytes": 107916,
+          "level": 10000
+        }
+      }
+    }
+  ],
+  "analysis": {
+    "argmin_agreement": 1.0,
+    "spearman_by_level": {},
+    "per_candidate": [
+      {
+        "candidate": "posts(AnswerCount,FavoriteCount,ViewCount)",
+        "argmin_mask": 10000,
+        "argmin_true": 10000,
+        "agree": true,
+        "spearman_mask_vs_true": 0.8305395344999218
+      }
+    ]
+  }
+}
