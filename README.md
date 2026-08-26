@@ -71,8 +71,8 @@ in [`docs/reproducibility.md`](docs/reproducibility.md).
   U.S. Census), downloaded from the UCI Machine Learning Repository:
   <https://archive.ics.uci.edu/static/public/116/us+census+data+1990.zip>.
   The 69-column `climate` table is built from `USCensus1990.data.txt`
-  (`benchmarks/Census/data/`, with the original `.readme`, `.attributes`,
-  and `.html` documentation included).
+  (placed in `benchmarks/Census/data/`; the archive's `.readme`, `.attributes`,
+  and `.html` documentation ships with the zip and need not be committed).
 - **Workload:** 468 `SELECT COUNT(*) ... WHERE` queries over the single
   `climate` table, following the census single-table workload in
   [BayesCard](https://github.com/wuziniu/BayesCard/tree/master)
@@ -116,12 +116,13 @@ in [`docs/reproducibility.md`](docs/reproducibility.md).
 
 ### Data files: what is in the repo vs. what you must download
 
-The **queries**, **schemas**, and Census **documentation** are committed to this
-repository. The **raw data payloads** (CSV / census text / tarballs) are *not*
-committed (they are large third-party files, git-ignored); you must download
-them into `benchmarks/<name>/data/` from the URLs above before running the
-`init_*.sh` scripts. The tree below marks committed files with ✓ and
-download-required files with ⬇.
+Only the repo-authored **queries** and **schemas** are committed. The **raw
+data payloads** (CSV / census text / tarballs) and the **bundled third-party
+docs** (e.g. the Census `*.readme` / `*.attributes` / `*.html` files that ship
+inside the dataset archive) are *not* committed --- they are large third-party
+files, git-ignored. You must download them into `benchmarks/<name>/data/` from
+the URLs above before running the `init_*.sh` scripts. The tree below marks
+committed files with ✓ and download-required files with ⬇.
 
 ```
 benchmarks/
@@ -131,7 +132,8 @@ benchmarks/
 │       ├── USCensus1990.data.txt    # ⬇ from us+census+data+1990.zip
 │       ├── USCensus1990raw.data.txt # ⬇ from us+census+data+1990.zip
 │       ├── us+census+data+1990.zip  # ⬇ (optional, keep archive)
-│       └── *.readme / *.attributes / *.html / *.mapping.sql   # ✓ docs (committed)
+│       └── *.readme / *.attributes /
+│           *.html / *.mapping.sql   # ⬇ bundled docs (from us+census+data+1990.zip)
 ├── JOB/                             # IMDb (JOB), join-heavy negative control
 │   ├── queries/*.sql                # ✓ the 113 canonical JOB queries
 │   ├── schema.sql / fkindexes.sql   # ✓ schema + indexes
