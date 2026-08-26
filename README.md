@@ -138,6 +138,10 @@ benchmarks/
 │           *.html / *.mapping.sql   # ⬇ bundled docs (from us+census+data+1990.zip)
 ├── JOB/                             # IMDb (JOB), join-heavy negative control
 │   ├── queries/*.sql                # ✓ the 113 canonical JOB queries
+│   ├── queries/job_light/           # ✓ job-light (CEB IMDB join sub-plans,
+│   │                                #   referenced in the paper):
+│   │                                #   job_light_queries.sql,
+│   │                                #   job_light_sub_query_with_star_join.sql
 │   ├── schema.sql / fkindexes.sql   # ✓ schema + indexes
 │   └── data/
 │       ├── *.csv                    # ⬇ 21 CSVs from imdb.tgz (aka_name.csv,
