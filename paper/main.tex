@@ -173,67 +173,34 @@ storage--maintenance mismatch, and characterize its practical scope.
 \section{Background and Related Work}
 \label{sec:back}
 
-\subsection{Cardinality Estimation and Multi-column Correlation}
+\subsection{Background}
 
-Query optimizers plan around estimated cardinalities. PostgreSQL's default
-estimator uses per-column histograms and most-common-value (MCV) lists and
-assumes columns are independent; when columns are correlated this assumption
-over- or under-counts by orders of magnitude. \emph{Extended statistics}
-(\texttt{CREATE STATISTICS}) address this by capturing multivariate structure,
-in three kinds --- MCV lists, \texttt{ndistinct}, and functional
-\emph{dependencies}. Empirically the MCV kind is the most effective for
-selection selectivity, so in this paper we focus on MCV statistics.
+Cardinality estimation is central to relational query optimization. Estimation
+errors often lead to sub-optimal execution plans, largely due to the pervasive
+column-independence assumption, which disregards real-world attribute
+correlations within tables. To alleviate this bias, PostgreSQL offers
+multivariate extended statistics of three types: multi-column MCV,
+\texttt{n}-distinct, and functional-\emph{dependency} statistics. This work
+focuses solely on MCV-style multivariate statistics intended for single-table
+predicates. Such extended statistics apply only to single-relation filter
+conditions and cannot directly improve cardinality estimates for join
+predicates.
 
-\subsection{How PostgreSQL Actually Uses Extended Statistics}
-\label{sec:mechanisms}
+Each multivariate statistic accepts an independent sample-size setting that
+governs both its estimation fidelity and storage footprint. PostgreSQL exhibits
+an inherent trade-off between per-statistic estimation quality and ANALYZE
+maintenance overhead: a larger sample-size setting produces more accurate
+estimates. However, ANALYZE runtime is determined by the \emph{maximum}
+sample-size setting on the underlying table, instead of summing costs across
+individual statistics. Consequently, storage consumption is an additive
+resource, while ANALYZE maintenance cost is non-additive.
+\emph{This key distinction motivates our choice of storage consumption as the
+primary budget metric for statistic tuning}.
 
-Several mechanism facts (verified from the PostgreSQL 16 source) ground our
-model. \textbf{Scope.} Extended statistics are consulted only for
-\emph{restriction} (WHERE) clauses on a \emph{single relation}:
-the selectivity entry point is gated by a single-relation check, and
-\texttt{eqjoinsel} never consults \texttt{pg\_statistic\_ext}. Consequently
-\textbf{extended statistics do not directly estimate cross-relation join
-selectivity} --- they act on single-table restriction clauses, so their direct
-effect is confined to single-relation selection predicates (they can influence a
-join plan only indirectly, through base-cardinality estimates). This is why our
-evaluation separates single-table workloads (where they act directly) from join
-workloads (a negative control).
-
-\textbf{Capacity is per-object and tunable.} Each statistic can be assigned its
-own \texttt{statistics\_target} via \texttt{ALTER STATISTICS ... SET STATISTICS}
-(stored in \texttt{stxstattarget}). The ANALYZE sampling effort is coupled to the
-\emph{largest relevant statistics target} on the relation (including the
-extended statistics' own targets) \cite{pgstats}; consequently, raising an
-extended-statistics target can increase maintenance cost beyond the persistent
-storage cost our objective models (\S\ref{sec:measure-naive}). This couples capacity
-to \emph{maintenance cost}, not only storage. Because of this coupling we
-deliberately optimize a \emph{storage} budget --- the persistent bytes of the
-selected statistics and the estimation quality they deliver --- and treat ANALYZE
-maintenance cost separately (it is a property of the maximum, not the sum, of
-targets).
-
-\textbf{Capacity-quality trade-off.} \texttt{statistics\_target} is the knob
-that sets an extended statistic's precision: for an MCV statistic it caps how
-many most-common value-tuples the list stores, and it scales ANALYZE's
-sampling effort (\cite{pgstats}). It is a \emph{cap}, not a requirement: a
-column-combination with fewer frequent tuples than the cap is fully captured at
-any larger target, so raising the target helps only while the list is
-\emph{target-capped} (still filling) rather than \emph{data-capped} (bounded by
-the data's own cardinality). We therefore model capacity as a small menu of
-levels spanning both directions of this axis,
-$$\{10, 25, 50, 100, 1000, 10000\},$$
-anchored on the PostgreSQL default (100) and extending \emph{below} it (10, 25,
-50 --- coarser but cheaper) and \emph{above} it (1000, 10000 --- finer for
-higher-cardinality combinations). We include sub-default levels deliberately: a
-DBA may legitimately \emph{lower} capacity to save storage on data-capped
-combinations, so the decision axis is two-sided and the menu must be wide
-enough to expose it. Capacity sets a \emph{per-query} precision floor --- the
-``how much'' dimension --- and is a genuine decision axis, which motivates
-allocating it under a shared budget. Whether a given combination is best served
-by \emph{raising} or \emph{lowering} its capacity is exactly the
-data-capped vs.\ target-capped distinction we quantify in \S\ref{sec:rq1};
-the two evaluated workloads sit on opposite ends of this axis
-(\S\ref{sec:measure-runtime}).
+Although these configuration knobs are available, PostgreSQL multivariate
+extended statistics still demand manual discovery of correlated column-sets and
+manual adjustment of sample-size settings, placing significant operational
+burden on database administrators.
 
 \subsection{Related Work}
 
@@ -474,6 +441,55 @@ size of the candidate's MCV payload --- the serialized list in the
 \texttt{pg\_column\_size} --- so a coarser capacity is simply a smaller
 serialized list, and a list large enough to be stored out-of-line (TOAST) is
 counted by the same call.
+
+\subsection{How PostgreSQL Uses Extended Statistics (Mechanisms)}
+\label{sec:mechanisms}
+
+Several mechanism facts (verified from the PostgreSQL 16 source) ground the
+model. \textbf{Scope.} Extended statistics are consulted only for
+\emph{restriction} (WHERE) clauses on a \emph{single relation}: the selectivity
+entry point is gated by a single-relation check, and \texttt{eqjoinsel} never
+consults \texttt{pg\_statistic\_ext}. Consequently extended statistics do not
+directly estimate cross-relation join selectivity --- they act on single-table
+restriction clauses, so their direct effect is confined to single-relation
+selection predicates (they can influence a join plan only indirectly, through
+base-cardinality estimates). This is why our evaluation separates single-table
+workloads (where they act directly) from join workloads (a negative control).
+
+\textbf{Capacity is per-object and tunable.} Each statistic can be assigned its
+own \texttt{statistics\_target} via \texttt{ALTER STATISTICS ... SET STATISTICS}
+(stored in \texttt{stxstattarget}). The ANALYZE sampling effort is coupled to the
+\emph{largest relevant statistics target} on the relation (including the
+extended statistics' own targets) \cite{pgstats}; consequently, raising an
+extended-statistics target can increase maintenance cost beyond the persistent
+storage cost our objective models (\S\ref{sec:measure-naive}). Because of this
+coupling we deliberately optimize a \emph{storage} budget --- the persistent
+bytes of the selected statistics and the estimation quality they deliver --- and
+treat ANALYZE maintenance cost separately (it is a property of the maximum, not
+the sum, of targets).
+
+\textbf{Capacity-quality trade-off.} \texttt{statistics\_target} is the knob
+that sets an extended statistic's precision: for an MCV statistic it caps how
+many most-common value-tuples the list stores, and it scales ANALYZE's
+sampling effort (\cite{pgstats}). It is a \emph{cap}, not a requirement: a
+column-combination with fewer frequent tuples than the cap is fully captured at
+any larger target, so raising the target helps only while the list is
+\emph{target-capped} (still filling) rather than \emph{data-capped} (bounded by
+the data's own cardinality). We therefore model capacity as a small menu of
+levels spanning both directions of this axis,
+$$\{10, 25, 50, 100, 1000, 10000\},$$
+anchored on the PostgreSQL default (100) and extending \emph{below} it (10, 25,
+50 --- coarser but cheaper) and \emph{above} it (1000, 10000 --- finer for
+higher-cardinality combinations). We include sub-default levels deliberately: a
+DBA may legitimately \emph{lower} capacity to save storage on data-capped
+combinations, so the decision axis is two-sided and the menu must be wide
+enough to expose it. Capacity sets a \emph{per-query} precision floor --- the
+``how much'' dimension --- and is a genuine decision axis, which motivates
+allocating it under a shared budget. Whether a given combination is best served
+by \emph{raising} or \emph{lowering} its capacity is exactly the
+data-capped vs.\ target-capped distinction we quantify in \S\ref{sec:rq1};
+the two evaluated workloads sit on opposite ends of this axis
+(\S\ref{sec:measure-runtime}).
 
 \subsection{Naive Measurement Is Infeasible on Wide Tables}
 \label{sec:measure-naive}
