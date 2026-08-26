@@ -147,21 +147,6 @@ competes directly with spending on \emph{adding} another combination, so
 capacity is a genuine two-sided decision that must be made jointly with which
 statistics to build.
 
-Motivated by this gap, we conduct extensive workload-driven evaluations and
-identify an empirical property we term \emph{one-stat sufficiency}. For most
-single-table queries, nearly all achievable cardinality-estimation improvement
-can be obtained by deploying at most one well-chosen multivariate statistic;
-additional statistics often yield negligible marginal gains while amplifying
-planner interference and ANALYZE maintenance overhead (a single well-chosen
-statistic
-already captures $\ge$0.9 of the best multi-statistic gain for every query with
-repair room; \S\ref{sec:rq2}). This finding reshapes our understanding of
-extended-statistics tuning: effective tuning favors \emph{compact, precise}
-statistic deployment rather than blindly accumulating as many statistics as
-possible. Moreover, it has a formal consequence --- restricted to at most one
-statistic per query, the objective has no interaction term and is exactly linear
-(Prop.~\ref{prop:linear}) --- which makes the optimization tractable.
-
 Measuring the independent benefit of each candidate statistic becomes essential
 given the above observation, yet simultaneous deployment causes coupled
 interference. We propose \emph{Catalog-Mask}, an isolation protocol that
@@ -173,15 +158,6 @@ column-combination selection (what) and per-statistic sampling-capacity
 assignment (how-much) --- maximizing overall estimation quality under a given
 storage budget.
 
-We conduct comprehensive experiments across multiple real and synthetic
-workloads. The results demonstrate that our approach substantially reduces
-Q-error and suppresses redundant, interfering statistics under tight storage
-budgets. We explicitly acknowledge an important modeling assumption: our
-optimizer uses storage consumption as the budget metric, which exhibits
-inherent mismatch against real-world ANALYZE maintenance overhead. We further
-characterize applicability boundaries for our technique to avoid over-claiming
-its practical scope.
-
 This paper makes the following contributions:
 \textbf{(1)} We discover and quantitatively validate the one-stat-sufficiency
 property over real-world workloads; our end-to-end evaluation further
@@ -191,11 +167,8 @@ isolation protocol that enables reliable measurement of the independent
 cost-benefit of each candidate statistic, resolving the coupled-measurement
 bottleneck. \textbf{(3)} We present a joint what-and-how-much integer-programming
 formulation that simultaneously selects column-sets and assigns differentiated
-sampling capacity for PostgreSQL multivariate statistics. \textbf{(4)} We
-perform extensive end-to-end evaluation over real and synthetic workloads,
-analyze the mismatch between storage-based budgeting and real ANALYZE
-maintenance cost, and provide practical tuning insights for PostgreSQL
-extended statistics.
+sampling capacity for PostgreSQL multivariate statistics. \textbf{(4)} We evaluate the approach end-to-end, quantify the
+storage--maintenance mismatch, and characterize its practical scope.
 
 \section{Background and Related Work}
 \label{sec:back}
@@ -232,10 +205,7 @@ own \texttt{statistics\_target} via \texttt{ALTER STATISTICS ... SET STATISTICS}
 \emph{largest relevant statistics target} on the relation (including the
 extended statistics' own targets) \cite{pgstats}; consequently, raising an
 extended-statistics target can increase maintenance cost beyond the persistent
-storage cost our objective models ($\texttt{ANALYZE}$ reads a larger sample and
-builds richer per-column statistics at higher targets; the measured base cost
-of a table ANALYZE grows from a few seconds at target 100 to $\approx$22\,s at
-10000 in \S\ref{sec:measure-naive}). This couples capacity
+storage cost our objective models (\S\ref{sec:measure-naive}). This couples capacity
 to \emph{maintenance cost}, not only storage. Because of this coupling we
 deliberately optimize a \emph{storage} budget --- the persistent bytes of the
 selected statistics and the estimation quality they deliver --- and treat ANALYZE
@@ -473,10 +443,7 @@ optimization is not the bottleneck at full-workload scale --- the phase-1
 \label{sec:measure}
 
 Our MILP needs a per-candidate, per-capacity q-error $e_{is}$ and size $c_s$
-for every option that survives pruning. This section turns the measurement
-from an afterthought into a first-class systems component: it is, in fact, the
-pipeline's dominant cost, whereas \S\ref{sec:rq3} quantifies how cheap the
-optimization itself is. We take $c_s$ as the on-disk byte
+for every option that survives pruning. We take $c_s$ as the on-disk byte
 size of the candidate's MCV payload --- the serialized list in the
 \texttt{stxmcv} column of its \texttt{pg\_statistic\_ext\_data} row, read with
 \texttt{pg\_column\_size} --- so a coarser capacity is simply a smaller
@@ -606,8 +573,7 @@ cost $T(N)=B_0+cN$ of \S\ref{sec:measure-naive} has a base term $B_0$
 proportional to table size, which the classical per-candidate protocol pays
 $2N$ times but Protocol-M pays once, so the saving is
 $(2N-1)\,B_0$ --- a \emph{monotone increasing function of dataset scale}.
-Our two benchmarks (CENSUS $\approx$740\,MB; the small \texttt{stats\_CEB\_single}
-tables, largest $\approx$9\,MB) are both \emph{small} by production standards;
+Our two benchmarks are both \emph{small} by production standards;
 at multi-hundred-GB scale the per-candidate protocol becomes infeasible and
 Catalog-Mask the \emph{only} tractable path. Because it relies on the system
 catalog layout and the planner's OID-order selection (\S\ref{sec:switch}),
@@ -651,8 +617,7 @@ deployment reproduces it exactly; we assess deployment fidelity in
 real deployment need not raise any single-column target.
 
 \emph{Batch granularity.}
-Protocol-M dominates Protocol-A by replacing per-candidate ANALYZEs with
-per-candidate masking, but \emph{masking is not free}: it rewrites the system
+Masking is not free: it rewrites the system
 catalog. Per (candidate, level) the measurement loop is
 \[
   \underbrace{\text{mask all but one payload}}_{\text{UPDATE }\times\,N}\;\to\;
@@ -749,15 +714,12 @@ and \texttt{job-light} join sub-plans \cite{kipf2018learned} a join-oriented one
 (Table \ref{tab:bench}). \emph{Synthetic} tables stress specific mechanisms
 (\S\ref{sec:rq2}, \S\ref{sec:e2e}). Candidates are the 2-/3-column subsets of
 each query's selection predicates --- they directly exercise single-relation
-correlation while keeping the candidate space tractable (e.g.\ 19{,}245
-distinct combinations on CENSUS); higher-order candidates are an explicit
+correlation while keeping the candidate space tractable; higher-order
+candidates are an explicit
 limitation (\S\ref{sec:disc}). We evaluate the full capacity menu
 $\capmenu$ with the per-column baseline fixed at
 \texttt{statistics\_target}=10000 (\S\ref{sec:measure}), so capacity is a
-free, two-sided decision axis; where a single operating point is needed we
-report 1000. We organize the findings around the three claims of the
-introduction --- capacity matters, one statistic usually suffices, and joint
-optimization helps --- followed by a scope control.
+free, two-sided decision axis.
 
 The \emph{mean} q-error on stats\_CEB\_single is only $\approx$1.1 --- but this
 is not a marginal problem. q-error is \emph{multiplicative}, so its cost
@@ -811,21 +773,14 @@ nothing new, and over the coarse menu $\{100,1000,10000\}$ the capacity axis is
 is the rare-case counter-example: it needs L10000 in a real deployment though the
 oracle makes it look already-fixed at L100 --- \S\ref{sec:disc-deployment}.)
 
-This contrast is \emph{systematic} once the capacity menu is wide enough to
-expose it. Over the coarse menu $\{100,1000,10000\}$ the capacity axis on CENSUS
-\emph{appears} absent; but that is an artifact of the coarse menu's lower bound,
-because CENSUS's saturation point is \emph{below} the default target 100. When
-we extend the menu downward to $\{10,25,50\}$, the axis re-emerges: across the
-full 468-query workload, $\approx$29\% of candidates now vary with target and
-$\approx$7\% improve by ${\ge}20\%$ as capacity rises from 10 to 50, because
-CENSUS's categorical columns are \emph{data-capped} --- their MCV lists fill at
-a very low cardinality, so a smaller target genuinely loses entries while a
-larger one stores nothing new. Capacity is therefore a genuine two-sided
-allocation axis --- a DBA may need to \emph{raise} it on high-cardinality
-combinations (the \texttt{posts} case) or find it already satisfied below the
-default (data-capped CENSUS) --- so \emph{how much} must be decided jointly with
-\emph{which} statistics. (ANALYZE cost likewise grows
-with target and installed statistics, \S\ref{sec:measure-runtime}.)
+Extending the menu downward exposes the opposite effect: with
+$\{10,25,50\}$, $\approx$29\% of CENSUS candidates vary with target and
+$\approx$7\% improve by ${\ge}20\%$ from L10 to L50, because CENSUS's categorical
+columns are \emph{data-capped} --- their MCV lists fill at a very low
+cardinality. Thus capacity is a two-sided allocation axis: high-cardinality
+combinations may need \emph{higher} targets (the \texttt{posts} case), whereas
+data-capped combinations may already be satisfied below the default --- so
+\emph{how much} must be decided jointly with \emph{which} statistics.
 
 \subsection{One Statistic Usually Captures the Attainable Repair}
 \label{sec:rq2}
@@ -860,15 +815,11 @@ queries (baseline $>1.2$) this ratio is \textbf{median 1.000} against the best
 the estimation floor ($\le1.05$) for $97\%$ of the genuinely repairable queries
 (base 2--10, $n{=}32$).
 
-(3) \emph{Exhaustive check.} Restricting to one statistic per query might still
-lose against the true multi-select optimum, so for every query with few
-candidates we enumerate \emph{all} non-empty subsets (173 queries, up to 10
-candidates, 18{,}177 subsets) and measure each subset's joint q-error. The best
-arbitrary subset never beats the best single statistic by more than $0.0011$ of
-absolute joint q-error ($170/173$ exactly equal; the rest differ only in the
-third decimal), including the hard ten-candidate queries \texttt{st.562}
-(baseline 4.70), \texttt{st.567} and \texttt{st.588}: the exhaustive optimum
-equals the singleton --- measured, not assumed.
+(3) \emph{Exhaustive check.} For 173 queries with at most 10 candidates, we
+enumerate all 18{,}177 non-empty subsets and measure each subset's joint
+q-error. The best arbitrary subset never beats the best single statistic by
+more than $0.0011$ of absolute q-error ($170/173$ exactly equal) --- the
+exhaustive optimum equals the singleton, measured not assumed.
 
 \textbf{Boundary.} One-stat sufficiency is not universal. (4) \emph{Width
 sensitivity.} Relaxing to 4/5-column MCVs on the hardest CENSUS queries, the
@@ -881,19 +832,15 @@ agnostic to how columns are grouped into candidates. On \texttt{posts} the
 2/3-column candidates already reach $\approx$1.0 everywhere, so this effect is
 confined to the CENSUS tail.
 
-(5) \emph{Synthetic many-cluster stress test.} We build the controlled failure
-test matching the mechanistic hypothesis (\S\ref{sec:disc-sparsity}): on a
-synthetic table vary the number $K$ of \emph{mutually independent},
-perfectly-correlated column clusters a query filters on, and measure the
-top-1 vs.\ top-$K$ coverage ratio
+(5) \emph{Synthetic many-cluster stress test.} We build a synthetic table and
+vary the number $K$ of \emph{mutually independent}, perfectly-correlated column
+clusters a query filters on, measuring the coverage ratio
 \[
   \operatorname{cov}_K = \frac{e^0 - e(\{s_1\})}{e^0 - e(\{s_1,\dots,s_K\})}.
 \]
 In this controlled construction, one-stat sufficiency holds exactly only for
-$K{=}1$ (one 3-column MCV captures the whole error and a second changes nothing)
-and \emph{decays} with $K$ (Table
-\ref{tab:sweep}): $\operatorname{cov}_K$ is $1.000$ at $K{=}1$, drops to $0.90$
-at $K{=}2$, and collapses to $\approx 0$ for $K\ge3$ --- the monotone failure
+$K{=}1$ and \emph{decays} with $K$ (Table
+\ref{tab:sweep}), collapsing to $\approx 0$ for $K\ge3$ --- the monotone failure
 regime where the multi-select model (\S\ref{sec:multi}) is required.
 
 \begin{table}[t]
@@ -957,23 +904,19 @@ budget & MILP & best greedy & MILP adv ($\Delta$q) & best-is\\
 \end{tabular}
 \end{table}
 
-The MILP wins at every budget, and its edge never disappears: largest under the
-tightest budget (0.026 at 5\,KB) and --- notably --- \emph{growing again} at
-250\,KB (0.024) because the best greedy saturates: once G1/G2 have spent their
-budget on cheap L100 coverage they cannot spend the remainder on
+The MILP wins at every budget. Its largest advantages occur at 5\,KB
+(0.026) and 250\,KB (0.024), where capacity reallocation matters most: greedy
+spends its budget on cheap L100 coverage and cannot spend the remainder on
 \emph{capacity} upgrades, whereas the MILP drives the mean from 1.0156 to
-1.0040. Only at the generous 500\,KB budget does the add-or-upgrade greedy
-close part of the gap (G3, 4 upgrades). The key difference is global capacity
-reallocation under a shared budget: although G3 can upgrade an already-deployed
-statistic, it cannot coordinate such upgrades across competing candidates
-(the ``how much'' axis; \S\ref{sec:rq3}).
+1.0040; only at 500\,KB does G3 partially close the gap. The difference is
+global capacity reallocation under a shared budget --- although G3 can upgrade
+an already-deployed statistic, it cannot coordinate such upgrades across
+competing candidates (the ``how much'' axis; \S\ref{sec:rq3}).
 
 On the full 632-query workload (Fig.~\ref{fig:budgetquality}), the real effect
 is \emph{tail repair}: the maximum q-error falls from 4.7 to 1.1, and on the
-ten hardest CENSUS queries baseline (mean / median / P90 / max) $=$
-$(1071.5 / 332.5 / 2542.9 / 4162.1)$ collapses to $(1.10 / 1.09 / 1.17 / 1.41)$
---- e.g.\ a 4162 $\to$ 1.4 maximum. We optimize mean but evaluate the full
-distribution.
+ten hardest CENSUS queries the mean / median / P90 / max falls from
+$(1071.5 / 332.5 / 2542.9 / 4162.1)$ to $(1.10 / 1.09 / 1.17 / 1.41)$.
 
 \begin{figure}[t]
 \centering
@@ -995,11 +938,9 @@ supplemental material). Its baseline is far worse
 (mean 25.19, max 4{,}162 over 468 queries), and a tiny budget already collapses
 it: 50\,KB drives the mean from 25.19 to 1.31, the 100\,KB budget cuts the
 maximum to 6.2, and 250\,KB brings it to $\approx$3. Beyond $\approx$500\,KB
-the curve \emph{saturates}: the mean plateaus at 1.057 and stays there through
-2\,MB even as the solver keeps adding more statistics (455 to 457 stats),
-because CENSUS's
-low-cardinality combinations are already fully captured --- the remaining error
-is not repairable by any candidate in the family ($\S\ref{sec:rq1}$). The level
+the curve \emph{saturates} (mean 1.057, constant through 2\,MB even as stats
+grow 455$\to$457): CENSUS's low-cardinality combinations are already fully
+captured (\S\ref{sec:rq1}). The level
 mix is also telling: unlike stats\_CEB\_single, where the solver shifts to
 \emph{high} capacity as the budget grows, on CENSUS it spends overwhelmingly on
 \emph{low} capacity (L10/L25) even at large budgets --- raising capacity is
@@ -1050,16 +991,10 @@ concentrated in the tail: at 250--500\,KB the what-only variants saturate (kept
 maximum q-error 2.19 at every budget), whereas the full model keeps driving it
 down (1.45 at 250\,KB, 1.17 at 500\,KB), because it spends the budget
 \emph{upgrading} the dominant combinations' capacity rather than adding more
-coverage --- the same capacity-reallocation behaviour that separates the MILP
-from greedy above. The ``how much'' axis is not a modelling luxury but the
-component that buys the last, hardest repairs.
+coverage.
 
-\emph{Optimization overhead.} The optimization is not the bottleneck: on the
-full 468-query CENSUS workload the worst-case MILP over the six-level menu
-(115{,}470 statistics, 300{,}606 binary variables) solves optimally in
-$\approx$4.0\,s and with pruning in $\approx$2.8\,s
-(\S\ref{sec:scale}). Measurement (\S\ref{sec:measure}) dominates the
-pipeline, not the solve. \label{sec:rq4}
+\emph{Optimization overhead.} The solve is not the bottleneck: as shown in
+\S\ref{sec:scale}, measurement dominates the pipeline. \label{sec:rq4}
 
 \emph{Component ablation.} Switching off one component at a time at a fixed
 budget isolates each design choice \label{sec:ablation}: disabling the
@@ -1080,8 +1015,7 @@ at deployment) from \emph{computational conveniences} (sparse cap; pruning).
 workload (146 join queries), deploying each query's best single-table candidate
 improves whole-query q-error by a median of only $1.022\times$; the residual
 error lives in cross-table join selectivity, which a single-relation MCV cannot
-repair (\S\ref{sec:mechanisms}). This is the expected null result: the method
-does not optimize for coverage's sake.
+repair (\S\ref{sec:mechanisms}).
 
 \section{End-to-End Validation}
 \label{sec:e2e}
@@ -1091,10 +1025,8 @@ pipeline by building the MILP-selected sets on the real database. Our
 measurement model (\S\ref{sec:measure-correct}) makes two predictions:
 (a) an isolated measurement should be exactly predictive, and (b) co-installed
 overlapping statistics should not affect each other. We test both causally in
-three stages: \emph{Is a single deployed statistic predictable? Is a
-co-installed overlapping set predictable? And can we restore predictability?}
-Each stage controls the previous one, so together they isolate exactly where
-the model is sound and where it is not.
+three stages --- single-statistic predictability, co-installed predictability,
+and restoring predictability --- each stage controlling the previous.
 
 \subsection{Isolated Measurements Are Predictive}
 \label{sec:e2e-singleton}
@@ -1221,18 +1153,11 @@ co-installed overlapping statistics that disjointness removes --- and removes
 \subsection{The Causal Takeaway}
 \label{sec:e2e-takeaway}
 
-The three stages form a clean causal chain: per-candidate measurement is sound
-and a single deployed statistic is exactly predictable (Stage~1); the only
-place prediction diverges is under co-installed \emph{overlapping} statistics,
-where the planner's joint choice violates the per-candidate independence
-assumption (Stage~2); and enforcing pairwise column disjointness removes that
-interaction and restores ratio 1.000 (Stage~3), at a quantified quality cost.
-This does not undermine the method --- it precisely delimits where the sparse
-model holds and provides a validated, deployable fix. The practical alternative
-when the quality cost of disjointness is unacceptable is Option~B
-(\S\ref{sec:disc-fix}): solve without the constraint and repair by
-EXPLAIN-checking and dropping flagged interferers --- this preserves nominal
-quality but does not guarantee predictability (Table~\ref{tab:optionB}).
+Together, the three stages show that isolated measurements are predictive,
+while co-installed overlapping statistics introduce the residual interaction;
+global disjointness removes it at a quantified quality cost. Option~B remains
+available when that quality cost is unacceptable, but requires post-selection
+validation (\S\ref{sec:disc-fix}).
 
 \section{Discussion and Open Questions}
 \label{sec:disc}
@@ -1278,8 +1203,7 @@ q-error as its L1000 twin, yet it forces PostgreSQL to sample ANALYZE at target
 stats\_CEB\_single, the storage-only MILP solution and one capped at L1000 have
 identical storage (99{,}996 B) and identical mean q-error (1.0156), but
 reconstructing them by ANALYZE differs by $\approx$2.7$\times$ (31.4\,s vs.\
-11.6\,s); the CENSUS data-capped case is starker (32.0\,s vs.\ 12.2\,s at
-10\,KB, with identical storage 9{,}991 B and mean 2.238). The storage-only
+11.6\,s). The storage-only
 objective is thus a genuine but imperfect proxy for maintenance cost; a
 maintenance-aware objective (open question~1) is the natural extension.
 
@@ -1291,32 +1215,26 @@ that the main conclusions are not sensitive to this choice.
 \subsection{Deployment Fidelity of the Oracle}
 \label{sec:disc-deployment}
 
-This sampling-fidelity issue is distinct from the planner-interference issue of
-\S\ref{sec:e2e}: the former concerns \emph{how a statistic is sampled at a
-given target} (large-sample oracle vs.\ a real target-specific deployment),
-whereas the latter concerns \emph{which statistic the planner uses when several
-are co-installed}. Here we quantify the former.
+This issue is distinct from the planner-interference of \S\ref{sec:e2e}: the
+former concerns \emph{how a statistic is sampled at a given target}
+(large-sample oracle vs.\ a real target-specific deployment), the latter
+\emph{which statistic the planner uses when several are co-installed}.
 
 Protocol-M evaluates every capacity level on the same large sample (a
-\emph{large-sample oracle} view), which a real ``\texttt{SET STATISTICS} $L$''
-deployment need not reproduce. Re-measuring with a real target-specific
-\texttt{ANALYZE} (single-column target back at 100), across the evaluated
-stats\_CEB\_single candidates and the core \texttt{posts} case the oracle is
-highly faithful: deploying the oracle-selected level under target-specific
-ANALYZE incurs at most 1\% q-error loss relative to the true best level, and
-the headline example \texttt{posts(AnswerCount,FavoriteCount,ViewCount)}
-($4.58\to2.82\to1.04$) is reproduced to within 1\%. In the low-$\lambda$ cases
-we evaluated, the oracle becomes optimistic --- when a candidate's columns cover
-a query's rare-selectivity driver and the combination is too rare to appear in
-a real low-capacity sample, so the large sample captures it while a real small
-sample misses it (falling back to base-frequency) with a far worse true q-error;
-sweeping capacity as a continuous knob, the ratio of real to oracle q-error
-reached $\sim$$10^{2}{-}10^{4}$, and approached 1 as $\lambda$ increased
-($\lambda(L){=}(r/N)\cdot\textrm{sample}(L)$ is the expected sample count);
-in our runs it approached 1 once $\lambda$ was several units or larger. We
-therefore treat low expected counts as an \emph{empirical warning regime}, not
-a hard threshold: the harmful optimistic bias arises when a candidate covers
-the rare driver AND its expected sample count is small.
+\emph{large-sample oracle}), which a real ``\texttt{SET STATISTICS} $L$''
+deployment need not reproduce. Target-specific ANALYZE shows high fidelity on
+the evaluated \texttt{stats\_CEB\_single} candidates and the core \texttt{posts}
+case: the oracle-selected level incurs at most 1\% q-error loss relative to the
+true best level, and the headline $4.58\to2.82\to1.04$ curve is reproduced
+within 1\%. In the low-$\lambda$ cases we evaluated, however, the oracle is
+optimistic: when the candidate covers a rare-selectivity driver but the
+combination is too rare to appear in a real low-capacity sample, the large
+sample captures it while a real small sample falls back to base-frequency with
+a far worse q-error; the real/oracle ratio reached $\sim$$10^{2}{-}10^{4}$ and
+approached 1 once $\lambda$ was several units or larger
+($\lambda(L){=}(r/N)\cdot\textrm{sample}(L)$ the expected sample count). We
+treat low expected counts as an \emph{empirical warning regime}, not a hard
+threshold.
 
 \subsection{The Interference Fix}
 \label{sec:disc-fix}
