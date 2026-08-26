@@ -21,6 +21,12 @@
 \usepackage{tikz}
 \usetikzlibrary{positioning,fit,arrows.meta}
 
+% capacity menu as an in-line-breakable math token (avoids overfull column boxes)
+\newcommand{\capmenu}{\{10,\allowbreak 25,\allowbreak 50,\allowbreak 100,\allowbreak 1000,\allowbreak 10000\}}
+
+% let LaTeX stretch lines slightly to absorb long \texttt/numbers near overfull
+\emergencystretch=1.5em
+
 \begin{document}
 
 \title{One-Stat Sufficiency Guided Budgeted Selection of PostgreSQL Extended Statistics}
@@ -131,7 +137,7 @@ from optimization formulations.
 
 \emph{Running example.} On the high-cardinality \texttt{posts} table, the
 statistic \texttt{posts(AnswerCount,FavoriteCount,ViewCount)} can be stored at
-any level of the capacity menu $\{10,25,50,100,1000,10000\}$ \cite{pgstats}:
+any level of the capacity menu $\capmenu$ \cite{pgstats}:
 at the default target 100 the list is too small to hold the 3-column
 correlation (q-error stays $\sim$4.7), while at 10000 it drives the error to
 $\approx$1.0. So ``should we build this statistic?'' admits no answer without
@@ -480,7 +486,7 @@ The obvious protocol (\emph{Protocol-A}) isolates a candidate by
 \]
 a clean, drop-analyzable cycle that costs two ANALYZEs per candidate. On a wide
 table this is prohibitive. On the CENSUS \texttt{climate} table (69 columns,
-$\sim$2.5M rows) a single ANALYZE at \texttt{statistics\_target}=10000 takes
+$\sim$2.5M rows) a single ANALYZE at \texttt{statistics\_target}\allowbreak$=10000$ takes
 $\approx$22s with no statistics (warm cache; a fixed base cost), growing
 roughly linearly with the number of statistics already on the table
 (\S\ref{sec:measure-runtime}). Consequently the naive protocol
@@ -728,7 +734,7 @@ each query's selection predicates --- they directly exercise single-relation
 correlation while keeping the candidate space tractable (e.g.\ 19{,}245
 distinct combinations on CENSUS); higher-order candidates are an explicit
 limitation (\S\ref{sec:disc}). We evaluate the full capacity menu
-$\{10,25,50,100,1000,10000\}$ with the per-column baseline fixed at
+$\capmenu$ with the per-column baseline fixed at
 \texttt{statistics\_target}=10000 (\S\ref{sec:measure}), so capacity is a
 free, two-sided decision axis; where a single operating point is needed we
 report 1000. We organize the results around six research questions.
@@ -951,7 +957,7 @@ distribution.
 632-query stats\_CEB\_single workload. Mean, median and P90 all decrease as the
 budget rises. The right panel shows the mix of chosen
 \texttt{statistics\_target} levels across the full two-sided menu
-$\{10,25,50,100,1000,10000\}$: under the tightest budgets the solver spends on
+$\capmenu$: under the tightest budgets the solver spends on
 \emph{low} capacity (L10/L25/L50) to fit many statistics, and shifts to
 \emph{high} capacity (L1000/L10000) as the budget grows --- capacity is a real
 allocation axis, not just coverage.}
