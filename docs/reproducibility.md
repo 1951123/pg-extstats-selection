@@ -84,6 +84,16 @@ menu upgrade.
 | Table:bench job-light row (join negative control) | `phase1_job_light_full_cand5.json`, `phase1_job_light_cand27.json` | job-light join workload |
 | RQ1 extreme-selectivity CENSUS cases (query.184 4,162→1.08 @L100, etc.) | `phase1_census_mcv_6level.json` (or `phase1_census_mask_top10.json`) | six-level phase (data-capped cases) |
 
+### 2c. Sec.7 / Sec.8 deployment, maintenance-mismatch and fidelity tables
+
+| Table / number in the paper | Primary data-source artifact | Reproduction script + command |
+|---|---|---|
+| §7 tab:rq5 (fidelity-ratio by deployment type on stats-CEB-single: singleton 1.0000/0/75, overlap 1.040/5/75, disjoint 0.9999/0/41) | `results/p_option_b_phaseB_full.json` (real-deployment ratios) + `results/p4_e2e_scatter.json` | `scripts/exp_option_b_phaseB.py`; `scripts/exp_e2e_scatter.py --input results/phase1_ceb_single_mask_6level.json --db stats --table posts --target 10000 --budgets 10000,40000,100000,250000 --out results/p4_e2e_scatter.json` |
+| §7 tab:rq6 (Census end-to-end target 10⁴: overlap/disjoint/repaired gmean-max-tail at 40/100/250KB) | `results/p_census_e2e_memlight.json` | `scripts/exp_census_e2e_memlight.py --input results/phase1_census_mcv_6level.json --budgets 40000,100000,250000 --db census --target 10000 --max-iters 3 --out results/p_census_e2e_memlight.json` |
+| §8 tab:disc-mismatch (storage vs ANALYZE maintenance mismatch, CENSUS + stats-CEB-single) | derived from `phase1_census_mcv_6level.json` / `phase1_ceb_single_mask_6level.json` via `analyze_storage_analyze_mismatch.py` (stdout; no separate JSON emitted) | `scripts/analyze_storage_analyze_mismatch.py --input results/phase1_census_mcv_6level.json --budgets 25000,40000,100000,250000,500000` (CENSUS); `--input results/phase1_ceb_single_mask_6level.json --budgets 10000,40000,100000,200000` (stats-CEB-single) |
+| §8 tab:fidelity-lambda (fidelity ratio ρ vs expected sample count λ, rare combo 13/2.46M) | `results/transition_query184.json` (single candidate) + `results/transition_multicand.json` (multi-candidate) | `scripts/exp_transition_query184.py`; `scripts/exp_transition_multicand.py` (need live `census` DB) |
+| §8 fidelity robust side (high-occurrence posts combo L25–L10000 zero gaps) | `results/p4_e2e_scatter.json` (singleton deployments) | `scripts/exp_e2e_scatter.py` (see above) |
+
 ---
 
 ## 3. Primary-artifact list (tracked in git)
@@ -102,6 +112,12 @@ menu upgrade.
 | `results/phase1_census_low_t10000.log` | small | **official rerun log** (in progress at commit; update after rerun completes) |
 | `results/phase1_census_mcv_multi.log` | 178 lines | CENSUS official baseline log |
 | `results/probe_census_fine_capacity.log` | 103 lines | fine-grained capacity-axis probe log |
+| `results/p4_e2e_scatter.json` | 103K | §7 tab:rq5 + fig:e2epredict data source (464 real-deployment points on `posts`, target 10000) |
+| `results/p_option_b_phaseB_full.json` | 13K | §7 tab:rq5 fidelity-ratio distribution by deployment type (Option-A/B on stats-CEB-single) |
+| `results/p_census_e2e_memlight.json` | 11K | §7 tab:rq6 Census end-to-end (real gmean/P90/max q-error, tail, storage, deploy time per budget×method; memory-light run) |
+| `results/transition_query184.json` | small | §8 tab:fidelity-lambda single-candidate λ-fidelity curve (CENSUS query.184 rare combo) |
+| `results/transition_multicand.json` | small | §8 tab:fidelity-lambda multi-candidate confirmation curve |
+| `results/transition_query184.png`, `results/transition_multicand.png` | — | plots of the above (optional) |
 
 ---
 
@@ -150,6 +166,39 @@ menu upgrade.
   Verified: 468/468 queries, identical candidate sets, all six levels present
   with no gaps.
 
+- **Sec.7 Census end-to-end deployment (tab:rq6)** — memory-light; real
+  PostgreSQL must be up with the `census` database loaded:
+  ```bash
+  source .venv/bin/activate
+  python scripts/exp_census_e2e_memlight.py \
+    --input results/phase1_census_mcv_6level.json \
+    --budgets 40000,100000,250000 --db census --target 10000 --max-iters 3 \
+    --out results/p_census_e2e_memlight.json
+  ```
+
+- **Sec.7 Option-A/B phase-B fidelity (tab:rq5)**:
+  ```bash
+  python scripts/exp_option_b_phaseB.py     # -> results/p_option_b_phaseB_full.json
+  ```
+
+- **Sec.8 storage-vs-ANALYZE mismatch (tab:disc-mismatch)** — pure derivation
+  from phase-1 (no DB), output printed to stdout:
+  ```bash
+  python scripts/analyze_storage_analyze_mismatch.py \
+    --input results/phase1_census_mcv_6level.json \
+    --budgets 25000,40000,100000,250000,500000
+  python scripts/analyze_storage_analyze_mismatch.py \
+    --input results/phase1_ceb_single_mask_6level.json \
+    --budgets 10000,40000,100000,200000
+  ```
+
+- **Sec.8 fidelity-vs-lambda curves (tab:fidelity-lambda)** — real `census` DB:
+  ```bash
+  python scripts/exp_transition_query184.py    # -> results/transition_query184.{json,png}
+  python scripts/exp_transition_multicand.py   # -> results/transition_multicand.{json,png}
+  ```
+
+
 ---
 
 ## 5. Git include / ignore policy
@@ -166,6 +215,16 @@ menu upgrade.
   verify with `git check-ignore -v <file>`.
 
 ## 6. To-do / change log
+
+- [x] **Reproducibility hardening for Sec.7/Sec.8 filled tables**: formalised
+      the λ-fidelity experiments (`tmp_transition_query184.py` /
+      `tmp_transition_multicand.py` → tracked `exp_transition_query184.py` /
+      `exp_transition_multicand.py`), whitelisted their outputs and the §7
+      end-to-end data (`p4_e2e_scatter.json`, `p_option_b_phaseB_full.json`,
+      `p_census_e2e_memlight.json`) in `.gitignore`, and registered all four
+      new tables (§7 tab:rq5/tab:rq6, §8 tab:disc-mismatch/tab:fidelity-lambda)
+      in §2c Data-source + §3 artifact list + §4 regeneration commands.
+      Obsolete `tmp_transition_*.py` removed.
 
 - [x] **All RQ3 tables rebuilt from the six-level `phase1_ceb_single_mask_6level.json`**
       (audit found old three-level leftovers). A systematic recomputation found

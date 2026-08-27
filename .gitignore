@@ -71,7 +71,7 @@ results/*
 !results/true_vs_mask_posts144.json
 # Protocol-M applicability boundary scan (scripts/tmp_boundary_scan.py output)
 !results/boundary_scan.json
-# λ transition curves (scripts/tmp_transition_*.py output: data + plots)
+# λ transition curves (scripts/exp_transition_query184.py / exp_transition_multicand.py output: data + plots)
 !results/transition_query184.json
 !results/transition_multicand.json
 !results/transition_query184.png
@@ -82,6 +82,11 @@ results/*
 !results/phase1_census_low_t10000.log
 !results/phase1_census_mcv_multi.log
 !results/probe_census_fine_capacity.log
+# Sec.7 End-to-End deployment tables (tab:rq5 / tab:rq6) — real-deployment
+# measured data, expensive to rerun (repeat CREATE/ANALYZE/deploy on live DB)
+!results/p4_e2e_scatter.json
+!results/p_option_b_phaseB_full.json
+!results/p_census_e2e_memlight.json
 
 # Upstream End-to-End-CardEst-Benchmark nested repo (data/reference source only, not tracked)
 End-to-End-CardEst-Benchmark/

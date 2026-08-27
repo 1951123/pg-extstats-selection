@@ -1,0 +1,433 @@
+{
+  "budgets": [
+    40000,
+    100000,
+    250000
+  ],
+  "n_banned_iter": 31,
+  "n_affected_iter": 13,
+  "deployments": [
+    {
+      "budget_bytes": 40000,
+      "label": "overlap",
+      "kind": "overlap",
+      "n_stats": 10,
+      "ratio": {
+        "n": 48,
+        "mean": 1.0789682489256747,
+        "median": 1.0,
+        "max": 1.6991525423728813,
+        "n_gt_tail": 8
+      },
+      "actual_mean_qerr": 1.0309345879935963,
+      "tail_threshold": 1.05,
+      "affected_ids": [
+        "st.144",
+        "st.284",
+        "st.308",
+        "st.326",
+        "st.398",
+        "st.562",
+        "st.567",
+        "st.588"
+      ],
+      "keys": [
+        "posts|FavoriteCount,ViewCount|L1000",
+        "posts|AnswerCount,ViewCount|L1000",
+        "posts|FavoriteCount,PostTypeId|L25",
+        "users|DownVotes,UpVotes|L25",
+        "users|Reputation,Views|L25",
+        "posts|AnswerCount,FavoriteCount|L100",
+        "posts|AnswerCount,FavoriteCount,PostTypeId|L25",
+        "posts|AnswerCount,PostTypeId|L10",
+        "posts|PostTypeId,ViewCount|L1000",
+        "users|DownVotes,Reputation|L10"
+      ]
+    },
+    {
+      "budget_bytes": 40000,
+      "label": "disjoint(A)",
+      "kind": "disjoint",
+      "n_stats": 5,
+      "ratio": {
+        "n": 32,
+        "mean": 0.9998652766622143,
+        "median": 1.0,
+        "max": 1.0362134688691234,
+        "n_gt_tail": 0
+      },
+      "actual_mean_qerr": 1.0420031488750767,
+      "tail_threshold": 1.05,
+      "affected_ids": [],
+      "keys": [
+        "posts|CommentCount,Score|L10",
+        "users|DownVotes,UpVotes|L25",
+        "users|Reputation,Views|L50",
+        "posts|AnswerCount,FavoriteCount|L100",
+        "posts|PostTypeId,ViewCount|L10000"
+      ]
+    },
+    {
+      "budget_bytes": 40000,
+      "label": "repaired1",
+      "kind": "repaired",
+      "n_stats": 13,
+      "ratio": {
+        "n": 50,
+        "mean": 1.0672057616219306,
+        "median": 1.0,
+        "max": 2.011406076511558,
+        "n_gt_tail": 7
+      },
+      "actual_mean_qerr": 1.030265724701166,
+      "tail_threshold": 1.05,
+      "affected_ids": [
+        "st.144",
+        "st.266",
+        "st.284",
+        "st.308",
+        "st.320",
+        "st.326",
+        "st.398"
+      ],
+      "keys": [
+        "posts|CommentCount,ViewCount|L50",
+        "posts|AnswerCount,Score,ViewCount|L1000",
+        "posts|AnswerCount,ViewCount|L100",
+        "posts|Score,ViewCount|L100",
+        "posts|FavoriteCount,PostTypeId|L10000",
+        "users|DownVotes,UpVotes|L50",
+        "users|Reputation,Views|L50",
+        "posts|AnswerCount,FavoriteCount|L100",
+        "users|DownVotes,Views|L10",
+        "posts|AnswerCount,FavoriteCount,PostTypeId|L50",
+        "posts|AnswerCount,PostTypeId|L25",
+        "posts|PostTypeId,ViewCount|L1000",
+        "users|DownVotes,Reputation|L10"
+      ]
+    },
+    {
+      "budget_bytes": 40000,
+      "label": "repaired_iter",
+      "kind": "repaired",
+      "n_stats": 14,
+      "ratio": {
+        "n": 50,
+        "mean": 1.0570704489288953,
+        "median": 1.0,
+        "max": 1.8574043554560726,
+        "n_gt_tail": 7
+      },
+      "actual_mean_qerr": 1.0305393555380342,
+      "tail_threshold": 1.05,
+      "affected_ids": [
+        "st.144",
+        "st.266",
+        "st.284",
+        "st.308",
+        "st.326",
+        "st.398",
+        "st.588"
+      ],
+      "keys": [
+        "posts|AnswerCount,Score,ViewCount|L1000",
+        "posts|AnswerCount,ViewCount|L100",
+        "posts|Score,ViewCount|L50",
+        "posts|FavoriteCount,PostTypeId|L10000",
+        "users|DownVotes,UpVotes|L50",
+        "users|Reputation,Views|L100",
+        "posts|AnswerCount,FavoriteCount|L100",
+        "users|DownVotes,Views|L10",
+        "postLinks|CreationDate,LinkTypeId|L10",
+        "posts|AnswerCount,FavoriteCount,PostTypeId|L100",
+        "posts|AnswerCount,PostTypeId|L1000",
+        "posts|FavoriteCount,Score|L10",
+        "posts|PostTypeId,ViewCount|L1000",
+        "users|DownVotes,Reputation|L10"
+      ]
+    },
+    {
+      "budget_bytes": 100000,
+      "label": "overlap",
+      "kind": "overlap",
+      "n_stats": 23,
+      "ratio": {
+        "n": 75,
+        "mean": 1.039984483188927,
+        "median": 1.0,
+        "max": 2.045151158225363,
+        "n_gt_tail": 5
+      },
+      "actual_mean_qerr": 1.023858031334706,
+      "tail_threshold": 1.05,
+      "affected_ids": [
+        "st.144",
+        "st.182",
+        "st.326",
+        "st.562",
+        "st.588"
+      ],
+      "keys": [
+        "posts|FavoriteCount,ViewCount|L1000",
+        "posts|AnswerCount,ViewCount|L1000",
+        "users|CreationDate,UpVotes|L10",
+        "users|CreationDate,Reputation|L100",
+        "posts|FavoriteCount,PostTypeId|L25",
+        "posts|FavoriteCount,PostTypeId,Score|L1000",
+        "posts|CommentCount,CreationDate,Score|L100",
+        "posts|CreationDate,Score|L25",
+        "users|DownVotes,UpVotes|L100",
+        "users|UpVotes,Views|L25",
+        "users|Reputation,Views|L100",
+        "posts|AnswerCount,FavoriteCount|L10000",
+        "posts|AnswerCount,FavoriteCount,Score|L1000",
+        "users|DownVotes,Views|L10",
+        "postLinks|CreationDate,LinkTypeId|L25",
+        "posts|CommentCount,Score|L50",
+        "posts|AnswerCount,FavoriteCount,PostTypeId|L100",
+        "posts|AnswerCount,PostTypeId|L25",
+        "posts|FavoriteCount,Score|L10",
+        "posts|PostTypeId,ViewCount|L1000",
+        "users|DownVotes,Reputation|L10",
+        "posts|AnswerCount,PostTypeId,ViewCount|L1000",
+        "posts|FavoriteCount,PostTypeId,ViewCount|L1000"
+      ]
+    },
+    {
+      "budget_bytes": 100000,
+      "label": "disjoint(A)",
+      "kind": "disjoint",
+      "n_stats": 6,
+      "ratio": {
+        "n": 41,
+        "mean": 0.9998948500778257,
+        "median": 1.0,
+        "max": 1.0362134688691234,
+        "n_gt_tail": 0
+      },
+      "actual_mean_qerr": 1.0417023837063322,
+      "tail_threshold": 1.05,
+      "affected_ids": [],
+      "keys": [
+        "posts|CommentCount,Score|L10",
+        "users|DownVotes,UpVotes|L1000",
+        "users|Reputation,Views|L10000",
+        "posts|AnswerCount,FavoriteCount|L100",
+        "postLinks|CreationDate,LinkTypeId|L50",
+        "posts|PostTypeId,ViewCount|L10000"
+      ]
+    },
+    {
+      "budget_bytes": 100000,
+      "label": "repaired1",
+      "kind": "repaired",
+      "n_stats": 12,
+      "ratio": {
+        "n": 46,
+        "mean": 1.089882379736532,
+        "median": 1.0,
+        "max": 2.125630897520298,
+        "n_gt_tail": 4
+      },
+      "actual_mean_qerr": 1.025626369176197,
+      "tail_threshold": 1.05,
+      "affected_ids": [
+        "st.26",
+        "st.266",
+        "st.314",
+        "st.320"
+      ],
+      "keys": [
+        "posts|CommentCount,ViewCount|L50",
+        "posts|AnswerCount,ViewCount|L10000",
+        "posts|Score,ViewCount|L100",
+        "posts|FavoriteCount,PostTypeId|L10000",
+        "users|Reputation,Views|L25",
+        "posts|AnswerCount,FavoriteCount|L100",
+        "users|DownVotes,UpVotes|L10",
+        "posts|AnswerCount,FavoriteCount,PostTypeId|L50",
+        "posts|AnswerCount,PostTypeId|L10",
+        "posts|PostTypeId,ViewCount|L1000",
+        "users|DownVotes,Reputation|L10",
+        "posts|AnswerCount,PostTypeId,ViewCount|L1000"
+      ]
+    },
+    {
+      "budget_bytes": 100000,
+      "label": "repaired_iter",
+      "kind": "repaired",
+      "n_stats": 11,
+      "ratio": {
+        "n": 46,
+        "mean": 1.0852530046292765,
+        "median": 1.0,
+        "max": 2.0388471177944867,
+        "n_gt_tail": 4
+      },
+      "actual_mean_qerr": 1.0254053184759757,
+      "tail_threshold": 1.05,
+      "affected_ids": [
+        "st.132",
+        "st.157",
+        "st.338",
+        "st.573"
+      ],
+      "keys": [
+        "posts|AnswerCount,ViewCount|L10000",
+        "posts|FavoriteCount,PostTypeId|L1000",
+        "posts|FavoriteCount,Score|L25",
+        "users|DownVotes,UpVotes|L50",
+        "users|Reputation,Views|L10",
+        "posts|AnswerCount,FavoriteCount|L1000",
+        "posts|AnswerCount,FavoriteCount,PostTypeId|L100",
+        "posts|AnswerCount,PostTypeId|L10",
+        "posts|PostTypeId,ViewCount|L1000",
+        "users|DownVotes,Reputation|L10",
+        "posts|AnswerCount,PostTypeId,ViewCount|L1000"
+      ]
+    },
+    {
+      "budget_bytes": 250000,
+      "label": "overlap",
+      "kind": "overlap",
+      "n_stats": 18,
+      "ratio": {
+        "n": 64,
+        "mean": 1.0180910533974021,
+        "median": 1.0,
+        "max": 2.045151158225363,
+        "n_gt_tail": 1
+      },
+      "actual_mean_qerr": 1.0060143631684313,
+      "tail_threshold": 1.05,
+      "affected_ids": [
+        "st.182"
+      ],
+      "keys": [
+        "posts|FavoriteCount,ViewCount|L1000",
+        "posts|AnswerCount,ViewCount|L1000",
+        "users|CreationDate,Reputation|L100",
+        "posts|FavoriteCount,PostTypeId|L25",
+        "posts|FavoriteCount,PostTypeId,Score|L1000",
+        "posts|CreationDate,Score|L10",
+        "users|DownVotes,UpVotes|L100",
+        "users|Reputation,Views|L100",
+        "posts|AnswerCount,FavoriteCount|L1000",
+        "posts|AnswerCount,FavoriteCount,ViewCount|L10000",
+        "users|DownVotes,Views|L10",
+        "posts|AnswerCount,FavoriteCount,PostTypeId|L100",
+        "posts|AnswerCount,PostTypeId|L25",
+        "posts|FavoriteCount,Score|L10",
+        "posts|PostTypeId,ViewCount|L1000",
+        "users|DownVotes,Reputation|L10",
+        "posts|AnswerCount,PostTypeId,ViewCount|L1000",
+        "posts|FavoriteCount,PostTypeId,ViewCount|L10000"
+      ]
+    },
+    {
+      "budget_bytes": 250000,
+      "label": "disjoint(A)",
+      "kind": "disjoint",
+      "n_stats": 6,
+      "ratio": {
+        "n": 50,
+        "mean": 0.9999137770638171,
+        "median": 1.0,
+        "max": 1.0362134688691234,
+        "n_gt_tail": 0
+      },
+      "actual_mean_qerr": 1.0416031425511152,
+      "tail_threshold": 1.05,
+      "affected_ids": [],
+      "keys": [
+        "postLinks|CreationDate,LinkTypeId|L10000",
+        "posts|CommentCount,Score|L10",
+        "users|DownVotes,UpVotes|L1000",
+        "users|Reputation,Views|L10000",
+        "posts|AnswerCount,FavoriteCount|L100",
+        "posts|PostTypeId,ViewCount|L10000"
+      ]
+    },
+    {
+      "budget_bytes": 250000,
+      "label": "repaired1",
+      "kind": "repaired",
+      "n_stats": 16,
+      "ratio": {
+        "n": 50,
+        "mean": 1.1407941273947886,
+        "median": 1.0,
+        "max": 2.563914636775167,
+        "n_gt_tail": 6
+      },
+      "actual_mean_qerr": 1.0197328683737503,
+      "tail_threshold": 1.05,
+      "affected_ids": [
+        "st.144",
+        "st.172",
+        "st.182",
+        "st.284",
+        "st.308",
+        "st.398"
+      ],
+      "keys": [
+        "posts|FavoriteCount,ViewCount|L10000",
+        "posts|AnswerCount,Score,ViewCount|L1000",
+        "posts|AnswerCount,ViewCount|L100",
+        "posts|FavoriteCount,PostTypeId|L1000",
+        "posts|FavoriteCount,PostTypeId,Score|L1000",
+        "users|DownVotes,UpVotes|L50",
+        "users|Reputation,Views|L25",
+        "posts|AnswerCount,FavoriteCount|L10000",
+        "posts|AnswerCount,FavoriteCount,ViewCount|L10000",
+        "posts|FavoriteCount,Score,ViewCount|L1000",
+        "users|DownVotes,Views|L10",
+        "posts|AnswerCount,FavoriteCount,PostTypeId|L50",
+        "posts|AnswerCount,PostTypeId|L10",
+        "posts|PostTypeId,ViewCount|L1000",
+        "users|DownVotes,Reputation|L10",
+        "posts|AnswerCount,PostTypeId,ViewCount|L1000"
+      ]
+    },
+    {
+      "budget_bytes": 250000,
+      "label": "repaired_iter",
+      "kind": "repaired",
+      "n_stats": 18,
+      "ratio": {
+        "n": 63,
+        "mean": 1.034019901985917,
+        "median": 1.0,
+        "max": 2.0518612790327717,
+        "n_gt_tail": 3
+      },
+      "actual_mean_qerr": 1.0184905863488747,
+      "tail_threshold": 1.05,
+      "affected_ids": [
+        "st.26",
+        "st.302",
+        "st.314"
+      ],
+      "keys": [
+        "posts|AnswerCount,ViewCount|L10000",
+        "posts|CommentCount,Score,ViewCount|L1000",
+        "users|CreationDate,Reputation|L10",
+        "posts|FavoriteCount,PostTypeId|L50",
+        "posts|CreationDate,Score|L100",
+        "users|DownVotes,UpVotes|L10000",
+        "users|Reputation,Views|L25",
+        "posts|AnswerCount,FavoriteCount|L25",
+        "users|DownVotes,Views|L25",
+        "postLinks|CreationDate,LinkTypeId|L25",
+        "posts|CommentCount,Score|L50",
+        "posts|AnswerCount,FavoriteCount,PostTypeId|L50",
+        "posts|AnswerCount,PostTypeId|L50",
+        "posts|FavoriteCount,Score|L10",
+        "posts|PostTypeId,ViewCount|L1000",
+        "users|DownVotes,Reputation|L10",
+        "posts|AnswerCount,PostTypeId,ViewCount|L10000",
+        "posts|FavoriteCount,PostTypeId,ViewCount|L10000"
+      ]
+    }
+  ]
+}
