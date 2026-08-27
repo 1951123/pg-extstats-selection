@@ -182,6 +182,22 @@ storage-based budgeting and real ANALYZE maintenance cost, and provide
 practical tuning insights for PostgreSQL extended statistics.
 \end{enumerate}
 
+\emph{Organization.} The rest of this paper is organized as follows.
+\S\ref{sec:back} positions our work against prior physical-design and
+statistics-advisor methods. \S\ref{sec:formulation} defines the
+budgeted multivariate-statistics selection problem, shows why the general
+multi-statistic case is intractable to measure, and derives the
+one-stat-sufficiency surrogate that makes the objective exactly linear.
+\S\ref{sec:milp} presents our sparse MILP with capacity levels, its
+constraints, and solver scalability. \S\ref{sec:measure} introduces the
+Catalog-Mask measurement protocol that makes per-candidate, per-capacity
+measurement feasible, and validates its correctness. \S\ref{sec:findings}
+reports our empirical findings on capacity, one-stat sufficiency, and joint
+optimization. \S\ref{sec:e2e} validates the full pipeline on a real database,
+exposing and fixing planner interference. \S\ref{sec:disc} discusses
+implications, the storage/ANALYZE mismatch, deployment fidelity, and open
+questions. \S\ref{sec:concl} concludes.
+
 \section{Background and Related Work}
 \label{sec:back}
 
@@ -285,6 +301,15 @@ pg\_qualstats \cite{pg_qualstats} & \checkmark & -- & \checkmark & -- & -- & \ch
 
 \section{Problem Formulation}
 \label{sec:formulation}
+
+This section defines the cardinality-estimation optimization problem for
+budgeted multivariate-statistics selection. We first introduce notation and the
+objective function (\S\ref{sec:notn}); we then show the intrinsic difficulty of
+the general multi-statistic selection problem (\S\ref{sec:multi}); next we
+introduce the empirical one-stat-sufficiency property and derive its
+consequence, an exactly-linear surrogate model (\S\ref{sec:sparse}); and we
+close by highlighting the measurement bottleneck (\S\ref{sec:measure}) that
+motivates our measurement infrastructure.
 
 \subsection{Notation and Objective}
 \label{sec:notn}
@@ -408,8 +433,26 @@ each capacity level is a distinct physical statistic, choosing \emph{which}
 level of a combination to build is expressed by selecting the corresponding
 $y_{(table,cols,level)}$, subject to a global budget.
 
+\paragraph{Measurement bottleneck.}
+The sparse integer program developed in \S\ref{sec:milp} requires
+per-candidate, per-capacity inputs for every candidate statistic $s$: its
+storage cost $c_s$ and its isolated q-error $e_{is}$. These values cannot be
+obtained trivially from vanilla PostgreSQL; a naive create-analyze-drop cycle is
+computationally prohibitive on wide tables with large candidate pools. We
+resolve this bottleneck in \S\ref{sec:measure} with the Catalog-Mask isolation
+protocol.
+
 \section{Optimization: Sparse MILP with Capacity Levels}
 \label{sec:milp}
+
+This section presents our sparse mixed-integer linear programming (MILP)
+formulation for capacity-aware extended-statistics selection. Building on the
+one-stat-sufficiency surrogate (\S\ref{sec:sparse}), we maximize total error
+reduction under a global storage budget. We describe the decision variables and
+objective, the constraints (including an optional deployment-aware variant),
+and pruning and solver scalability (\S\ref{sec:scale}); the MILP consumes the
+per-candidate cost-benefit measurements $(c_s,e_{is})$ produced by the
+measurement infrastructure of \S\ref{sec:measure}.
 
 \subsection{Variables and Objective}
 
@@ -429,13 +472,19 @@ The MILP enforces: (1) the storage budget $\sum_s c_s y_s\le C$; (2) a statistic
 must exist to be used, $x_{is}\le y_s$ (shared across queries); (3) sparse
 per-query cap $\sum_s x_{is}\le 1$; and (4) capacity-level exclusivity
 $\sum_{\ell} y_{(cols,\ell)}\le 1$ (one level per column-combination). A fifth,
-optional constraint enforces \emph{global disjointness}: $y_a+y_b\le 1$ when
-the column sets of $a,b$ overlap. We evaluate two deployment variants: the model
-\emph{with} (5) --- the \emph{deployment-valid} model, whose pairwise
-column-disjoint set lets the planner's per-candidate predictions compose after
-deployment (\S\ref{sec:p1}) --- and the model \emph{without} it (overlap
-allowed, which optimizes the surrogate more aggressively but may require
-post-selection validation; Option B, \S\ref{sec:disc-fix}).
+optional constraint enforces \emph{global column disjointness}: $y_a+y_b\le 1$
+when the column sets of $a,b$ overlap. We support two solver variants. The
+\emph{disjoint-set variant} enables this optional constraint, producing
+pairwise column-disjoint statistic sets whose per-candidate predictions compose
+after deployment (\S\ref{sec:p1}), at a quantified nominal-quality cost; the
+\emph{unconstrained variant} omits it, optimizing the surrogate more
+aggressively but allowing overlapping statistics whose joint planner effect must
+be checked at deployment.
+
+\textbf{Remark.} We defer the names ``Option-A'' and ``Option-B'' for these two
+deployment modes to \S\ref{sec:disc-fix}, after presenting end-to-end
+deployment evidence; we avoid introducing these aliases before the experimental
+results motivate them.
 
 \subsection{Pruning and Solve Scalability}
 \label{sec:scale}
@@ -459,16 +508,23 @@ optimization is not the bottleneck at full-workload scale --- the phase-1
 \section{Measurement Infrastructure}
 \label{sec:measure}
 
-Our MILP needs a per-candidate, per-capacity q-error $e_{is}$ and size $c_s$
-for every option that survives pruning. We take $c_s$ as the on-disk byte
-size of the candidate's MCV payload --- the serialized list in the
-\texttt{stxmcv} column of its \texttt{pg\_statistic\_ext\_data} row, read with
-\texttt{pg\_column\_size} --- so a coarser capacity is simply a smaller
-serialized list, and a list large enough to be stored out-of-line via the
-oversized-attribute storage technique (TOAST) is
-counted by the same call.
+As established in \S\ref{sec:milp}, our sparse MILP requires per-candidate,
+per-capacity measurements: the on-disk storage cost $c_s$ and the isolated
+q-error $e_{is}$ for every physical statistic
+$s=(\texttt{table},\texttt{columns},\texttt{level})$. We take $c_s$ as the
+serialized MCV payload in the \texttt{stxmcv} column of
+\texttt{pg\_statistic\_ext\_data} (read via
+\texttt{pg\_column\_size}\allowbreak), so a coarser capacity is simply a smaller
+list, and out-of-line (TOAST) storage is counted by the same call. A naive
+create-analyze-drop cycle is computationally intractable on wide tables with
+large candidate pools, so we need an efficient isolation protocol. This section
+introduces \emph{Catalog-Mask (Protocol-M)}: we first recap relevant PostgreSQL
+internals (\S\ref{sec:mechanisms}), demonstrate the infeasibility of naive
+measurement (\S\ref{sec:measure-naive}), describe the protocol
+(\S\ref{sec:measure-mask}), validate its correctness (\S\ref{sec:measure-correct}),
+and analyze measurement cost and granularity (\S\ref{sec:measure-runtime}).
 
-\subsection{How PostgreSQL Uses Extended Statistics (Mechanisms)}
+\subsection{Internal Semantics of PostgreSQL Extended Statistics}
 \label{sec:mechanisms}
 
 Several mechanism facts (verified from the PostgreSQL 16 source) ground the
