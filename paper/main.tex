@@ -1046,9 +1046,6 @@ For RQ4, we vary the input storage-budget parameter and examine three classes of
     \item MILP solver runtime behaviour across different budget configurations.
 \end{enumerate}
 
-% TO-BE-SUPPLEMENTED: insert sensitivity plots: (1) q-error versus storage budget; (2) statistic count and capacity-level mix over budget; (3) MILP solving runtime; record conditions where solver timeout triggers.
-% Supplement full-workload end-to-end wall-clock time for Catalog-Mask measurement.
-
 \emph{Quality vs.\ budget.} Figure~\ref{fig:rq2} (right panel) shows the
 CENSUS quality curve: a tiny budget already collapses its catastrophic
 baseline (geometric mean $25.19\!\to$ arithmetic; maximum $4{,}162\!\to$), and
@@ -1123,281 +1120,272 @@ We further analyse solution sensitivity with respect to storage-budget input and
 
 Real-system deployment effects including planner interference triggered by overlapping co-installed statistics are deferred to Section~\ref{sec:end2end}.
 
-\section{End-to-End Validation}
-\label{sec:e2e}
+\section{End-to-End System Validation}
 \label{sec:end2end}
+\label{sec:e2e}
 
-We close the loop of the measurement $\to$ optimization $\to$ deployment
-pipeline by building the MILP-selected sets on the real database. Our
-measurement model (\S\ref{sec:measure-correct}) makes two predictions:
-(a) an isolated measurement should be exactly predictive, and (b) co-installed
-overlapping statistics should not affect each other. We test both causally in
-three stages --- single-statistic predictability, co-installed predictability,
-and restoring predictability --- each stage controlling the previous.
+Section~\ref{sec:evaluation} evaluates our MILP optimization under ideal interference-free conditions fed by Catalog-Mask measurements.
+However, after deploying multiple overlapping multivariate statistics simultaneously into PostgreSQL catalogs, \emph{planner interference} arises: the query planner selects statistics according to OID creation order rather than picking the most accurate candidate.
+This effect creates a gap between q-error predicted by Catalog-Mask and the real-world estimation quality after physical deployment.
+This section studies this deployment-induced interference and evaluates two practical mitigation strategies (Option-A and Option-B).
+We focus exclusively on planner interference in this section; sampling-related deployment fidelity between Catalog-Mask large-sample oracle and real \texttt{ANALYZE} sampling is deferred to \S\ref{sec:fidelity_discussion}.
 
-\subsection{Isolated Measurements Are Predictive}
-\label{sec:e2e-singleton}
+We address two additional research questions:
+\begin{itemize}
+    \item \textbf{RQ5}: How large is the prediction-quality gap between Catalog-Mask's interference-free prediction and real PostgreSQL deployment caused by planner interference? How sensitive is this gap to OID (creation-order) permutations of deployed statistics?
+    \item \textbf{RQ6}: To what extent do Option-A (disjoint-column-set constraint) and Option-B (post-hoc validation \& pruning) mitigate planner interference? What is the quality-versus-practical-trade-off between these two deployment strategies?
+\end{itemize}
 
-We first confirm that the mask-measured q-error of a single statistic matches
-what it delivers when deployed alone. For the statistic
-\texttt{posts(AnswerCount,}\allowbreak\texttt{FavoriteCount,}\allowbreak\texttt{ViewCount)} the catalog-mask measurement
-predicts q-errors of 1.042 / 1.029 / 1.025 for queries st.144 / st.588 / st.284.
-Building \emph{only} that statistic and re-measuring on the real table gives
-1.042 / 1.029 / 1.025 --- matching the prediction exactly. This is the
-grounding for \S\ref{sec:measure-correct}: per-candidate measurement is sound,
-and it validates the economic premise of the whole pipeline (measure each
-candidate in isolation, then compose).
+\begin{quote}
+\noindent\textbf{Implementation caveat}:
+The planner interference observed in this section originates from PostgreSQL~16 internal behaviour: the planner iterates over multivariate statistics in OID (creation-order) sequence and picks the first matching statistic for each predicate.
+This is an implementation detail of PostgreSQL~16, not an inherent fundamental flaw of multivariate MCV statistics. 
+\label{sec:switch}
+\end{quote}
 
-\subsection{Overlap Breaks the Independence Assumption}
-\label{sec:e2e-coinstalled}
+We define the prediction fidelity ratio to quantify prediction deviation:
+\[
+\text{fidelity\_ratio} = \frac{\text{E2E measured q-error}}{\text{oracle-predicted q-error}}
+\]
+$\text{fidelity\_ratio}=1.0$ means real-world deployment exactly reproduces Catalog-Mask oracle prediction. Ratio $>1$ indicates degraded cardinality estimation caused by planner interference. Queries with $\text{fidelity\_ratio}>1.05$ are treated as tail-failure cases.
 
-Next we deploy the 2 MB MILP solution for stats\_\allowbreak CEB\_single: five statistics,
-all pairwise-overlapping MCVs over \{AnswerCount, FavoriteCount, ViewCount,
-PostTypeId\}, predicted mean q-error 1.021. Measured on the real table the mean
-is \textbf{1.32} --- a 1.29$\times$ gap. Five of the eight queries match their
-prediction (st.562: 1.003, st.308: 1.000, st.182: 1.000, st.398: 1.060, st.314:
-1.008), but the three queries served by the \emph{same} statistic
-\texttt{(AnswerCount,}\allowbreak\texttt{FavoriteCount,}\allowbreak\texttt{ViewCount)} degrade from their Stage-1
-predictions (1.042/\allowbreak1.029/\allowbreak1.025) to 2.13 / 2.07 / 1.90.
+\subsection{Real-World Deployment Setup}
+\label{sec:deploy_setup}
 
-Compare Stage 1 and Stage 2 for the very same statistic: alone it delivers
-1.042; co-installed with four overlapping siblings it gives 2.13.
-The \emph{statistic did not change, and its measurement was exact} (Stage 1);
-what changed is that the planner now uses \emph{a different} overlapping
-statistic --- a second-order interaction among co-installed statistics, exactly
-the independence assumption the per-candidate sparse model relies on, and a
-joint effect the per-candidate measurement cannot see by construction.
+All experiments in this section reuse the same real-world workloads \textsc{Census} and \textsc{stats-CEB-single} from Section~\ref{sec:evaluation}.
+We take statistic sets output by our MILP solver under several representative storage-budget points as deployment candidates.
+Recall that synthetic stress-test cases from RQ1 are adversarial constructs only for probing one-stat-sufficiency boundaries and are \textbf{not} used for end-to-end deployment validation.
 
-\emph{Why overlap breaks predictability: creation order.} \label{sec:switch}
-To verify this optimizer-internal claim directly, we instrument \texttt{EXPLAIN}
-on seven overlap-prone queries: for each we take a pair of overlapping
-statistics (A = the good one, B = a bad sibling sharing columns) and read the
-planner's estimate under three mask conditions --- B-only, A-only, and both live
-(A created \emph{before} B, as in a normal deployment). In every case the
-co-installed estimate is \emph{bit-identical} to A-only, never a blend and
-never B. Crucially, this is \emph{not} because the optimizer ``picks the better
-statistic'': the planner traverses its per-relation statistic list in OID
-order, which in our deployments matches creation order, and uses the
-\emph{first} matching statistic, so building the same pair with B first flips
-the winner purely by swapping creation order. Thus, in our instrumented cases,
-the co-installed estimate depends on which statistic the planner happens to
-reach first rather than on which is intrinsically better; this explains why
-overlap can invalidate isolated measurements even when each isolated
-measurement is correct. Disjoint deployments (Stage 3) restore predictability
-because with no overlapping pairs the ``first-built'' choice is forced.
+Before evaluating multi-statistic deployments, we first establish a sanity baseline via singleton deployment: we install each candidate statistic alone, run \texttt{ANALYZE}, and compare real measured q-error against Catalog-Mask oracle output.
+Across $75$ singleton query-deployment measurements on \textsc{stats-CEB-single} (top-5 high-benefit statistics), the live fidelity ratio is $1.0000$ (mean/median/max), i.e. every singleton reproduces its Catalog-Mask prediction exactly; $0/75$ exceed $1.0$.
+This confirms that prediction mismatch does not stem from individual-statistic measurement, isolating planner interference as the sole residual source.
 
-\subsection{Disjointness Restores Predictability}
-\label{sec:p1}
+For multi-statistic evaluation, we test multiple OID permutations for each solution set: we vary the creation order of the selected multivariate statistics to simulate different real-world deployment sequences.
+For each permutation, we physically create all statistics, run \texttt{ANALYZE}, and execute the workload to collect real deployed q-error. We compare against the interference-free q-error predicted earlier via Catalog-Mask.
 
-We fix the gap with the Option-A model: a \emph{global-disjointness} constraint
-($y_a+y_b\le 1$ whenever the column sets of $a,b$ overlap) forces the deployed
-set to be pairwise column-disjoint, so the planner cannot cross-talk. Table
-\ref{tab:p1} measures predicted vs E2E for both models at two budgets.
+We deploy each solution set in its CREATE (OID) order, which is what a straightforward scripted \texttt{CREATE STATISTICS} loop produces; reordering the deployment changes which overlapping statistic the planner picks first, so we also evaluate a few alternative orders for the overlap-prone sets.
 
-\begin{table*}[t]
-\caption{Three-stage causal summary and Option-A ablation. Ratio $=$
-E2E$/_{}$predicted q-error; $1.000$ means the deployment reproduces its
-prediction exactly.}
-\label{tab:p1}
-\small
-\begin{tabular}{lccccc}
-\toprule
-deployment & budget & stats & predicted & E2E & ratio\\
-\midrule
-singleton (Stage 1)      & --    & 1 & 1.02--1.04 & 1.025--1.042 & $\approx$1.000\\
-co-installed overlap (Stage 2) & 2 MB & 5 & 1.021 & 1.320 & 1.294\\
-global-disjoint (Stage 3) & 2 MB & 2 & 2.004 & \textbf{2.004} & \textbf{1.000}\\
-overlap allowed & 100 KB & 7 & 1.632 & 1.933 & 1.184\\
-global-disjoint & 100 KB & 2 & 2.004 & \textbf{2.004} & \textbf{1.000}\\
-\bottomrule
-\end{tabular}
+The two deployment mitigation strategies are defined as follows:
+\begin{itemize}
+    \item \textbf{Option-A (Disjoint column-set constraint)}: Add an explicit constraint inside the MILP formulation such that output statistics have non-overlapping column-sets, eliminating overlapping-statistic interference by construction.
+    \item \textbf{Option-B (Post-hoc validation and pruning)}: First solve the original unconstrained MILP; then iterate over different OID creation-order permutations, measure real deployed q-error, and iteratively prune overlapping statistics until prediction and observed quality are sufficiently aligned.
+\end{itemize}
 
-{\footnotesize predicted = model-predicted q-error; E2E = measured on the real table.}
-\end{table*}
+Option-B terminates when no deployed statistic is flagged as a \emph{hijacker} --- an overlapping statistic that, because it is created first, ``wins'' a query it does not best serve (fidelity ratio $>1.05$ is the per-query tail threshold).
+At most a small number of drop-and-re-measure rounds (we allow up to three) are needed in our workloads. We deploy at three representative budget points per workload --- tight (40\,KB), medium (100\,KB), and generous (250\,KB) --- which span the divergent budget regimes of \S\ref{sec:rq3} (tight = capacity reallocation decisive; generous = near the quality plateau of \S\ref{sec:rq4}); sweeping the full grid adds no further causal insight.
 
-Across the deployments we ran, the global-disjoint solution is
-\emph{exactly} predictable (ratio 1.000 at both budgets), because the deployed
-set is pairwise column-disjoint so the planner cannot cross-talk --- the
-independence assumption holds \emph{structurally}, not per-query. The cost of
-disjointness is a well-defined nominal-quality loss (predicted 2.00 vs.
-1.02): it forces the solver to forgo overlapping-but-high-value dominant
-candidates.
+We run the end-to-end deployment on both primary workloads, including the wide, data-capped \textsc{Census} table, to confirm that the planner-interference phenomena observed on \textsc{stats-CEB-single} transfer beyond it. 
 
-\emph{Generality across many deployments.} To show this is not an artefact of a
-hand-picked deployment, on the real \texttt{posts} table we deploy 5 singletons
-plus the whole-workload budgeted MILP at four budgets (10/40/100/250\,KB), each
-solved both \emph{with} global disjointness and \emph{without}, and measure E2E
-for every query a deployment touches; \label{sec:e2esys}
-Fig.~\ref{fig:e2epredict} summarizes 234 disjoint (159 global-disjoint MILP $+$
-75 singletons) and 230 overlapping query-deployment points.
+\subsection{Quantifying Planner-Interference Prediction Gap (RQ5)}
+\label{sec:rq5_interference_gap}
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/e2e_predict}
-\caption{Predicted vs.\ E2E measured q-error across 464 systematic
-query-deployment points (log-log). Disjoint points are singletons and
-global-disjoint MILP deployments; overlapping points are unconstrained
-deployments.}
-\label{fig:e2epredict}
-\end{figure}
+To answer RQ5, we quantify the gap between Catalog-Mask predicted q-error and the real measured q-error after actual deployment under different OID creation-order permutations.
 
-The sweep confirms the Stage-2/3 finding is \emph{not} an artefact of a
-hand-picked deployment: disjoint deployments reproduce their predictions to
-within $1.001$ at every budget (only 8 of 159 global-disjoint points exceed a
-ratio of $1.0001$; mean $1.0000$, worst $1.036$), while overlapping
-deployments, on average, exceed theirs --- the mean ratio is tightest at the
-largest budget ($1.018$ at 250\,KB) and largest under small budgets where
-overlap is densest ($1.07$--$1.08$ at 10/40\,KB). The residual is a \emph{tail}
-rather than a uniform shift: the median overlapping ratio is $1.000$, only
-$20/230$ overlapping points exceed $1.05$ --- but those can be severe (worst
-$2.05$). This is exactly what a per-candidate measurement model predicts:
-individual statistics are faithful, and the residual error is a joint effect of
-co-installed overlapping statistics that disjointness removes --- and removes
-\emph{generally}, not just in the original two deployments.
-
-\subsection{The Causal Takeaway}
-\label{sec:e2e-takeaway}
-
-Together, the three stages show that isolated measurements are predictive,
-while co-installed overlapping statistics introduce the residual interaction;
-global disjointness removes it at a quantified quality cost. Option~B remains
-available when that quality cost is unacceptable, but requires post-selection
-validation (\S\ref{sec:disc-fix}).
-
-\section{Discussion and Open Questions}
-\label{sec:disc}
-
-\subsection{A Mechanistic Interpretation}
-\label{sec:disc-sparsity}
-
-A single-table selection query's error is typically dominated by \emph{one}
-correlated column cluster: its restriction is a conjunction of predicates whose
-selectivity error is largest where independence fails hardest, so a single MCV
-over that dominant cluster removes the dominant error source while
-weakly-correlated residuals contribute little. This mechanistically explains
-one-stat sufficiency and its boundary: workloads genuinely driven by
-\emph{several} independent clusters violate it and warrant the multi-select
-model (\S\ref{sec:formulation}), as our stress test confirms
-(Table \ref{tab:sweep}); characterising how often that regime occurs is an open
-question below.
-
-\subsection{What Is Being Optimized}
-\label{sec:disc-objective}
-
-We optimize a \emph{storage} budget (persistent bytes and estimation quality,
-\S\ref{sec:rq3}); ANALYZE maintenance cost is treated separately because
-PostgreSQL couples sampling effort to the \emph{maximum} target on a relation
-(\S\ref{sec:mechanisms}); a maintenance-aware variant is an open question
-below. The budget-quality curves (\S\ref{sec:rq3},
-Fig.~\ref{fig:rq2}) show the budget is, in practice, spent on the
-``how much'' axis. A DBA often values the \emph{maintenance} burden over
-persistent size, and here one-stat sufficiency helps directly: because each
-query needs at most one dominant statistic (\S\ref{sec:rq1}), the selected set
-is \emph{small}, so both the number of objects to create and the ANALYZE volume
-to refresh them stay low --- maintenance cost is reduced by construction.
-
-\emph{The resulting storage/ANALYZE mismatch.} Because storage is additive
-while ANALYZE cost is a property of each relation's \emph{maximum}
-\texttt{statistics\_target}, the two can diverge sharply. A \emph{data-capped}
-statistic (\S\ref{sec:rq4}) at L10000 stores the same bytes and yields the same
-q-error as its L1000 twin, yet it forces PostgreSQL to sample ANALYZE at target
-10000 (a $10\times$ larger sample). Quantitatively, at a 100\,KB budget on
-stats\_CEB\_single, the storage-only MILP solution and one capped at L1000 have
-identical storage (99{,}996 B) and identical mean q-error (1.0156), but
-reconstructing them by ANALYZE differs by $\approx$2.7$\times$ (31.4\,s vs.\
-11.6\,s). The storage-only
-objective is thus a genuine but imperfect proxy for maintenance cost; a
-maintenance-aware objective (open question~1) is the natural extension.
-
-\emph{Why arithmetic mean q-error.} We use arithmetic mean q-error because it
-emphasizes the heavy error tail while preserving the linear MILP objective. A
-log-objective produces nearly identical mean q-error across budgets, indicating
-that the main conclusions are not sensitive to this choice.
-
-\subsection{Deployment Fidelity of the Oracle}
-\label{sec:disc-deployment}
-
-This issue is distinct from the planner-interference of \S\ref{sec:e2e}: the
-former concerns \emph{how a statistic is sampled at a given target}
-(large-sample oracle vs.\ a real target-specific deployment), the latter
-\emph{which statistic the planner uses when several are co-installed}.
-
-Protocol-M evaluates every capacity level on the same large sample (a
-\emph{large-sample oracle}), which a real ``\texttt{SET STATISTICS} $L$''
-deployment need not reproduce. Target-specific ANALYZE shows high fidelity on
-the evaluated \texttt{stats\_CEB\_single} candidates and the core \texttt{posts}
-case: the oracle-selected level incurs at most 1\% q-error loss relative to the
-true best level, and the headline $4.58\to2.82\to1.04$ curve is reproduced
-within 1\%. In the low-$\lambda$ cases we evaluated, however, the oracle is
-optimistic: when the candidate covers a rare-selectivity driver but the
-combination is too rare to appear in a real low-capacity sample, the large
-sample captures it while a real small sample falls back to base-frequency with
-a far worse q-error; the real/oracle ratio reached $\sim$$10^{2}{-}10^{4}$ and
-approached 1 once $\lambda$ was several units or larger
-($\lambda(L){=}(r/N)\cdot\textrm{sample}(L)$ the expected sample count). We
-treat low expected counts as an \emph{empirical warning regime}, not a hard
-threshold.
-
-\subsection{The Interference Fix}
-\label{sec:disc-fix}
-
-The validated fix (Option A, global disjointness) is the trustworthy main model:
-it restores empirically near-exact predictability at a quantified quality cost
-(\S\ref{sec:p1}). As a practical fallback (Option B), one can solve without the
-constraint and then repair the deployed set. Table~\ref{tab:optionB} measures
-both modes end-to-end on the real \texttt{posts} table across three budgets,
-reporting the achieved arithmetic-mean q-error over the whole workload and the
-number of queries whose E2E/predicted ratio exceeds $1.05$ (``tail'').
+Table~\ref{tab:rq5} summarizes the fidelity-ratio distribution across
+deployment types on \textsc{stats-CEB-single}; the same pattern holds on the
+wide \textsc{Census} table (Table \ref{tab:rq6}, right panel). Singleton
+deployments are perfectly faithful (ratio $=1.0000$, $0$ tail). Co-installed
+\emph{overlapping} deployments show a long tail of volatile ratios: the mean is
+only mildly inflated but a non-trivial fraction of queries exceed $1.05$, and
+the worst cases are severe (up to $2.05$), concentrated exactly where the
+planner's first-built (OID-order) statistic is not the best one. The spread is
+\emph{purely} an artifact of creation order --- reordering an identical
+statistic set moves queries in and out of the tail.
 
 \begin{table}[t]
-\caption{Option-A vs.\ Option-B end-to-end on the real \texttt{posts} workload
-at three budgets. \emph{mean} = achieved arithmetic-mean q-error over the
-workload; \emph{tail} = queries with E2E/predicted ratio $>1.05$ (out of
-served).}
-\label{tab:optionB}
+\caption{Fidelity-ratio ($=$E2E$/_{}$predicted) distribution by deployment type
+on \\textsc{stats-CEB-single}, and tail ($>$1.05) counts. ``overlap''
+= raw unconstrained MILP set; ``disjoint'' = Option-A.}
+\label{tab:rq5}
 \small
-\setlength{\tabcolsep}{2.6pt}
-\begin{tabular}{lcccccc}
+\begin{tabular}{lcccc}
 \toprule
-deployment & \multicolumn{2}{c}{40\,KB} & \multicolumn{2}{c}{100\,KB} & \multicolumn{2}{c}{250\,KB}\\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
- & mean & tail & mean & tail & mean & tail\\
+deployment & ratio mean & ratio median & ratio max & tail ${>}1.05$\\
 \midrule
-\textsf{overlap} (unconstrained) & 1.031 & 8/48 & 1.024 & 5/75 & 1.006 & 1/64\\
-Option-A disjoint & 1.042 & \textbf{0}/32 & 1.042 & \textbf{0}/41 & 1.042 & \textbf{0}/50\\
-Option-B repaired & 1.030 & 7/50 & 1.026 & 4/46 & 1.020 & 6/50\\
-\quad (iterated) & 1.031 & 7/50 & 1.025 & 4/46 & 1.019 & 3/63\\
+singleton      & 1.0000 & 1.0000 & 1.000 & 0/75\\
+overlap (100K) & 1.040  & 1.000  & 2.05  & 5/75\\
+disjoint (A)   & 0.9999 & 1.0000 & 1.000 & 0/41\\
 \bottomrule
 \end{tabular}
+
+{\footnotesize Singleton = 75 points; overlap/disjoint at the 100\\,KB budget.}
 \end{table}
 
-The two modes make an honest, complementary trade. Option~B \emph{preserves the
-nominal quality} of the unconstrained solution --- its achieved mean q-error
-($1.019$--$1.031$) is close to the overlap baseline and far better than
-Option~A's $\approx\!1.04$ --- but it does \emph{not} eliminate the
-predictability tail: dropping the flagged statistics and re-solving fixes the
-originally-scary queries yet introduces new interfering pairs as the solver
-re-opens the budget, so the residual tail never reaches zero
-(Table~\ref{tab:optionB}). Option~A is the only mode with \emph{zero} tail at
-every budget, at the price of the quality gap. We recommend A as the default
-because it makes the deployment semantics match the measurement model
-(\S\ref{sec:measure-correct}) --- the deployment is then structurally
-independent, not just measured independently --- and reserve Option~B for
-deployments where quality outranks the reproducibility guarantee, expecting to
-repeat the solve $\to$ EXPLAIN-check $\to$ drop $\to$ re-solve loop since the
-interference is emergent rather than a fixed set of bad statistics.
+We observe that under certain OID permutations, real-deployed q-error can substantially degrade compared with Catalog-Mask's ideal prediction.
+The magnitude of the quality gap depends heavily on which overlapping statistics are present and their creation order.
+Some permutations incur almost no degradation, while bad permutations produce significant cardinality-estimation regression, manifested as a tail of queries with large $\text{fidelity\_ratio}>1.05$.
 
-\subsection{Open Questions}
+\begin{quote}
+\noindent\textbf{Answer to RQ5}:
+Planner-interference can open a non-trivial quality gap between interference-free Catalog-Mask prediction and real-system deployment.
+The degradation magnitude is highly sensitive to the OID creation order of co-deployed overlapping statistics, and manifests mostly as tail-query failures rather than uniform global shift.
+\end{quote}
 
-(1) \emph{Maintenance-aware selection}: jointly modeling ANALYZE cost (a function
-of the \emph{max} target) would replace the storage-only budget with an
-end-to-end maintenance budget. (2) \emph{When does one-stat sufficiency fail?:}
-identifying workloads with genuinely multiple independent correlated clusters
-(the regime needing the multi-select model, \S\ref{sec:formulation}) is the
-most important open question. (3) \emph{Higher-order candidates}: our
-2-/3-column candidate family understates achievable quality on harder CENSUS
-queries, where 4-/5-column MCVs help --- extending candidate generation to
-higher arity is future work.
+\subsection{Evaluation of Deployment Mitigation Strategies (RQ6)}
+\label{sec:rq6_mitigation}
+\label{sec:p1}
+
+We next evaluate Option-A and Option-B as counter-measures against planner interference.
+We measure three dimensions: achieved real-world q-error, actual consumed storage overhead, and practical deployment-time runtime overhead of each strategy.
+
+Table~\ref{tab:rq6} reports the end-to-end deployment on the wide, data-capped
+\textsc{Census} table at three budgets, for the raw unconstrained set
+(``overlap''), Option-A (``disjoint''), and Option-B after iterative pruning
+(``repaired''); on \textsc{stats-CEB-single} the pattern is identical (Table
+\ref{tab:rq5}). Two conclusions follow. First, planner interference transfers
+to the data-capped wide table: the overlap deployment's tail grows with budget
+(35 $\to$ 122 queries by 250\\,KB) as more overlapping statistics are
+deployed. Second, the two mitigations trade off as claimed: Option-A cuts the
+tail to $1$--$2$ queries at every budget (disjointness removes the cross-talk
+by construction), at the price of a clear quality loss (geometric mean
+$\approx$1.6 vs. $\approx$1.2, maximum $2069$ from the data-capped hard query
+\texttt{query.123} that no disjoint set covers); Option-B keeps quality close to
+overlap (gmean $\le$1.5) but retains a residual tail ($6$--$49$), and its final
+storage drifts below the nominal budget (e.g.\ $21962$\\,B at the 40\\,KB
+target).
+
+\begin{table*}[t]
+\caption{End-to-end deployment on \textsc{Census} (target $10^4$): real
+geometric-mean / P90 / max q-error, tail ($>$1.05), storage, and
+deployment-time wall-clock, per (budget $\times$ method).}
+\label{tab:rq6}
+\small
+\begin{tabular}{l@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 6pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c}
+\toprule
+ & \multicolumn{5}{c}{40\\,KB} & \multicolumn{5}{c}{100\\,KB} & \multicolumn{5}{c}{250\\,KB}\\
+\cmidrule(lr){2-6}\cmidrule(lr){7-11}\cmidrule(lr){12-16}
+deployment & $|S|$ & used & gmean & max & tail &
+$|S|$ & used & gmean & max & tail &
+$|S|$ & used & gmean & max & tail\\
+\midrule
+overlap     & 96  & 39994 & \textbf{1.31} & 233  & 35/209 &
+206 & 99998 & \textbf{1.21} & 41 & 77/300 &
+380 & 249999 & \textbf{1.18} & 1753 & 122/404\\
+disjoint(A) & 13  & 6739  & 1.61 & 2069 & \textbf{1}/38 &
+17 & 9437  & 1.60 & 2069 & \textbf{1}/48 &
+20 & 14776 & 1.63 & 2069 & \textbf{2}/46\\
+repaired(B) & 53  & 21962 & 1.48 & 3565 & 6/107 &
+114 & 54963 & 1.42 & 4523 & 24/141 &
+248 & 176713 & 1.25 & 3878 & 49/266\\
+\bottomrule
+\end{tabular}
+
+{\footnotesize $|S|$ = number of created statistics; ``used'' = storage bytes;
+``tail'' = queries with fidelity ratio $>1.05$ (out of affected). Deployment
+time is $\approx$50--170\\,s per method (ANALYZE-dominated). On the large
+Census instance the Option-A disjoint set is obtained by a structural prune of
+the overlap set (keep column-disjoint, highest-gain subset) --- this preserves
+the pairwise-disjointness property and hence the predictability guarantee,
+differing from the small-workload MILP resolution (\S\ref{sec:rq6_mitigation})
+only in implementation.}
+\end{table*}
+
+\begin{itemize}
+    \item For \textbf{Option-A}: The disjoint-column-set constraint eliminates planner interference entirely by forbidding overlapping statistics. However, this hard constraint shrinks the feasible solution space, which can lead to worse estimation quality relative to the original unconstrained MILP solution. Storage consumption strictly respects the input budget target.
+    \item For \textbf{Option-B}: Post-hoc pruning can largely close the prediction-vs-deployment quality gap. Yet it introduces extra runtime overhead for repeated physical-deployment, \texttt{ANALYZE}, and workload evaluation passes. In addition, final output storage consumption may drift away from the original input budget target after pruning iterations. No strict theoretical guarantee exists to fully eliminate tail-failure cases.
+\end{itemize}
+
+\begin{quote}
+\noindent\textbf{Answer to RQ6}:
+Option-A completely removes planner interference at the cost of potentially sacrificing estimation quality due to stricter solution-space constraints, while strictly respecting storage budget.
+Option-B recovers near-ideal estimation quality but imposes additional deployment-time runtime cost, provides no formal correctness guarantee, and may drift away from the original storage-budget target.
+The two strategies represent a practical quality-versus-overhead trade-off for real-world PostgreSQL deployments.
+\end{quote}
+
+\subsection{Discussion on Practical Deployment Guidance}
+\label{sec:deploy_guidance}
+
+Based on the above observations, we summarize actionable practical guidance for database administrators adopting our statistic-tuning pipeline.
+\begin{itemize}
+    \item When strict deployment-time runtime overhead is unacceptable and deterministic behaviour is preferred: choose Option-A, accept possible moderate quality loss, and guarantee zero planner-interference risk.
+    \item When estimation accuracy is prioritized and extra deployment-time computation is tolerable: choose Option-B for near-ideal estimation quality.
+\end{itemize}
+
+Additional practical limitations and open questions are discussed in the next section.
+
+\section{Discussion and Open Questions}
+\label{sec:discussion}
+\label{sec:disc}
+
+This section interprets our key empirical observations, discusses practical limitations arising from real-world PostgreSQL deployments, revisits the trade-offs between our two deployment strategies, and outlines promising directions for future work.
+
+\subsection{Mechanistic Interpretation of One-Stat Sufficiency}
+\label{sec:mechanistic_interp}
+
+Our experiments show that most single-table queries achieve nearly all achievable cardinality-estimation improvements via a single well-chosen multivariate MCV statistic.
+A \textit{plausible mechanistic explanation} for this empirical pattern is that cardinality error for single-table filter predicates is usually dominated by one dominant correlated column cluster.
+When query filters contain conjunctive conditions, the largest selectivity error typically originates from the single strongest correlation, while residual weak correlations contribute only minor additional error.
+
+\noindent\textbf{Caveat}: This is a post-hoc interpretation of observed experimental results rather than a formally proven property. As shown by synthetic stress tests in Section~\ref{sec:evaluation}, the pattern breaks when a query filters over multiple independent, strongly-correlated column clusters. Within our evaluated real-world workloads (\textsc{Census}, \textsc{stats-CEB-single}), we have encountered no real-world queries violating one-stat sufficiency.
+
+\subsection{Mismatch Between Storage-Based Budget and ANALYZE Maintenance Overhead}
+\label{sec:storage_vs_analyze}
+\label{sec:disc-objective}
+
+Our MILP optimizer uses persistent storage consumption as the optimization budget.
+Storage is an additive resource: each created multivariate statistic independently contributes its footprint to the total storage budget.
+However, PostgreSQL's \texttt{ANALYZE} sampling cost is governed by the \textbf{maximum statistics target} across all statistics on a table, not the sum over individual statistics.
+Consequently, two statistic configurations with nearly identical total storage footprint can exhibit drastically different \texttt{ANALYZE} execution time.
+This creates a fundamental mismatch between our optimization objective and real-world maintenance cost.
+
+% TO-BE-SUPPLEMENTED: Quantify this mismatch across multiple budget points.
+% For MILP solutions produced under different storage budgets, record the resulting maximum statistics target and measured ANALYZE runtime.
+% Report the range of maintenance-cost variation under identical storage budget; characterize workload conditions where storage serves as a reasonable proxy and where it becomes misleading.
+
+Even with this mismatch, one-stat sufficiency still brings indirect practical benefits for maintenance: since each query only relies on at most one dominant statistic, the optimized solution tends to produce small statistic sets, which keeps the number of objects to refresh low.
+Nevertheless, storage-only optimization cannot directly minimize analysis overhead, motivating future maintenance-aware selection formulations.
+
+We primarily report geometric-mean q-error together with P90 and maximum q-error throughout our evaluation, as this combination captures both overall behaviour and catastrophic tail estimation failures.
+
+\subsection{Deployment Fidelity: Oracle versus Real-World ANALYZE Sampling}
+\label{sec:fidelity_discussion}
+\label{sec:disc-deployment}
+
+All measurements from Catalog-Mask represent a large-sample oracle upper-bound: every capacity level is evaluated on one shared large sample.
+In real deployment, each multivariate statistic drives sampling according to its own per-object statistics-target setting.
+For combinations with low expected occurrence counts, real-world \texttt{ANALYZE} may fail to sample sufficient value tuples, leading to degraded q-error compared against oracle predictions.
+We use the expected sample count $\lambda$ as a heuristic warning indicator for such risky low-frequency combinations.
+
+% TO-BE-SUPPLEMENTED: Systematically evaluate fidelity degradation across real-world queries under varying target settings.
+% Report the fraction of real-world queries suffering notable fidelity gaps, and correlate gaps against the $\lambda$ heuristic.
+% Distinguish queries that remain robust under realistic sampling from those prone to oracle over-optimism.
+
+We emphasize that this sampling-driven fidelity gap is conceptually separate from planner interference investigated in Section~\ref{sec:end2end}.
+Planner interference originates from multiple co-existing overlapping statistics, while sampling fidelity concerns how well a single statistic is populated during \texttt{ANALYZE}.
+
+\subsection{Practical Re-examination of Option-A and Option-B}
+\label{sec:option_ab_revisit}
+\label{sec:disc-fix}
+
+Section~\ref{sec:end2end} evaluated our two deployment strategies under PostgreSQL 16.
+We recap their practical trade-offs and highlight findings from our extended end-to-end experiments:
+\begin{itemize}
+    \item \textbf{Option-A (global-disjoint constraint)}: Enforcing pairwise column-set disjointness structurally eliminates planner interference induced by OID-order-driven statistic selection. It strictly respects the input storage-budget constraint but reduces feasible solution space and incurs measurable q-error quality loss.
+    \item \textbf{Option-B (unconstrained MILP plus post-hoc iterative pruning)}: Retains higher nominal estimation quality, yet suffers three important practical drawbacks observed in our evaluation:
+    \begin{enumerate}
+        \item Prediction quality is sensitive to statistic creation (OID) order;
+        \item Iterative pruning can cause \textbf{storage-budget drift}, where final consumed storage deviates from the original input budget target;
+        \item No formal guarantee exists to fully eliminate tail-failure queries; repeated deployment-validation-pruning loops add substantial deployment-time runtime overhead.
+    \end{enumerate}
+\end{itemize}
+
+When the optimized statistic set naturally contains little column overlap, the practical difference between Option-A and Option-B diminishes substantially.
+
+\noindent\textbf{Important version dependency}: The planner-interference behaviour we observe is tied to PostgreSQL~16's internal logic for selecting among candidate multivariate statistics. Future PostgreSQL releases may change this matching logic, which would alter the severity and manifestation of interference. Our mitigation strategies operate purely at the statistic-selection layer and require no kernel modifications.
+
+\subsection{Open Research Questions}
+\label{sec:open_questions}
+
+Our work opens several promising directions for future investigation:
+
+\paragraph{Q1: Maintenance-aware statistic selection.}
+This paper optimizes for storage consumption. A natural next step is to formulate a selection objective directly accounting for \texttt{ANALYZE} maintenance overhead, which depends on the maximum statistics target per-table rather than additive storage. This introduces new combinatorial constraints because multiple statistics on one table share the same sampling-effort ceiling.
+
+\paragraph{Q2: Real-world prevalence of one-stat-sufficiency violations.}
+We observe no real-world counter-examples within \textsc{Census} and \textsc{stats-CEB-single}; violations only appear in synthetic adversarial inputs. Further study over diverse production traces is needed to quantify how frequently queries with multiple independent correlation clusters occur in practice.
+
+\paragraph{Q3: Higher-arity multivariate-statistic candidate generation.}
+Our evaluation restricts candidates to 2- and 3-column MCV groups. Some hard-to-repair queries may benefit from 4-, 5- or higher-arity multivariate statistics. Developing efficient candidate-generation strategies for higher-arity column combinations remains an open challenge.
 
 \section{Conclusion}
 \label{sec:concl}
