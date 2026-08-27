@@ -1498,6 +1498,21 @@ We observe no real-world counter-examples within \textsc{Census} and \textsc{sta
 \paragraph{Q3: Higher-arity multivariate-statistic candidate generation.}
 Our evaluation restricts candidates to 2- and 3-column MCV groups. Some hard-to-repair queries may benefit from 4-, 5- or higher-arity multivariate statistics. Developing efficient candidate-generation strategies for higher-arity column combinations remains an open challenge.
 
+\paragraph{Q4: Query-internal cluster decomposition for sufficiency-violating workloads.}
+One potential extension for workloads violating one-stat sufficiency is
+\emph{query-internal cluster decomposition}: decompose a query containing
+multiple independent correlation clusters into several sub-problems, where each
+sub-problem corresponds to one individual correlated cluster and obeys one-stat
+sufficiency. We could optimize candidate statistics for each decomposed cluster
+separately, and combine the resulting candidates under the global storage
+budget. Nevertheless, this extension introduces non-trivial new challenges:
+automatic detection of independent correlation clusters from the
+schema-workload is non-trivial; merging per-cluster candidates may
+re-introduce overlapping statistics and planner interference; furthermore,
+local per-cluster optimality does not guarantee global optimality under a
+shared storage budget. For these reasons we leave this end-to-end
+decomposition-and-merge pipeline as future work.
+
 \section{Conclusion}
 \label{sec:concl}
 
