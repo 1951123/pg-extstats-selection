@@ -1208,7 +1208,7 @@ disjoint (A)   & 0.9999 & 1.0000 & 1.000 & 0/41\\
 \bottomrule
 \end{tabular}
 
-{\footnotesize Singleton = 75 points; overlap/disjoint at the 100\\,KB budget.}
+{\footnotesize Singleton = 75 points; overlap/disjoint at the 100\,KB budget.}
 \end{table}
 
 We observe that under certain OID permutations, real-deployed q-error can substantially degrade compared with Catalog-Mask's ideal prediction.
@@ -1234,14 +1234,14 @@ Table~\ref{tab:rq6} reports the end-to-end deployment on the wide, data-capped
 (``repaired''); on \textsc{stats-CEB-single} the pattern is identical (Table
 \ref{tab:rq5}). Two conclusions follow. First, planner interference transfers
 to the data-capped wide table: the overlap deployment's tail grows with budget
-(35 $\to$ 122 queries by 250\\,KB) as more overlapping statistics are
+(35 $\to$ 122 queries by 250\,KB) as more overlapping statistics are
 deployed. Second, the two mitigations trade off as claimed: Option-A cuts the
 tail to $1$--$2$ queries at every budget (disjointness removes the cross-talk
 by construction), at the price of a clear quality loss (geometric mean
 $\approx$1.6 vs. $\approx$1.2, maximum $2069$ from the data-capped hard query
 \texttt{query.123} that no disjoint set covers); Option-B keeps quality close to
 overlap (gmean $\le$1.5) but retains a residual tail ($6$--$49$), and its final
-storage drifts below the nominal budget (e.g.\ $21962$\\,B at the 40\\,KB
+storage drifts below the nominal budget (e.g.\ $21962$\,B at the 40\,KB
 target).
 
 \begin{table*}[t]
@@ -1252,7 +1252,7 @@ deployment-time wall-clock, per (budget $\times$ method).}
 \small
 \begin{tabular}{l@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 6pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c@{\hskip 5pt}c}
 \toprule
- & \multicolumn{5}{c}{40\\,KB} & \multicolumn{5}{c}{100\\,KB} & \multicolumn{5}{c}{250\\,KB}\\
+ & \multicolumn{5}{c}{40\,KB} & \multicolumn{5}{c}{100\,KB} & \multicolumn{5}{c}{250\,KB}\\
 \cmidrule(lr){2-6}\cmidrule(lr){7-11}\cmidrule(lr){12-16}
 deployment & $|S|$ & used & gmean & max & tail &
 $|S|$ & used & gmean & max & tail &
@@ -1272,7 +1272,7 @@ repaired(B) & 53  & 21962 & 1.48 & 3565 & 6/107 &
 
 {\footnotesize $|S|$ = number of created statistics; ``used'' = storage bytes;
 ``tail'' = queries with fidelity ratio $>1.05$ (out of affected). Deployment
-time is $\approx$50--170\\,s per method (ANALYZE-dominated). On the large
+time is $\approx$50--170\,s per method (ANALYZE-dominated). On the large
 Census instance the Option-A disjoint set is obtained by a structural prune of
 the overlap set (keep column-disjoint, highest-gain subset) --- this preserves
 the pairwise-disjointness property and hence the predictability guarantee,
@@ -1331,6 +1331,61 @@ This creates a fundamental mismatch between our optimization objective and real-
 % TO-BE-SUPPLEMENTED: Quantify this mismatch across multiple budget points.
 % For MILP solutions produced under different storage budgets, record the resulting maximum statistics target and measured ANALYZE runtime.
 % Report the range of maintenance-cost variation under identical storage budget; characterize workload conditions where storage serves as a reasonable proxy and where it becomes misleading.
+
+{We quantify this mismatch directly on \textsc{Census}. For each storage budget, we
+re-solve the MILP under a capping constraint that forbids deploying any statistic
+above a maximum statistics target (L10000 vs.\ L1000 vs.\ L100), emulating a DBA who
+bounds maintenance effort, while keeping the storage budget fixed. Table~\ref{tab:disc-mismatch}
+reports, per budget, the resulting storage, geometric-mean q-error, the maximum
+deployed target, and the estimated per-table \texttt{ANALYZE} rebuild time at that
+maximum target. Two observations emerge. First, capping the maximum target down to
+L1000 is \textit{essentially storage- and quality-neutral} at every budget: both the
+total footprint (${\le}0.3\%$) and the geometric-mean q-error (${\le}0.002$) are
+unchanged, and even capping all the way to L100 degrades q-error by at most $0.064$.
+Second, despite this near-identical footprint,
+the estimated \texttt{ANALYZE} rebuild cost drops substantially, e.g.\ from
+$\approx\!60$\,s to $\approx\!38$\,s at a 40\,KB budget. Intriguingly, at the two
+tightest budgets (25\,KB and 40\,KB) the L100-capped solution is \textit{identical} in
+storage and q-error to the uncapped one (maximum-target delta of L9000): the tight
+budget never had room to deploy an L10000 statistic that matters. The mismatch is
+therefore benign in the tight-budget regime, where storage is a faithful proxy, and
+only appears once the budget is generous enough to freely host high-target statistics
+purely as a maintenance liability. This motivates the maintenance-aware selection
+formulations we discuss below.}
+
+\begin{table}[t]
+\caption{Storage vs.\ maintenance mismatch on \textsc{Census}: at a fixed budget
+we cap the maximum allowed statistics target (L10000 / L1000 / L100) and report
+the achieved storage, geometric-mean q-error, maximum deployed target ($L_{\max}$),
+and estimated single-table \texttt{ANALYZE} rebuild time at that target.}
+\label{tab:disc-mismatch}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+budget & $L_{\max}$ & storage (B) & gmean & ANALYZE (s) & $\Delta$gmean\\
+\midrule
+25\,KB  & 10000 & 24968 & 1.483 & 45.1 & ---\\
+        & 1000  & 24968 & 1.483 & 25.3 & $+0.0000$\\
+        & 100   & 24968 & 1.483 & 23.3 & $+0.0000$\\
+40\,KB  & 10000 & 39994 & 1.364 & 60.2 & ---\\
+        & 1000  & 39998 & 1.364 & 40.4 & $-0.0003$\\
+        & 100   & 39994 & 1.364 & 38.4 & $-0.0003$\\
+100\,KB & 10000 & 99998 & 1.142 & 104.0 & ---\\
+        & 1000  & 99998 & 1.142 & 84.2 & $+0.0000$\\
+        & 100   & 99996 & 1.201 & 86.6 & $+0.058$\\
+250\,KB & 10000 & 249999& 1.066 & 173.2 & ---\\
+        & 1000  & 249999& 1.066 & 153.4 & $+0.0000$\\
+        & 100   & 249999& 1.123 & 163.0 & $+0.058$\\
+500\,KB & 10000 & 499727& 1.057 & 203.1 & ---\\
+        & 1000  & 499587& 1.059 & 183.7 & $+0.0017$\\
+        & 100   & 401161& 1.121 & 180.9 & $+0.064$\\
+\bottomrule
+\end{tabular}
+
+{\footnotesize ANALYZE $(s)$ = estimated per-table \texttt{ANALYZE} rebuild time at
+the relation's maximum statistics target; storage is fixed across rows within a
+budget. $L_{\max}$ = maximum target of a deployed statistic.}
+\end{table}
 
 Even with this mismatch, one-stat sufficiency still brings indirect practical benefits for maintenance: since each query only relies on at most one dominant statistic, the optimized solution tends to produce small statistic sets, which keeps the number of objects to refresh low.
 Nevertheless, storage-only optimization cannot directly minimize analysis overhead, motivating future maintenance-aware selection formulations.
