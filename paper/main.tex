@@ -1416,6 +1416,59 @@ We use the expected sample count $\lambda$ as a heuristic warning indicator for 
 % Report the fraction of real-world queries suffering notable fidelity gaps, and correlate gaps against the $\lambda$ heuristic.
 % Distinguish queries that remain robust under realistic sampling from those prone to oracle over-optimism.
 
+To quantify this degradation, we express the expected sample count as
+$\lambda=p_{\mathrm{comb}}\cdot\mathrm{sample\_rows}(L)$ and measure the
+fidelity ratio $\rho=\mathrm{qerr}_{\mathrm{true}}/\mathrm{qerr}_{\mathrm{mask}}$
+(the real deployed q-error over the Catalog-Mask oracle) across a sweep of
+$\lambda$. Table~\ref{tab:fidelity-lambda} reports this sweep on \textsc{Census}
+for a rare driver combination whose true cardinality is $13$ among $2.46$M rows
+($p_{\mathrm{comb}}\approx5\times10^{-6}$). The transition is sharp and
+systematic: at $\lambda=0.16$ the real q-error is \emph{$224\times$} the oracle
+prediction; the gap shrinks monotonically as $\lambda$ grows and closes entirely
+by $\lambda\approx5$ ($\rho=1.1$) --- for $\lambda\ge10$ the real deployment
+reaches the oracle exactly. The same divergence-to-convergence shape reproduces
+across all three candidate statistics we tested, confirming it is a mechanistic
+property of the combination-to-sampling path rather than a single-query
+artifact.
+
+Crucially, the $\lambda$ threshold cleanly separates the two query populations
+we seek to distinguish. For \emph{high-occurrence} combinations, $\lambda$ is
+abundant and fidelity is robust at every practical target: on
+\textsc{stats-CEB-single}, single-statistically deploying a frequent
+\texttt{posts} combination (AnswerCount, FavoriteCount) yields $\rho=1.0000$ for
+all 15 queries at every target from L25 to L10000 (75 points, zero gaps). In
+contrast, \emph{rare} combinations ($\lambda\le1$) are precisely the ones
+prone to oracle over-optimism: their true q-error can be orders of magnitude
+above the Catalog-Mask prediction. $\lambda$ therefore serves as a valid,
+cheaply computable warning heuristic: deployments with abundant $\lambda$ inherit
+the oracle's accuracy, while combinations with $\lambda\le1$ should trigger
+a fidelity check or a larger target before their predicted benefit is trusted.
+
+\begin{table}[t]
+\caption{Fidelity transition on \textsc{Census}: real q-error / oracle q-error
+($\rho$) vs.\ expected sample count $\lambda$ for a rare driver combination
+(true cardinality $13$ / $2.46$M rows).}
+\label{tab:fidelity-lambda}
+\small
+\begin{tabular}{cccc}
+\toprule
+$\lambda$ & $L$ & real qerr & $\rho$\\
+\midrule
+0.16 & 30---100 & 117---242 & 109---224\\
+0.32 & 200       & 24          & 22\\
+0.63 & 400       & 22          & 20\\
+1.27 & 800       & 11          & 10\\
+2.54 & 1600      & 2.8         & 2.6\\
+5.08 & 3200      & 1.2         & 1.1\\
+10.2 & 6400      & 1.08        & 1.0\\
+15.9 & 10000     & 1.08        & 1.0\\
+\bottomrule
+\end{tabular}
+
+{\footnotesize $\lambda=p_{\mathrm{comb}}\cdot\mathrm{sample\_rows}(L)$;
+$\rho=1$ means the real deployment matches the Catalog-Mask oracle exactly.}
+\end{table}
+
 We emphasize that this sampling-driven fidelity gap is conceptually separate from planner interference investigated in Section~\ref{sec:end2end}.
 Planner interference originates from multiple co-existing overlapping statistics, while sampling fidelity concerns how well a single statistic is populated during \texttt{ANALYZE}.
 
