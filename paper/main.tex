@@ -1328,10 +1328,6 @@ However, PostgreSQL's \texttt{ANALYZE} sampling cost is governed by the \textbf{
 Consequently, two statistic configurations with nearly identical total storage footprint can exhibit drastically different \texttt{ANALYZE} execution time.
 This creates a fundamental mismatch between our optimization objective and real-world maintenance cost.
 
-% TO-BE-SUPPLEMENTED: Quantify this mismatch across multiple budget points.
-% For MILP solutions produced under different storage budgets, record the resulting maximum statistics target and measured ANALYZE runtime.
-% Report the range of maintenance-cost variation under identical storage budget; characterize workload conditions where storage serves as a reasonable proxy and where it becomes misleading.
-
 {We quantify this mismatch directly on \textsc{Census}. For each storage budget, we
 re-solve the MILP under a capping constraint that forbids deploying any statistic
 above a maximum statistics target (L10000 vs.\ L1000 vs.\ L100), emulating a DBA who
@@ -1411,10 +1407,6 @@ All measurements from Catalog-Mask represent a large-sample oracle upper-bound: 
 In real deployment, each multivariate statistic drives sampling according to its own per-object statistics-target setting.
 For combinations with low expected occurrence counts, real-world \texttt{ANALYZE} may fail to sample sufficient value tuples, leading to degraded q-error compared against oracle predictions.
 We use the expected sample count $\lambda$ as a heuristic warning indicator for such risky low-frequency combinations.
-
-% TO-BE-SUPPLEMENTED: Systematically evaluate fidelity degradation across real-world queries under varying target settings.
-% Report the fraction of real-world queries suffering notable fidelity gaps, and correlate gaps against the $\lambda$ heuristic.
-% Distinguish queries that remain robust under realistic sampling from those prone to oracle over-optimism.
 
 To quantify this degradation, we express the expected sample count as
 $\lambda=p_{\mathrm{comb}}\cdot\mathrm{sample\_rows}(L)$ and measure the
