@@ -1387,6 +1387,17 @@ the relation's maximum statistics target; storage is fixed across rows within a
 budget. $L_{\max}$ = maximum target of a deployed statistic.}
 \end{table}
 
+The same pattern reproduces on \textsc{stats-CEB-single}. At its 100\,KB budget the
+uncapped solution tops out at L10000 (estimated \texttt{ANALYZE} $\approx\!31$\,s),
+yet capping the maximum target to L1000 leaves both storage and geometric-mean
+q-error \textit{exactly unchanged} ($99{,}996$\,B; $1.0156$) while cutting the
+estimated \texttt{ANALYZE} rebuild to $\approx\!12$\,s --- a $2.7\times$ reduction
+in maintenance cost at zero statistical cost. At the two tighter budgets (10\,KB,
+40\,KB) the capped and uncapped solutions are byte- and value-identical (maximum-target
+delta of 0), confirming that a tight budget simply never has room to host a high-target
+statistic that matters. As on \textsc{Census}, the mismatch is confined to the
+generous-budget regime.
+
 Even with this mismatch, one-stat sufficiency still brings indirect practical benefits for maintenance: since each query only relies on at most one dominant statistic, the optimized solution tends to produce small statistic sets, which keeps the number of objects to refresh low.
 Nevertheless, storage-only optimization cannot directly minimize analysis overhead, motivating future maintenance-aware selection formulations.
 
