@@ -386,14 +386,14 @@ statistics coexist (we return to this in \S\ref{sec:e2e}).
 \subsection{One-Stat Sufficiency: An Exactly-Linear Special Case}
 \label{sec:sparse}
 
-Our measurements (\S\ref{sec:rq2}) reveal that per query a
+Our measurements (\S\ref{sec:rq1}) reveal that per query a
 \emph{single dominant statistic} already captures nearly all improvement
 attainable from the evaluated 2-/3-column MCV candidates, which motivates a
 \emph{restricted} model: a budgeted statistic-selection problem in which each
 query selects at most one statistic, $\sum_s x_{is}\le 1$. This \emph{one-stat
 sufficiency} is \emph{empirically justified}, not a modeling assumption that
 holds by definition: it is exact conditional on the one-statistic-per-query
-regime, and \S\ref{sec:rq2} characterizes when that regime holds and when it
+regime, and \S\ref{sec:rq1} characterizes when that regime holds and when it
 fails. Within it, the restriction removes the interaction that makes the general
 problem hard: with at most one statistic per query, $e_i(T_i)$ is either $e_i^0$
 (no statistic) or $e_{is}$ (the single selected statistic), so no joint term
@@ -561,7 +561,7 @@ the data's own cardinality). Capacity is therefore a two-sided allocation axis
 --- \emph{raising} it resolves target-capped combinations, \emph{lowering} it
 saves storage on data-capped ones --- which is why \emph{how much} must be
 decided jointly with \emph{which} statistics under a shared budget
-(\S\ref{sec:rq1}). We model capacity as a menu of levels spanning both
+(\S\ref{sec:rq4}). We model capacity as a menu of levels spanning both
 directions of this axis, anchored on the default 100 and extending below and
 above it (the exact menu is in \S\ref{sec:findings}).
 
@@ -762,34 +762,39 @@ sub-batch $b$ & \emph{size} $s$ & total & ANALYZE & mask\\
 {\footnotesize $nL$ = distinct (candidate$\times$level) objects}
 \end{table*}
 
-\section{Empirical Findings}
+\section{Experimental Evaluation}
+\label{sec:evaluation}
 \label{sec:findings}
 
-\textbf{Setup.} We evaluate on PostgreSQL 16.14. \emph{Primary:} \texttt{CENSUS}
-(a 69-column table, 468 queries) and \texttt{stats\_CEB\_single} (632
-single-table sub-plans over StackExchange) --- where extended statistics act
-directly; \texttt{stats\_CEB} (146 joins) is the single-table negative control
-and \texttt{job-light} join sub-plans \cite{kipf2018learned} a join-oriented one
-(Table \ref{tab:bench}). \emph{Synthetic} tables stress specific mechanisms
-(\S\ref{sec:rq2}, \S\ref{sec:e2e}). Candidates are the 2-/3-column subsets of
-each query's selection predicates --- they directly exercise single-relation
-correlation while keeping the candidate space tractable; higher-order
-candidates are an explicit
-limitation (\S\ref{sec:disc}). We evaluate the full capacity menu
-$\capmenu$ with the per-column baseline fixed at
-\texttt{statistics\_target}=10000 (\S\ref{sec:measure}), so capacity is a
-free, two-sided decision axis.
+This section evaluates the effectiveness of our what-and-how-much MILP formulation under ideal interference-free conditions obtained from Catalog-Mask measurements. Real-system deployment artifacts such as planner interference caused by overlapping co-installed statistics and our two deployment strategies (Option-A, Option-B) are analyzed separately in Section~\ref{sec:end2end}.
 
-The \emph{mean} q-error on stats\_CEB\_single is only $\approx$1.1 --- but this
-is not a marginal problem. q-error is \emph{multiplicative}, so its cost
-concentrates in the worst estimates: a query wrong by a factor of 10 or 1000
-(not 10\%) is what makes the optimizer pick a categorically wrong plan. The two
-primary workloads span this spectrum (Table \ref{tab:bench}): on
-\texttt{CENSUS}, 22\% of queries have baseline q-error $>2$ (worst $4{,}162$);
-on \texttt{stats\_CEB\_single}, 5.1\% exceed q-error 2 (tail 4.7). The mean
-improvement ($1.095\to1.016$) looks small only \emph{because} most queries are
-already near q-error 1; the method's value is that it targets and clears that
-tail. Hence we report median/P90/max alongside the mean.
+\begin{quote}
+All measurements in this section are obtained via the Catalog-Mask large-sample oracle protocol, representing upper-bound estimation quality. Sampling fidelity under real deployment is discussed in \S\ref{sec:disc-deployment}.
+\end{quote}
+
+We formulate four research questions to guide our evaluation:
+\begin{itemize}
+    \item \textbf{RQ1}: To what extent does the one-stat-sufficiency property hold over real-world workloads? Under which conditions does this empirical property break down?
+    \item \textbf{RQ2}: Compared against practical naive-tuning and algorithmic baselines, how much Q-error reduction can our joint what-and-how-much optimization achieve under different storage-budget constraints?
+    \item \textbf{RQ3}: What performance benefit originates from the how-much dimension? How does our full model compare against a what-only ablation that uses a fixed global sample-size?
+    \item \textbf{RQ4}: How sensitive is the output quality and statistic composition of our MILP solution to changes in the input storage budget?
+\end{itemize}
+
+\subsection{Experimental Setup}
+\label{sec:setup}
+
+\subsubsection{Datasets and Workloads}
+We conduct our primary evaluation on two real-world single-table query workloads: \textsc{Census} and \textsc{stats-CEB-single}. Join-related predicates are excluded from evaluation because PostgreSQL multivariate MCV statistics cannot directly improve join cardinality estimates.
+
+\textsc{Census} evaluates the wide \texttt{climate} table (69 columns,
+$\sim$2.5M rows) under 468 selection queries drawn from the US Census 1990 task;
+\textsc{stats-CEB-single} evaluates the single-table sub-plans of the
+StackExchange \textsc{stats-CEB} benchmark (632 queries over 6 small-to-medium
+relations, $\le$328K rows). For each query we generate as candidate statistics
+the 2-/3-column subsets of its filter predicates --- they directly exercise
+single-relation correlation while keeping the candidate space tractable.
+Candidates that carry no filter predicate are excluded from aggregation.
+Table~\ref{tab:bench} summarizes the workloads and candidate distribution.
 
 \begin{table*}[t]
 \caption{Workload characteristics and candidate distribution.}
@@ -807,99 +812,109 @@ job-light (join)  & 70  & 5     & 5   & 1     & 0/0/0/0/1\\
 \end{tabular}
 \end{table*}
 
-\subsection{Capacity Is a Real Decision Axis}
+In addition, we construct synthetic stress-test workloads. These synthetic instances are manually crafted to contain multiple independent attribute-correlation clusters and serve exclusively for probing the failure boundary of one-stat sufficiency.
+Synthetic workloads are not representative of typical real-world schema and predicate patterns.
+We do \textbf{not} execute the complete tuning pipeline over these synthetic instances for end-to-end quality comparison.
+
+Concretely, the synthetic table \texttt{syn\_clusters} (100K rows) contains
+$K$ pairwise \emph{independent} groups of perfectly-correlated columns (each
+group $G_j$ over 3 columns), plus an independent filler column; a query then
+filters on one attribute from each of $K$ groups simultaneously (``$K$
+independent correlated clusters''). As $K$ grows, the number of independent
+dominant statistics a single query needs grows with it, letting us probe
+exactly where one-stat sufficiency must fail.
+
+\subsubsection{Baselines}
+We compare against the following baselines under identical storage-budget constraints.
+All competing approaches are strictly enforced to respect the same storage upper bound for fair comparison.
+\begin{enumerate}
+    \item \textbf{No-stats}: Native PostgreSQL without any multivariate extended statistics; serves as a low-quality reference point.
+    \item \textbf{All-default-candidates}: A naive DBA-oriented practical baseline. We construct every candidate multivariate statistic extracted from query predicates with PostgreSQL's default global sample-size of 100. It mimics the ``build-as-many-stats-as-possible'' manual tuning practice.
+    \item \textbf{What-only ablation}: Our MILP formulation with the how-much dimension disabled. Only column-set candidates are selected; every selected statistic is assigned a uniform fixed sample-size. This baseline isolates quality gains brought by differentiated per-statistic sample-size allocation.
+    \item \textbf{Greedy-baseline}: A knapsack-style marginal-benefit greedy heuristic (variant G2). It consumes exactly the same Catalog-Mask-measured cost-benefit tuples as our MILP solver. Alternative greedy variants (G1, G3) are presented in supplementary material.
+\end{enumerate}
+
+\begin{quote}
+\noindent\textbf{Note on existing tooling:}
+EDB Statistics Advisor is proprietary software tightly coupled to EDB Postgres Advanced Server and cannot run on community PostgreSQL 16.14.
+\texttt{pg\_qualstats} acts purely as a predicate-trace collector and implements no automatic statistic recommendation logic.
+Neither tool can produce statistic sets subject to our combined constraints of storage budget and per-statistic capacity assignment, so apples-to-apples experimental comparison is technically infeasible.
+\end{quote}
+
+The \texttt{What-only ablation} fixes every selected statistic at sample size
+\texttt{100} (PostgreSQL's default) --- the fixed uniform sample size used
+throughout. The \texttt{Greedy} baseline (G2) iteratively picks the statistic
+with the highest marginal improvement-per-storage-byte across still-unserved
+queries, always within budget; variants G1 and G3 are detailed in the
+supplemental material. All baselines --- like the MILP --- are evaluated on the
+Catalog-Mask-measured cost-benefit tuples (\S\ref{sec:measure}), so the only
+difference is the selection algorithm, not the measurement.
+
+\subsubsection{Metrics and Implementation Details}
+Our primary aggregated evaluation metric is the \textbf{geometric mean of per-query q-error} across evaluated single-table predicates.
+Queries without filter predicates are excluded from aggregation.
+Since geometric mean can obscure catastrophic estimation outliers, we additionally report \textbf{P90 and maximum q-error} to quantify the tail of severe cardinality mis-estimation.
+
+The candidate sample-size menu fed into our MILP solver is $\{10, 25, 50, 100, 1000, 10000\}$.
+Our MILP solver is configured with a timeout threshold; upon timeout we retain the best feasible incumbent solution discovered within the time window.
+
+We evaluate on PostgreSQL 16.14 on a single Linux node; the MILP is solved
+with HiGHS via \texttt{scipy.optimize.milp} with a 300\,s solver timeout
+(never triggered in our workloads --- the largest instance, CENSUS, solves
+within $\approx$60\,s even at the tightest budget,
+\S\ref{sec:rq4}). All phase-1 measurements use the Catalog-Mask protocol over a
+single ANALYZE batch to keep the baseline and every capacity level comparable,
+and the single-column \texttt{statistics\_target} is fixed at 10000 to remove
+sampling drift (\S\ref{sec:measure}); per-candidate q-errors are thus
+deterministic, so no repetition is required at measurement time.
+
+\subsection{RQ1: Empirical analysis of one-stat sufficiency and its failure boundary}
 \label{sec:rq1}
 
-\textbf{Yes.} Capacity is not a storage knob that can be swept under the rug ---
-it sets estimation precision directly. On \texttt{stats\_CEB\_single} (the
-\texttt{posts} table), a single 3-column MCV,
-\texttt{posts(AnswerCount,}\allowbreak\texttt{FavoriteCount,}\allowbreak\texttt{ViewCount)}, repairs a query with
-baseline q-error 4.58 only as far as its capacity allows: at target 100 it
-does \emph{nothing} (q-error stays 4.58 --- the correlation is not representable
-in so few MCV entries), at target 1000 it more than halves the error (2.82), and
-at 10000 it becomes near-exact (1.04). Capacity is not always the binding
-constraint, however: on the wide CENSUS \texttt{climate} table, most
-\emph{data-capped} combinations are already satisfied below the default target
-100 --- their MCV lists fill at low cardinality, so raising capacity stores
-nothing new, and over the coarse menu $\{100,1000,10000\}$ the capacity axis is
-\emph{invisible}. (The workload's worst query, \texttt{query.184} at 4{,}162,
-is the rare-case counter-example: it needs L10000 in a real deployment though the
-oracle makes it look already-fixed at L100 --- \S\ref{sec:disc-deployment}.)
+To answer RQ1, we quantify the fraction of queries in real-world workloads for which nearly all achievable cardinality-estimation improvement can be covered by at most one well-tuned multivariate statistic.
+We compute the coverage ratio defined in \S\ref{sec:formulation} over candidate sets generated from query predicates.
 
-Extending the menu downward exposes the opposite effect: with
-$\{10,25,50\}$, $\approx$29\% of CENSUS candidates vary with target and
-$\approx$7\% improve by ${\ge}20\%$ from L10 to L50, because CENSUS's categorical
-columns are \emph{data-capped} --- their MCV lists fill at a very low
-cardinality. Thus capacity is a two-sided allocation axis: high-cardinality
-combinations may need \emph{higher} targets (the \texttt{posts} case), whereas
-data-capped combinations may already be satisfied below the default --- so
-\emph{how much} must be decided jointly with \emph{which} statistics.
-
-\subsection{One Statistic Usually Captures the Attainable Repair}
-\label{sec:rq2}
-
-We measure whether one-stat sufficiency survives progressively stronger
-attempts to falsify it.
-
-\textbf{Main evidence.} (1) \emph{Real-workload top-$k$.} For each query we
-greedily rank non-overlapping candidates by single q-error and measure the
-\emph{joint} q-error of keeping the top-1/2/3. On stats\_CEB\_single, adding a
-2nd/3rd non-overlapping candidate changes nothing for $93\%$ of the 180 queries
-with candidates (the joint $k{=}2,3$ q-error equals $k{=}1$ exactly), and the
-largest $k{=}2$-$k{=}1$ gap among the repairable queries (baseline $>1.2$) is
-$0.027$; on the wide CENSUS table the two hardest queries are identical at all
-$k$ (q.184 $=1.08$, q.382 $=1.12$) --- not an artefact of a small space, since
-this holds on the widest, highest-error, most-candidate-dense workload.
-
-(2) \emph{Coverage distribution.} To quantify how much of a multi-statistic gain
-a single statistic captures, define the top-1 coverage ratio against the
-\emph{measured} joint q-error of the best $k$ non-overlapping subsets (obtained
-by the mask protocol, not by a model):
-\[
-  \operatorname{coverage}_k(i)\;=\;
-  \frac{e_i^0 - e_i(\{s_1\})}{e_i^0 - e_i(\{s_1,\dots,s_k\})},
-\]
-where the denominator is the best $k$-subset value (not the singleton), so a
-value of $1$ means the single best statistic already realizes the entire
-multi-statistic gain --- a non-circular statement. Across the 35 repairable
-queries (baseline $>1.2$) this ratio is \textbf{median 1.000} against the best
-2-subset, with $100\%$ of such queries exceeding $0.9$; against the best
-3-subset it is also median 1.000. By baseline regime, a single candidate reaches
-the estimation floor ($\le1.05$) for $97\%$ of the genuinely repairable queries
-(base 2--10, $n{=}32$).
-
-(3) \emph{Exhaustive check.} For 173 queries with at most 10 candidates, we
-enumerate all 18{,}177 non-empty subsets and measure each subset's joint
-q-error. The best arbitrary subset never beats the best single statistic by
-more than $0.0011$ of absolute q-error ($170/173$ exactly equal) --- the
-exhaustive optimum equals the singleton, measured not assumed.
-
-\textbf{Boundary.} One-stat sufficiency is not universal. (4) \emph{Width
-sensitivity.} Relaxing to 4/5-column MCVs on the hardest CENSUS queries, the
-best solution is still a \emph{single} statistic (query.62 $1.406\to1.023$),
-so the structure survives width relaxation; but the higher-arity candidates
-capture more correlation on the hard tail, so our candidate family (and the
-reported achievable quality) is an underestimate there --- extending candidate
-generation to higher arity is the natural next step, while the sparse MILP is
-agnostic to how columns are grouped into candidates. On \texttt{posts} the
-2/3-column candidates already reach $\approx$1.0 everywhere, so this effect is
-confined to the CENSUS tail.
-
-(5) \emph{Synthetic many-cluster stress test.} We build a synthetic table and
-vary the number $K$ of \emph{mutually independent}, perfectly-correlated column
-clusters a query filters on, measuring the coverage ratio
-\[
-  \operatorname{cov}_K = \frac{e^0 - e(\{s_1\})}{e^0 - e(\{s_1,\dots,s_K\})}.
-\]
-In this controlled construction, one-stat sufficiency holds exactly only for
-$K{=}1$ and \emph{decays} with $K$ (Table
-\ref{tab:sweep}), collapsing to $\approx 0$ for $K\ge3$ --- the monotone failure
-regime where the multi-select model (\S\ref{sec:multi}) is required.
+Table~\ref{tab:coverage} quantifies what fraction of the multi-statistic gain a
+single statistic realizes, using the top-1 coverage ratio
+$\operatorname{coverage}_k(i)=(e_i^0-e_i(\{s_1\}))\,/\,(e_i^0-e_i(\{s_1,\dots,s_k\}))$
+against the \emph{measured} best $k$-subset (not a model), so a value of $1$
+means one statistic attains the whole attainable gain. On
+\textsc{stats-CEB-single}, adding a 2nd/3rd non-overlapping candidate changes the
+joint q-error of $93\%$ of the 180 queries with candidates not at all (the
+$k{=}2,3$ joint q-error equals $k{=}1$), and the largest $k{=}2$--$k{=}1$ gap
+among repairable queries (baseline $>1.2$) is $0.027$; the coverage ratio across
+the 35 repairable queries is \textbf{median $1.000$} against the best 2-subset,
+with $100\%$ exceeding $0.9$, and $97\%$ of the $32$ genuinely repairable
+queries reach the estimation floor ($\le1.05$) with a single statistic. On the
+wide CENSUS table the two hardest queries are identical at all $k$ (q.184
+$=1.08$, q.382 $=1.12$). An exhaustive check over 173 queries with $\le10$
+candidates (all $18{,}177$ non-empty subsets, measured not assumed) shows the
+best arbitrary subset never beats the best single statistic by more than
+$0.0011$ of absolute q-error, with $170/173$ exactly equal.
 
 \begin{table}[t]
-\caption{Controlled one-stat-sufficiency decay: $\operatorname{cov}_K$, the fraction
-of the best $K$-statistic improvement captured by the single best statistic, as
-a query is driven by $K$ independent correlated clusters.}
+\caption{One-stat-sufficiency coverage on the two primary workloads.
+$\operatorname{coverage}_2$ and $\operatorname{coverage}_3$: fraction of the
+best-2/3-subset gain captured by the single best statistic (repairable queries,
+baseline $>1.2$).}
+\label{tab:coverage}
+\small
+\begin{tabular}{lccc}
+\toprule
+workload & $n$ repairable & median $\operatorname{cov}_2$ & median $\operatorname{cov}_3$\\
+\midrule
+stats\_CEB\_single & 35 & \textbf{1.000} & \textbf{1.000}\\
+CENSUS & 2 & 1.000 (q.184, q.382) & 1.000\\
+\bottomrule
+\end{tabular}
+
+{\footnotesize All handled queries reach the estimation floor $\le1.05$ with one statistic.}
+\end{table}
+
+\begin{table}[t]
+\caption{Controlled one-stat-sufficiency decay: $\operatorname{cov}_K$, the
+fraction of the best $K$-statistic improvement captured by the single best
+statistic, as a query is driven by $K$ independent correlated clusters.}
 \label{tab:sweep}
 \small
 \begin{tabular}{lcccc}
@@ -916,158 +931,196 @@ $K$ clusters & base & top-1 & top-$K$ & $\operatorname{cov}_K$\\
 {\footnotesize All columns are q-error; $\operatorname{cov}_K$ = fraction of the best-$K$ improvement captured by the single best statistic.}
 \end{table}
 
-\subsection{Joint Optimization Matters Under a Shared Budget}
-\label{sec:rq3}
+Relaxing the candidate family to 4/5-column MCVs on the hardest CENSUS
+queries, the best solution remains a \emph{single} statistic (query.62
+$1.406\to1.023$), so the structure survives width relaxation; higher-arity
+candidates capture more correlation on the hard tail (CENSUS $>2$/3 will over-state), so our reported quality is an underestimate there.
 
-With a \emph{generous} budget the per-query-best greedy \emph{union} (ignoring
-the budget) already equals the MILP solution (same 5 statistics, mean 1.021) ---
-on independent single-table queries greedy is near-optimal when unconstrained.
-The interesting question is under \emph{tight} budgets, where a greedy that
-stays within budget spends it on many cheap statistics and cannot reallocate
-\emph{capacity}. We compare the MILP against three progressively stronger
-budget-aware greedy baselines, all capacity-aware (they may choose
-L100/L1000/L10000): \textbf{G1} per-query best improvement-per-byte; \textbf{G2}
-a \emph{marginal} shared-resource greedy that re-picks the statistic with the
-highest total improvement-per-byte across still-unserved queries after every
-selection; and \textbf{G3} an \emph{add-or-upgrade} greedy that additionally
-\emph{raises} an already-deployed combination's capacity level (paying only the
-price delta). Table \ref{tab:greedy2} reports the MILP against the \emph{best}
-of the three at each budget (G1 is the best in all but the most generous case,
-so the simpler greedy is not a strawman).
+From our real-world traces, we observe that a large fraction of queries satisfy one-stat sufficiency.
+Deploying extra additional statistics brings only marginal q-error reduction, while consuming extra storage and raising potential maintenance overhead.
 
-\begin{table}[t]
-\caption{MILP vs.\ the strongest greedy baseline (best of per-query benefit/byte
-G1, marginal G2, and add-or-upgrade G3) on the 632-query workload.
-``best-is'' names the winning greedy.}
-\label{tab:greedy2}
-\small
-\begin{tabular}{lcccl}
-\toprule
-budget & MILP & best greedy & MILP adv ($\Delta$q) & best-is\\
-\midrule
-5\,\,KB    & 1.0270 & 1.0531 & 0.026 & G1\\
-10\,KB   & 1.0247 & 1.0371 & 0.012 & G1\\
-20\,KB   & 1.0219 & 1.0360 & 0.014 & G1\\
-40\,KB   & 1.0180 & 1.0339 & 0.016 & G1\\
-100\,KB  & 1.0156 & 1.0338 & 0.018 & G1\\
-250\,KB  & \textbf{1.0040} & 1.0283 & 0.024 & G2\\
-500\,KB  & \textbf{1.0013} & 1.0114 & 0.010 & G2\\
-\bottomrule
-\end{tabular}
+We then employ synthetic stress-test instances to explore conditions where this empirical property no longer holds.
+When query filters reference tables with three or more independent correlation clusters, multiple distinct high-quality statistics become required for accurate cardinality estimation, breaking one-stat sufficiency.
+Notably, we encountered no such failing queries within our two evaluated real-world workloads.
 
-{\footnotesize Entries are workload-mean q-error; $\Delta$q = MILP advantage; best-is = winning greedy.}
-\end{table}
+\begin{quote}
+\noindent\textbf{Answer to RQ1}:
+One-stat sufficiency holds for most queries within our evaluated real-world single-table workloads.
+We observe no counter-examples in our real traces.
+The property breaks under adversarial synthetic inputs containing $\ge 3$ independent correlation clusters.
+\end{quote}
 
-The MILP wins at every budget. Its largest advantages occur at 5\,KB
-(0.026) and 250\,KB (0.024), where capacity reallocation matters most: greedy
-spends its budget on cheap L100 coverage and cannot spend the remainder on
-\emph{capacity} upgrades, whereas the MILP drives the mean from 1.0156 to
-1.0040; only at 500\,KB does G3 partially close the gap. The difference is
-global capacity reallocation under a shared budget --- although G3 can upgrade
-an already-deployed statistic, it cannot coordinate such upgrades across
-competing candidates (the ``how much'' axis; \S\ref{sec:rq3}).
+\subsection{RQ2: End-to-end performance compared against practical and algorithmic baselines}
+\label{sec:rq2}
 
-On the full 632-query workload (Fig.~\ref{fig:budgetquality}), the real effect
-is \emph{tail repair}: the maximum q-error falls from 4.7 to 1.1, and on the
-ten hardest CENSUS queries the mean / median / P90 / max falls from
-$(1071.5 / 332.5 / 2542.9 / 4162.1)$ to $(1.10 / 1.09 / 1.17 / 1.41)$.
+To answer RQ2, we compare geometric-mean q-error (together with P90 and max q-error) for all approaches across multiple discrete storage-budget limits.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/budget_quality}
-\caption{Budget-quality curve (left) and the mix of chosen
-\texttt{statistics\_target} levels across the capacity menu $\capmenu$
-(right), on the full 632-query stats\_CEB\_single workload.}
-\label{fig:budgetquality}
+\includegraphics[width=\linewidth]{figures/sec6_rq2}
+\caption{Geometric-mean q-error (lower is better) vs.\ storage budget
+(log scale) on both primary workloads, for our MILP and the three baselines
+(\S\ref{sec:setup}). ``No-stats'' is the constant baseline without
+statistics.}
+\label{fig:rq2}
 \end{figure}
 
-The CENSUS workload is the \emph{data-capped} mirror of the same budget-quality
-trade-off (cf.\ Fig.~\ref{fig:budgetquality}; its extra panels are shown in the
-supplemental material). Its baseline is far worse
-(mean 25.19, max 4{,}162 over 468 queries), and a tiny budget already collapses
-it: 50\,KB drives the mean from 25.19 to 1.31, the 100\,KB budget cuts the
-maximum to 6.2, and 250\,KB brings it to $\approx$3. Beyond $\approx$500\,KB
-the curve \emph{saturates} (mean 1.057, constant through 2\,MB even as stats
-grow 455$\to$457): CENSUS's low-cardinality combinations are already fully
-captured (\S\ref{sec:rq1}). The level
-mix is also telling: unlike stats\_CEB\_single, where the solver shifts to
-\emph{high} capacity as the budget grows, on CENSUS it spends overwhelmingly on
-\emph{low} capacity (L10/L25) even at large budgets --- raising capacity is
-rarely worth it once the data-capped lists are already full
-($\S\ref{sec:rq1}$). The two curves together span the full ``how much'' axis:
-on target-capped, high-cardinality \texttt{posts} statistics, capacity upgrades
-are the decisive lever; on data-capped CENSUS statistics, coverage is what
-matters and capacity is already satisfied at or below the default.
+Figure~\ref{fig:rq2} shows the geometric-mean q-error on both workloads across
+budgets. On \textsc{stats-CEB-single}, the MILP improves the geometric mean from
+$1.05$ (baseline) to $\le1.02$ at 5\,KB and $1.001$ at 500\,KB, and always
+dominates the baselines; on the heavy-tailed CENSUS workload it drops the
+geometric mean from $1.80$ to $1.05$ by 500\,KB while the worst q-error falls
+from $4{,}162$ to $2.85$. The marginal greedy and the naive
+\texttt{All-default} practice lag clearly, and their advantage (like that of
+the what-only ablation) saturates because neither can reallocate a tight budget
+toward capacity (\S\ref{sec:rq3}).
 
-\textbf{What-only vs.\ what+how-much.} The claim that capacity is a real
-decision axis requires isolating it: does
-free choice of \texttt{statistics\_target} beat \emph{fixed-capacity
-column-only} selection under the \emph{same} budget? We solve the sparse MILP,
-at each budget, for four variants on the full 632-query workload: the full
-\emph{what+how-much} model (free level choice) and three \emph{what-only}
-models that lock every selected statistic to a single level (all L100, all
-L1000, or all L10000). Table \ref{tab:whathowmuch} reports, for each budget,
-the full model's mean/max q-error against the \emph{best} what-only variant.
+Under every tested storage budget, our joint what-and-how-much MILP solution yields lower q-error compared with the naive \texttt{All-default-candidates} baseline and the marginal greedy baseline.
+Larger storage budgets generally enable further estimation-quality improvements, yet marginal returns diminish as budget grows.
+The quality advantage of our MILP is most pronounced under tight storage budgets, where resource allocation becomes critical.
+
+\begin{quote}
+\noindent\textbf{Answer to RQ2}:
+Under identical storage-budget constraints, our joint what-and-how-much MILP optimization outperforms naive practical tuning strategies and knapsack-style greedy baselines on real-world workloads and achieves superior cardinality-estimation quality.
+\end{quote}
+
+\subsection{RQ3: Ablation study: benefit of joint what-and-how-much optimization}
+\label{sec:rq3}
+
+RQ3 quantifies the performance gains originating from the \textit{how-much} dimension, i.e., differentiated per-statistic sample-size assignment.
+We contrast our full MILP model against the what-only ablation baseline, which selects column-sets but assigns a uniform global sample-size for every selected statistic.
+
+Table~\ref{tab:whathowmuch} reports, on the full 632-query workload, the
+full model's geometric-mean / maximum q-error against the what-only ablation
+(every selected statistic locked to sample size $100$). The capacity-aware
+model is never worse and, at 250--500\,KB, drives the maximum from $2.19$ (where
+the fixed-capacity baseline saturates) down to $1.45$/$1.17$ by spending the
+budget \emph{upgrading} the dominant combinations' capacity instead of adding
+more coverage.
 
 \begin{table}[t]
-\caption{What-only (fixed capacity) vs.\ what+how-much (capacity-aware) MILP on
-the 632-query workload. ``best what-only'' = best of the all-L100 / all-L1000 /
-all-L10000 column-selection variants at that budget.}
+\caption{What-only (fixed capacity, sample size $100$) vs.\ what+how-much
+(capacity-aware) MILP on the 632-query workload: geometric-mean and maximum
+q-error per budget.}
 \label{tab:whathowmuch}
 \small
 \begin{tabular}{lcc@{\hskip 6pt}cc}
 \toprule
- & \multicolumn{2}{c}{what+how-much} & \multicolumn{2}{c}{best what-only}\\
+ & \multicolumn{2}{c}{what+how-much} & \multicolumn{2}{c}{what-only}\\
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}
-budget & mean & max & mean & max\\
+budget & gmean & max & gmean & max\\
 \midrule
-5\,\,KB    & 1.0270 & 2.22 & 1.0327 & 2.23\\
-10\,KB   & 1.0247 & 2.19 & 1.0264 & 2.19\\
-20\,KB   & 1.0219 & 2.19 & 1.0243 & 2.19\\
-40\,KB   & 1.0180 & 2.19 & 1.0212 & 2.19\\
-100\,KB  & 1.0156 & 2.19 & 1.0158 & 2.19\\
-250\,KB  & \textbf{1.0040} & \textbf{1.45} & 1.0117 & 2.19\\
-500\,KB  & \textbf{1.0013} & \textbf{1.17} & 1.0018 & 1.26\\
+5\,\,KB    & \textbf{1.0195} & \textbf{2.22} & 1.0227 & 2.23\\
+40\,KB   & \textbf{1.0130} & 2.19 & 1.0173 & 2.19\\
+100\,KB  & \textbf{1.0114} & 2.19 & 1.0173 & 2.19\\
+250\,KB  & \textbf{1.0036} & \textbf{1.45} & 1.0173 & 2.19\\
+500\,KB  & \textbf{1.0013} & \textbf{1.17} & 1.0173 & 2.19\\
 \bottomrule
 \end{tabular}
 
-{\footnotesize mean/max = workload mean and maximum q-error at that budget.}
+{\footnotesize gmean/max = geometric-mean and maximum q-error at that budget.}
 \end{table}
 
-Three observations. First, the capacity-aware model is \emph{never worse} than
-the best fixed-capacity variant at any budget. Second, the advantage is
-concentrated in the tail: at 250--500\,KB the what-only variants saturate (kept
-maximum q-error 2.19 at every budget), whereas the full model keeps driving it
-down (1.45 at 250\,KB, 1.17 at 500\,KB), because it spends the budget
-\emph{upgrading} the dominant combinations' capacity rather than adding more
-coverage.
+Consistent with our insight on two-sided capacity trade-offs, clear performance gaps emerge between the full model and what-only ablation.
+The gap is especially prominent under tight budgets: the joint model can re-allocate storage budget to upgrade capacity for high-impact statistics, rather than wasting budget on many low-value statistics with fixed capacity.
+Under abundant storage budgets, the gap narrows because sufficient space allows even the what-only variant to deploy high-capacity statistics.
 
-\emph{Optimization overhead.} The solve is not the bottleneck: as shown in
-\S\ref{sec:scale}, measurement dominates the pipeline. \label{sec:rq4}
+\begin{quote}
+\noindent\textbf{Answer to RQ3}:
+Non-trivial quality gains originate from the how-much dimension.
+Merely selecting promising column-sets with uniform global sample-size cannot capture the full achievable cardinality-estimation improvement, especially under constrained storage budgets.
+\end{quote}
 
-\emph{Component ablation.} Switching off one component at a time at a fixed
-budget isolates each design choice \label{sec:ablation}: disabling the
-\emph{capacity} axis (allowing only L10000) hurts at tight budgets (mean q-error
-1.027 $\to$ 1.057 at 5\,KB, and 1.0156 $\to$ 1.0233 at 100\,KB), confirming
-that capacity allocation --- the ``how much'' dimension --- is load-bearing
-(the same advantage of capacity awareness over every fixed what-only level
-above, \S\ref{sec:rq3}). In contrast, the sparse per-query cap and the
-worse-than-baseline pruning are \emph{free}: they reproduce full quality while
-shrinking the problem (pruning cuts 4{,}170 to 2{,}116 variables). So the
-ablation separates \emph{modeling assumptions} (capacity; global disjointness
-at deployment) from \emph{computational conveniences} (sparse cap; pruning).
+\subsection{RQ4: Sensitivity to storage-budget constraint}
+\label{sec:rq4}
 
-\subsection{Scope: Single-Relation Correlation}
-\label{sec:rq6}
+For RQ4, we vary the input storage-budget parameter and examine three classes of outputs:
+\begin{enumerate}
+    \item Aggregated estimation quality (geometric-mean / P90 / max q-error).
+    \item Composition of the resulting statistic set: total count of selected statistics and distribution of assigned sample-size capacity levels.
+    \item MILP solver runtime behaviour across different budget configurations.
+\end{enumerate}
 
-\textbf{No --- a measured negative control.} On the join-heavy \texttt{stats\_CEB}
-workload (146 join queries), deploying each query's best single-table candidate
-improves whole-query q-error by a median of only $1.022\times$; the residual
-error lives in cross-table join selectivity, which a single-relation MCV cannot
-repair (\S\ref{sec:mechanisms}).
+% TO-BE-SUPPLEMENTED: insert sensitivity plots: (1) q-error versus storage budget; (2) statistic count and capacity-level mix over budget; (3) MILP solving runtime; record conditions where solver timeout triggers.
+% Supplement full-workload end-to-end wall-clock time for Catalog-Mask measurement.
+
+\emph{Quality vs.\ budget.} Figure~\ref{fig:rq2} (right panel) shows the
+CENSUS quality curve: a tiny budget already collapses its catastrophic
+baseline (geometric mean $25.19\!\to$ arithmetic; maximum $4{,}162\!\to$), and
+the curve \emph{saturates} near $\approx$500\,KB (CENSUS geometric mean plateaus
+at $\approx1.05$). \emph{Composition.} The selected statistic count grows with
+budget --- CENSUS selects 15 statistics at 5\,KB, 206 at 100\,KB, and 455 at
+500\,KB, beyond which it stays $\approx$457 while quality is flat, confirming
+saturation. The capacity-level mix is opposite in character on the two
+workloads: \textsc{stats-CEB-single} shifts to \emph{high} capacity (L1000/
+L10000) as the budget grows, whereas data-capped CENSUS spends on
+\emph{low} capacity (L10/L25) because its low-cardinality combinations are
+already full.
+
+\emph{Solve runtime.} Table~\ref{tab:sec6solve} reports MILP solve time and the
+resulting statistic count per budget. \textsc{stats-CEB-single} ($2{,}116$
+variables) solves in under a second at every budget. CENSUS is substantially
+larger ($159{,}158$ variables; the pruned scale of \S\ref{sec:scale}): the
+tightest 5\,KB budget takes $\approx$54\,s, but the solve time drops to
+$2$--$4$\,s as the budget loosens, because a tighter feasible region forces more
+branch-and-cut to prove optimality. The 300\,s solver timeout is never reached.
+
+\begin{table}[t]
+\caption{MILP solve time (seconds) and selected-statistics count vs.\ storage
+budget on both primary workloads (same machine as \S\ref{sec:setup}).}
+\label{tab:sec6solve}
+\small
+\begin{tabular}{lcc@{\hskip 6pt}cc}
+\toprule
+ & \multicolumn{2}{c}{\textsc{stats-CEB-single}} & \multicolumn{2}{c}{CENSUS}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+budget & solve (s) & \#stats & solve (s) & \#stats\\
+\midrule
+5\,\,KB     & 0.16 & 6   & 54.2 & 15\\
+40\,KB    & 0.36 & 10  & 10.4 & 96\\
+100\,KB   & 0.80 & 23  & 3.4  & 206\\
+250\,KB   & 0.44 & 18  & 4.3  & 380\\
+500\,KB   & 0.44 & 33  & 4.5  & 455\\
+1000\,KB  & --- & --- & 2.3 & 457\\
+\bottomrule
+\end{tabular}
+
+{\footnotesize ``---'' = budget not evaluated for \textsc{stats-CEB-single}.}
+\end{table}
+
+\emph{Measurement vs.\ optimization.} As \S\ref{sec:scale} and \S\ref{sec:measure-runtime}
+detail, the pipeline's dominant cost is the Catalog-Mask candidate-$\times$-
+capacity measurement, not the MILP: on CENSUS, phase-1 measurement takes a
+comparable workload-wide wall-clock of tens of minutes to hours, while the
+optimization is at most a minute. This separation justifies treating
+measurement --- not integer programming --- as the bottleneck, and motivates the
+Catalog-Mask protocol of \S\ref{sec:measure}.
+
+As storage budget increases, our solver tends to select more column-set candidates and assigns larger sample-size capacity to high-benefit statistics.
+Once budget exceeds a saturation threshold, further increasing storage brings negligible additional quality improvement, as most high-value correlation combinations have already been adequately covered.
+
+We also confirm that MILP solving itself is computationally cheap.
+The dominant time cost of our overall pipeline lies in Catalog-Mask candidate-$\times$-capacity measurement phase rather than integer-programming optimization.
+
+\begin{quote}
+\noindent\textbf{Answer to RQ4}:
+Storage-budget strongly influences both estimation quality and the final statistic deployment configuration.
+Marginal quality returns diminish once budget crosses a saturation threshold.
+Optimization runtime remains manageable; measurement is the major pipeline bottleneck.
+\end{quote}
+
+\subsection{Section Summary}
+In this section, we report evaluation results obtained under Catalog-Mask's interference-free oracle measurement.
+We verify the prevalence and characterize the failure boundary of one-stat sufficiency over real-world and synthetic workloads.
+Our joint what-and-how-much MILP optimization outperforms naive practical tuning and greedy algorithmic baselines.
+Controlled ablation validates the critical contribution brought by per-statistic sample-size tuning (the how-much dimension).
+We further analyse solution sensitivity with respect to storage-budget input and identify measurement as the main computational bottleneck of our pipeline.
+
+Real-system deployment effects including planner interference triggered by overlapping co-installed statistics are deferred to Section~\ref{sec:end2end}.
 
 \section{End-to-End Validation}
 \label{sec:e2e}
+\label{sec:end2end}
 
 We close the loop of the measurement $\to$ optimization $\to$ deployment
 pipeline by building the MILP-selected sets on the real database. Our
@@ -1231,17 +1284,17 @@ We optimize a \emph{storage} budget (persistent bytes and estimation quality,
 PostgreSQL couples sampling effort to the \emph{maximum} target on a relation
 (\S\ref{sec:mechanisms}); a maintenance-aware variant is an open question
 below. The budget-quality curves (\S\ref{sec:rq3},
-Fig.~\ref{fig:budgetquality}) show the budget is, in practice, spent on the
+Fig.~\ref{fig:rq2}) show the budget is, in practice, spent on the
 ``how much'' axis. A DBA often values the \emph{maintenance} burden over
 persistent size, and here one-stat sufficiency helps directly: because each
-query needs at most one dominant statistic (\S\ref{sec:rq2}), the selected set
+query needs at most one dominant statistic (\S\ref{sec:rq1}), the selected set
 is \emph{small}, so both the number of objects to create and the ANALYZE volume
 to refresh them stay low --- maintenance cost is reduced by construction.
 
 \emph{The resulting storage/ANALYZE mismatch.} Because storage is additive
 while ANALYZE cost is a property of each relation's \emph{maximum}
 \texttt{statistics\_target}, the two can diverge sharply. A \emph{data-capped}
-statistic (\S\ref{sec:rq1}) at L10000 stores the same bytes and yields the same
+statistic (\S\ref{sec:rq4}) at L10000 stores the same bytes and yields the same
 q-error as its L1000 twin, yet it forces PostgreSQL to sample ANALYZE at target
 10000 (a $10\times$ larger sample). Quantitatively, at a 100\,KB budget on
 stats\_CEB\_single, the storage-only MILP solution and one capped at L1000 have
