@@ -499,11 +499,16 @@ $(\text{table},\text{cols},\text{level})$ rather than the per-query sum. On the
 full 468-query CENSUS workload the resulting problem is large but trivially
 solvable: the worst-case (no pruning) instance over the full six-level menu
 $\capmenu$ has 115{,}470 physical
-statistics, 185{,}136 options and 300{,}606 binary variables and is solved
-optimally by HiGHS in $\approx$4.0s; with pruning it shrinks to 69{,}431
-statistics / 89{,}727 options / 159{,}158 variables ($\approx$2.8s). Thus the
-optimization is not the bottleneck at full-workload scale --- the phase-1
-\emph{measurement} is (\S\ref{sec:measure}).
+statistics, 185{,}136 options and 300{,}606 binary variables; with pruning it
+shrinks to 69{,}431 statistics / 89{,}727 options / 159{,}158 variables. The
+solve time is \emph{budget-dependent}: a tighter budget leaves a narrower
+feasible region and forces more branch-and-cut to prove optimality, so the
+pruned CENSUS instance solves in $\approx$54\,s at 5\,KB but in only $2$--$4$\,s
+at $\ge$100\,KB, and \textsc{stats-CEB-single} solves in under a second at
+every budget (Table~\ref{tab:sec6solve}). Even the worst observed case weighs
+negligibly against the phase-1 Catalog-Mask measurement cost
+(\S\ref{sec:measure}), so the optimization is never the pipeline bottleneck ---
+measurement is.
 
 \section{Measurement Infrastructure}
 \label{sec:measure}
